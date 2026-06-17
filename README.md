@@ -1,4 +1,4 @@
-# TRACE — GT7 Telemetry Analytics
+﻿# TRACE — GT7 Telemetry Analytics
 
 **Telemetry Racing Analytics & Comparative Engine**
 
@@ -30,6 +30,12 @@ Download this repo as a zip or clone it:
 ```
 git clone https://github.com/ransh2014/gt7telemtrace.git
 cd gt7telemtrace
+```
+
+Or, if GitHub's giving you trouble, grab the zip straight from the website as a fallback (Windows PowerShell):
+
+```
+iwr https://gt7trace.netlify.app/gt7telem.zip -OutFile gt7telem.zip
 ```
 
 ---
@@ -174,3 +180,4 @@ The GT7 UDP stream was reverse-engineered by [Bornhall](https://github.com/Bornh
 
 Core UDP protocol and Salsa20 decryption by **[Bornhall — gt7telemetry](https://github.com/Bornhall/gt7telemetry)**.
 Not affiliated with Polyphony Digital or Sony Interactive Entertainment.
+
