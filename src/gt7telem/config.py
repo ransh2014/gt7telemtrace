@@ -1,0 +1,78 @@
+"""
+runtime_config.py — replaces config.py for the standalone .exe builds.
+
+No manual editing needed. On first run it uses sensible defaults; whenever
+you change the PS4/PS5 IP in the app, it's saved to settings.json right
+next to the .exe (or script) so it's remembered next time.
+"""
+import sys
+import json
+from pathlib import Path
+
+__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS"]
+
+
+def _base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent
+
+
+_SETTINGS_FILE = _base_dir() / "settings.json"
+
+_DEFAULTS = {
+    "PS_IP": "192.168.1.1",
+    "LAPS_FOLDER": str(_base_dir() / "laps"),
+    # Recording sample rate in Hz for Record Lap / Record Race (see
+    # gt7telem.py's RECORD_RATE_OPTIONS). 10 is the safe default -- it's
+    # the one rate we know for certain the app can sustain end-to-end.
+    "SAMPLE_RATE": 10,
+    "KNOWN_IPS": [],   # IPs that have successfully connected before, most-recent-first
+    "DEBUG_LOG": False,  # show raw [DEBUG] state-change dumps in the log panel
+}
+
+MAX_KNOWN_IPS = 3
+
+
+def remember_good_ip(ip: str) -> list:
+    """Push `ip` to the front of the known-good IP list (dedup, capped at
+    MAX_KNOWN_IPS), persist it, and return the updated list. Only call this
+    once a connection has actually been confirmed -- not on every keystroke."""
+    ip = (ip or "").strip()
+    if not ip:
+        return load().get("KNOWN_IPS", [])
+    data  = load()
+    known = [x for x in data.get("KNOWN_IPS", []) if x != ip]
+    known.insert(0, ip)
+    known = known[:MAX_KNOWN_IPS]
+    save(KNOWN_IPS=known)
+    return known
+
+
+def load() -> dict:
+    if _SETTINGS_FILE.exists():
+        try:
+            data = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
+            merged = dict(_DEFAULTS)
+            merged.update(data)
+            return merged
+        except Exception:
+            pass
+    return dict(_DEFAULTS)
+
+
+def save(**kwargs) -> None:
+    data = load()
+    data.update(kwargs)
+    try:
+        _SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+_cfg = load()
+PS_IP = _cfg["PS_IP"]
+LAPS_FOLDER = _cfg["LAPS_FOLDER"]
+SAMPLE_RATE = _cfg["SAMPLE_RATE"]
+KNOWN_IPS = _cfg["KNOWN_IPS"]
+DEBUG_LOG = _cfg["DEBUG_LOG"]

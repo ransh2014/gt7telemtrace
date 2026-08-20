@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gt7tracetelem"
+version = "0.1.0"
+description = "TRACE - GT7 telemetry capture, live dashboard, and lap/race analysis toolkit"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "pycryptodome",
+]
+
+[project.urls]
+Homepage = "https://gt7trace.netlify.app/"
+
+[project.scripts]
+gt7telem = "gt7telem.launcher:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+gt7telem = ["*.csv"]
