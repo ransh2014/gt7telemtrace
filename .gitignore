@@ -5,4 +5,4 @@ dist/
 *.egg-info/
 .venv/
 venv/
-_srctmp/
+_srctmp/settings.json
