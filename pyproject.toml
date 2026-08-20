@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gt7tracetelem"
-version = "0.1.1"
+version = "0.1.2"
 description = "TRACE - GT7 telemetry capture, live dashboard, and lap/race analysis toolkit"
 readme = "README.md"
 requires-python = ">=3.10"

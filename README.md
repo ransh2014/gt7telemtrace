@@ -36,7 +36,7 @@ Site: **https://gt7trace.netlify.app**
 
 **Tooling**
 - `add_car.py` / `add_track.py` — add missing car/track IDs to the local database
-- Car and track ID databases kept current
+- Car and track ID databases kept current -- the car database is refreshed every time 10 or more new cars have been added since the last update
 
 ---
 
