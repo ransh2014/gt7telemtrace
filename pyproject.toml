@@ -18,6 +18,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://gt7trace.netlify.app/"
+Repository = "https://github.com/ransh2014/gt7telemtrace"
 
 [project.scripts]
 gt7telem = "gt7telem.launcher:main"
