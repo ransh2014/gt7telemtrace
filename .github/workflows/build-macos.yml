@@ -1,0 +1,74 @@
+name: Build macOS App
+
+# Produces TRACE.app via a GitHub-hosted macOS runner -- no physical Mac
+# needed. Runs automatically on a version tag (and attaches the zip to the
+# GitHub Release for that tag); can also be triggered manually from the
+# Actions tab to test a build without cutting a release.
+#
+# The package uses relative imports (`from . import dashboard`), so
+# PyInstaller can't point directly at src/gt7telem/launcher.py -- it needs
+# a plain entry-point script that imports gt7telem as an installed package
+# instead. We write that wrapper here rather than relying on the
+# setuptools-generated console-script (which is a compiled stub on Windows,
+# but a plain script on macOS/Linux -- writing our own keeps this portable
+# and easy to reason about).
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build TRACE.app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and PyInstaller
+        run: python -m pip install . pyinstaller
+
+      - name: Write PyInstaller entry point
+        run: |
+          cat > entrypoint.py << 'EOF'
+          import sys
+          from gt7telem.launcher import main
+
+          if __name__ == "__main__":
+              sys.exit(main())
+          EOF
+
+      - name: Build TRACE.app
+        run: |
+          PKG_DIR=$(python -c "import gt7telem, os; print(os.path.dirname(gt7telem.__file__))")
+          pyinstaller --onefile --windowed --name TRACE \
+            --add-data "$PKG_DIR/car_ids.csv:gt7telem" \
+            --add-data "$PKG_DIR/course_ids.csv:gt7telem" \
+            entrypoint.py
+
+      - name: Zip the app bundle
+        run: |
+          cd dist
+          zip -r ../gt7telem-macos.zip TRACE.app
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gt7telem-macos
+          path: gt7telem-macos.zip
+          retention-days: 30
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: gt7telem-macos.zip
