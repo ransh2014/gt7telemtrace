@@ -4,6 +4,10 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+- Added a real standalone macOS app (`TRACE.app`), built automatically on a
+  GitHub-hosted Apple Silicon runner via `build-macos.yml` -- no physical
+  Mac needed on this end. Replaces the old "email a Mac user and ask them
+  to build one" flow. Attaches to the GitHub Release on every `vX.Y.Z` tag.
 - Added a test suite (`tests/`) covering car/track DB lookups, settings
   persistence, and a full Salsa20 decrypt+parse round-trip against a
   synthetic packet

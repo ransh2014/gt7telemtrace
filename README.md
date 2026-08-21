@@ -110,7 +110,7 @@ gt7telem
 ```
 
 ### Option 3 — standalone binaries
-No Python required — grab a prebuilt Windows `.exe` or Linux binary from **[gt7trace.netlify.app/setup.html](https://gt7trace.netlify.app/setup.html)**.
+No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.app` from **[gt7trace.netlify.app/setup.html](https://gt7trace.netlify.app/setup.html)**. The macOS build is produced automatically on a GitHub-hosted Apple Silicon runner (see [`build-macos.yml`](.github/workflows/build-macos.yml)) — on an older Intel Mac, use Option 1 or 2 instead.
 
 ---
 
