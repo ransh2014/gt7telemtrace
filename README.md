@@ -99,7 +99,12 @@ See `gt7telem.__all__` for the full list of exported functions (`get_snapshot`, 
 
 ## Credits
 
-TRACE stands on the shoulders of the people who reverse-engineered GT7's telemetry protocol and maintain the community car/track databases it relies on. Full writeup and credits: **[gt7trace.netlify.app/about.html](https://gt7trace.netlify.app/about.html)**.
+TRACE stands on the shoulders of two people who did the hard, unglamorous work this project depends on:
+
+- **[Bornhall](https://github.com/Bornhall/gt7telemetry)** — reverse-engineered GT7's UDP telemetry protocol, including the Salsa20 decryption key and full packet byte structure. Every telemetry value TRACE reads comes from this work.
+- **[ddm999](https://github.com/ddm999/gt7info)** — maintains [gt7info](https://ddm999.github.io/gt7info/), the community car and track database that resolves every car/track ID to a real name shown anywhere in TRACE.
+
+Full writeup and credits: **[gt7trace.netlify.app/about.html](https://gt7trace.netlify.app/about.html)**.
 
 ## License
 
