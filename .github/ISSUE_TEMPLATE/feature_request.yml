@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest an idea for TRACE
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What are you trying to do that TRACE doesn't support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool does this relate to?
+      options:
+        - Live Dashboard
+        - Lap Analyst
+        - Race Analyst
+        - Public data API (gt7telem module)
+        - Not sure / other
+    validations:
+      required: false

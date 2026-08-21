@@ -5,8 +5,8 @@ No manual editing needed. On first run it uses sensible defaults; whenever
 you change the PS4/PS5 IP in the app, it's saved to settings.json right
 next to the .exe (or script) so it's remembered next time.
 """
-import sys
 import json
+import sys
 from pathlib import Path
 
 __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS"]

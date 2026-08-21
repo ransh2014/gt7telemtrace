@@ -12,6 +12,7 @@ import struct
 import threading
 import time
 from collections import deque
+from typing import Any, Callable
 
 from .config import PS_IP
 
@@ -63,12 +64,12 @@ def _diag_incr(key):
     with _diag_lock:
         _diag[key] = _diag.get(key, 0) + 1
 
-def get_diagnostics():
+def get_diagnostics() -> dict:
     """Snapshot of connection diagnostics for the GUI's log/status panel."""
     with _diag_lock:
         return dict(_diag)
 
-def get_last_error():
+def get_last_error() -> str | None:
     """Best single-line explanation of why we're not connected right now."""
     d = get_diagnostics()
     if d["bind_error"]:
@@ -131,7 +132,7 @@ MIX_CHANGE_RATIO      = 1.3      # recent/prior burn-rate ratio to flag (either 
 MIX_CHANGE_COOLDOWN_S = 15.0     # don't re-flag more often than this
 _last_mix_change_t    = None
 
-def get_incidents():
+def get_incidents() -> list:
     return list(_incidents)
 
 def _log_incident(kind, parsed, value):
@@ -224,7 +225,7 @@ def _check_debug_state(parsed, now, paused, car_on_track, loading, speed, lap_nu
             "grid_armed": now <= _grid_start_armed_until,
         })
 
-def register_event(name, fn):
+def register_event(name: str, fn: Callable[[dict], None]) -> None:
     """Register a callback for an event: 'race_start', 'race_end', 'pause', 'resume'.
     Callback receives the parsed telemetry dict for the packet that triggered it.
     Keep callbacks fast/non-blocking -- they run on the UDP receive thread."""
@@ -316,11 +317,11 @@ def _check_events(parsed):
             _race_active = False
             _fire_event("race_end", parsed)
 
-def set_track(name): global _track; _track = name
-def set_car(name):   global _car;   _car   = name
-def is_connected():  return _connected
+def set_track(name: str) -> None: global _track; _track = name
+def set_car(name: str) -> None:   global _car;   _car   = name
+def is_connected() -> bool:  return _connected
 
-def set_ip(new_ip):
+def set_ip(new_ip: str) -> None:
     global _ps4_ip, _connected, _source, _latest
     _ps4_ip = new_ip.strip()
     with _lock:
@@ -328,13 +329,13 @@ def set_ip(new_ip):
         _source    = None
         _latest    = {}
 
-def sanitize(name):
+def sanitize(name: str) -> str:
     if not name: return "unknown"
     safe = "".join(c if c.isalnum() else "_" for c in name.lower().strip())
     while "__" in safe: safe = safe.replace("__", "_")
     return safe.strip("_")
 
-def reset_lap():
+def reset_lap() -> None:
     global _prev_x, _prev_z, _prev_heading, _cum_dist
     _prev_x = _prev_z = _prev_heading = None
     _cum_dist = 0.0
@@ -772,23 +773,23 @@ def _ensure_started():
     threading.Thread(target=_udp_thread,       daemon=True).start()
 
 # ── Public API ─────────────────────────────────────────────────────────────────
-def get(key):
+def get(key: str) -> Any:
     _ensure_started()
     with _lock: return _latest.get(key)
 
-def get_snapshot():
+def get_snapshot() -> dict:
     _ensure_started()
     with _lock: return dict(_latest)
 
-def get_int(key):
+def get_int(key: str) -> int:
     try: return int(get(key) or 0)
     except: return 0
 
-def get_float(key):
+def get_float(key: str) -> float:
     try: return float(get(key) or 0.0)
     except: return 0.0
 
-def wait_for_connection(timeout=60):
+def wait_for_connection(timeout: int = 60) -> str | None:
     _ensure_started()
     print(f"[gt7udp] Heartbeat → {_ps4_ip}:{SEND_PORT}  |  Listening on :{RECV_PORT}")
     deadline = time.time() + timeout

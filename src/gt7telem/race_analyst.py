@@ -1,19 +1,27 @@
 # race_analyst.py — GT7 Race Analyst
 # pip install pandas matplotlib numpy
+import base64
+import io
+import json
+import math
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-import json, math, base64, io
 from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("TkAgg")
+import warnings
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.collections import LineCollection
-from matplotlib.patches import Polygon as MplPolygon
 from matplotlib.gridspec import GridSpec
-import warnings; warnings.filterwarnings("ignore")
+from matplotlib.patches import Polygon as MplPolygon
+
+warnings.filterwarnings("ignore")
 
 # ── Theme (matches lap_analyst.py) ─────────────────────────────────────────────
 BG   = "#07080f"

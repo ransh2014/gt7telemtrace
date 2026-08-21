@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup help / FAQ
+    url: https://gt7trace.netlify.app/setup.html
+    about: Connection issues, install problems, and common questions are covered here first.

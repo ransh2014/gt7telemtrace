@@ -10,8 +10,7 @@ import tkinter as tk
 # numpy, pandas, matplotlib, pycryptodome) -- do NOT switch these back to
 # dynamic __import__() calls, PyInstaller can't see those.
 from . import dashboard as gt7telem
-from . import lap_analyst
-from . import race_analyst
+from . import lap_analyst, race_analyst
 
 BG = "#0a0e1a"
 

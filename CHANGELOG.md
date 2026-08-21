@@ -3,6 +3,19 @@
 All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+- Added a test suite (`tests/`) covering car/track DB lookups, settings
+  persistence, and a full Salsa20 decrypt+parse round-trip against a
+  synthetic packet
+- Added CI (GitHub Actions): tests run on Python 3.10–3.13 on every push/PR,
+  plus `ruff` linting
+- Added a trusted-publishing workflow (`publish.yml`) that builds and
+  uploads to PyPI automatically on a `vX.Y.Z` tag push -- no more manual
+  local `twine upload`
+- Added type hints to the public API (`cars`, `tracks`, `udp`) and a
+  `py.typed` marker so IDEs get proper autocomplete for `import gt7telem`
+- Added issue templates, a PR template, and `CODEOWNERS`
+
 ## [0.1.3] - 2026-08-21
 - Synced `__version__` in `src/gt7telem/__init__.py` with `pyproject.toml`
   (had drifted to 0.1.2 while the package version moved to 0.1.3)

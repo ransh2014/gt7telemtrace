@@ -9,11 +9,11 @@ from pathlib import Path
 __all__ = ["get_car_name"]
 
 _CSV_PATH = Path(__file__).parent / "car_ids.csv"
-_car_names = {}
+_car_names: dict[int, str] = {}
 _loaded = False
 
 
-def _load():
+def _load() -> None:
     global _loaded
     if _loaded:
         return
@@ -31,7 +31,7 @@ def _load():
         pass
 
 
-def get_car_name(car_id):
+def get_car_name(car_id: int | str) -> str:
     """Return the car's short name for a given GT7 car_id, or "" if unknown."""
     _load()
     try:

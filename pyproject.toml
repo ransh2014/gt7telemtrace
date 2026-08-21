@@ -62,4 +62,22 @@ gt7telem = "gt7telem.launcher:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-gt7telem = ["*.csv"]
+gt7telem = ["*.csv", "py.typed"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+# E501 line-length, E701/E702 multi-statement lines, E722 bare-except, and
+# E731 lambda-assignment are all deliberate, pervasive conventions in the
+# GUI/plotting modules (dense matplotlib one-liners, defensive catch-alls
+# around live packet parsing, local byte-unpack lambdas) -- not bugs.
+ignore = ["E501", "E701", "E702", "E722", "E731"]

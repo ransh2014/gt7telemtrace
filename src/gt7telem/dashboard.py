@@ -4,21 +4,22 @@
 #   - Tyre hot / cold / fuel-low alert banners (flashing)
 #   - Lap history Treeview (scrollable, right panel)
 
-import tkinter as tk
-from tkinter import ttk, scrolledtext, filedialog
-import threading
-import time
 import json
 import math
+import threading
+import time
+import tkinter as tk
 from collections import deque
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from tkinter import filedialog, scrolledtext, ttk
 
-from . import udp as telem
 from . import cars as car_db
-from . import tracks as track_db
-from .config import PS_IP as PS4_IP, LAPS_FOLDER, KNOWN_IPS, DEBUG_LOG
 from . import config as runtime_config
+from . import tracks as track_db
+from . import udp as telem
+from .config import KNOWN_IPS, LAPS_FOLDER
+from .config import PS_IP as PS4_IP
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Recording sample rate

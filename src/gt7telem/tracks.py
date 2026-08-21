@@ -20,11 +20,11 @@ from pathlib import Path
 __all__ = ["get_track_name", "all_track_names"]
 
 _CSV_PATH = Path(__file__).parent / "course_ids.csv"
-_track_names = {}
+_track_names: dict[int, str] = {}
 _loaded = False
 
 
-def _load():
+def _load() -> None:
     global _loaded
     if _loaded:
         return
@@ -42,7 +42,7 @@ def _load():
         pass
 
 
-def get_track_name(track_id):
+def get_track_name(track_id: int | str) -> str:
     """Return the track's name for a given GT7 course ID, or "" if unknown."""
     _load()
     try:
@@ -51,7 +51,7 @@ def get_track_name(track_id):
         return ""
 
 
-def all_track_names():
+def all_track_names() -> list[str]:
     """Return every known track name, sorted, for populating the TRACK picker."""
     _load()
     return sorted(n for n in _track_names.values() if n)

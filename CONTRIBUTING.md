@@ -8,14 +8,22 @@ updates are all welcome.
 ```bash
 git clone https://github.com/ransh2014/gt7telemtrace.git
 cd gt7telemtrace
-pip install -e .
+pip install -e ".[dev]"
 gt7telem
 ```
 
-No build step and no bundled test suite yet — the fastest way to check a
-change is to run the affected tool (`dashboard`, `lap_analyst`, or
-`race_analyst`) against a live GT7 session, or against a previously recorded
-CSV where the tool supports loading one.
+Run the test suite and linter before opening a PR (CI runs both on every push):
+
+```bash
+pytest tests/
+ruff check .
+```
+
+The tests cover car/track DB lookups, settings persistence, and a Salsa20
+decrypt+parse round-trip — they don't need a live GT7 session. For anything
+touching the GUI apps themselves, the fastest check is still running the
+affected tool (`dashboard`, `lap_analyst`, or `race_analyst`) against a live
+session or a previously recorded lap.
 
 ## Where things live
 
@@ -53,3 +61,7 @@ Keep PRs focused — one fix or one feature per PR is easier to review than a
 batch of unrelated changes. Please bump `version` in `pyproject.toml` **and**
 `__version__` in `src/gt7telem/__init__.py` together when a PR is meant to
 ship as a release; the two have drifted out of sync before.
+
+CI runs `pytest` and `ruff check .` on every PR — make sure both pass
+locally first. Pushing a `vX.Y.Z` tag on `main` (after merging a version
+bump) triggers an automatic build + PyPI publish via GitHub Actions.

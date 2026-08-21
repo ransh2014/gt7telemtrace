@@ -2,6 +2,7 @@
 
 **T**elemetry **R**acing **A**nalytics & **C**omparative **E**ngine
 
+[![CI](https://github.com/ransh2014/gt7telemtrace/actions/workflows/ci.yml/badge.svg)](https://github.com/ransh2014/gt7telemtrace/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/gt7tracetelem?color=00e5ff&label=PyPI)](https://pypi.org/project/gt7tracetelem/)
 [![Python versions](https://img.shields.io/pypi/pyversions/gt7tracetelem?color=7c5cff)](https://pypi.org/project/gt7tracetelem/)
 [![Downloads](https://img.shields.io/pypi/dm/gt7tracetelem?color=ff5c8a)](https://pypi.org/project/gt7tracetelem/)
