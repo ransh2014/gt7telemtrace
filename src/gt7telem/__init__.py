@@ -12,7 +12,7 @@ GUI apps (Live Dashboard, Lap Analyst, Race Analyst) are not re-exported
 here -- run `gt7telem` from the command line, or import the submodules
 directly: gt7telem.dashboard, gt7telem.lap_analyst, gt7telem.race_analyst.
 """
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 from .udp import (
     get_snapshot, get, get_int, get_float,
