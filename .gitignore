@@ -6,3 +6,5 @@ dist/
 .venv/
 venv/
 _srctmp/settings.json
+src/gt7telem/settings.json
+src/launcher_crash.log
