@@ -35,23 +35,11 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 ## Screenshots
 
-<!--
-  Add real screenshots or a short GIF here before your next release — a PyPI/GitHub
-  page for a GUI tool earns far more trust once people can see it before installing.
-  Suggested shots: Live Dashboard mid-session, a Lap Analyst chart group (e.g. Braking
-  or the Heat Maps track view), and the launcher menu.
+![Live Dashboard](https://raw.githubusercontent.com/ransh2014/gt7telemtrace/main/docs/screenshot-dashboard.png)
 
-  Drop images in a /docs or /assets folder and reference them like this:
+![Lap Analyst — Tyres](https://raw.githubusercontent.com/ransh2014/gt7telemtrace/main/docs/screenshot-lapanalyst.png)
 
-  ![Live Dashboard](docs/screenshot-dashboard.png)
-  ![Lap Analyst — Heat Maps](docs/screenshot-lapanalyst.png)
-
-  On PyPI, relative image paths only render if you set up a proper `Homepage`
-  and the images are committed to the repo — GitHub raw URLs
-  (https://raw.githubusercontent.com/ransh2014/gt7telemtrace/main/docs/...) are the
-  safest choice since they work identically on both PyPI and GitHub.
--->
-*(screenshots coming soon — see the [site](https://gt7trace.netlify.app) for a live preview in the meantime)*
+![Race Analyst — Inputs](https://raw.githubusercontent.com/ransh2014/gt7telemtrace/main/docs/screenshot-raceanalyst.png)
 
 ---
 
