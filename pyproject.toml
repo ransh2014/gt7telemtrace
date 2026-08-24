@@ -1,14 +1,14 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "gt7tracetelem"
-version = "0.1.6"
+version = "0.1.7"
 description = "TRACE - GT7 telemetry capture, live dashboard, and lap/race analysis toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Ransh"},
 ]
@@ -30,7 +30,6 @@ classifiers = [
     "Topic :: Games/Entertainment :: Simulation",
     "Topic :: Multimedia :: Graphics",
     "Topic :: Scientific/Engineering :: Visualization",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Environment :: Win32 (MS Windows)",
     "Environment :: MacOS X",

@@ -10,7 +10,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `vX.Y.Z` tag push, same as the macOS app. Replaces manually running
   `rebuild_all.ps1` / building through WSL for those two platforms
 
-## [0.1.6] - 2026-08-24
+## [0.1.7] - 2026-08-24
+- Republished under 0.1.7 -- 0.1.6's wheel filename got stuck on PyPI
+  after an earlier upload attempt failed mid-transfer (metadata rejected,
+  but the file bytes were already stored server-side), which permanently
+  blocks re-uploading that exact filename. No functional change from 0.1.6
+- Switched `license` to the SPDX expression format (`license = "MIT"`)
+  and dropped the redundant `License :: OSI Approved :: MIT License`
+  classifier -- the old `{text = "MIT"}` + classifier combination trips
+  PyPI's newer metadata validation and gets rejected outright
+
+## [0.1.6] - 2026-08-24 (superseded, never published to PyPI)
 - Added the global lap leaderboard (Phase 2 of the Supabase-backed feature
   set): a new `leaderboard.py` module (stdlib-only, same fire-and-forget
   pattern as `analytics.py`) backs a "Submit to Leaderboard" button and a
