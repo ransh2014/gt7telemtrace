@@ -6,12 +6,12 @@ pick a different tool).
 """
 import tkinter as tk
 
+from . import analytics, lap_analyst, race_analyst
+
 # Static imports so PyInstaller's analysis bundles these (and their deps:
 # numpy, pandas, matplotlib, pycryptodome) -- do NOT switch these back to
 # dynamic __import__() calls, PyInstaller can't see those.
 from . import dashboard as gt7telem
-from . import lap_analyst, race_analyst
-from . import analytics
 
 BG = "#0a0e1a"
 
