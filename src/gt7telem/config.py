@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED"]
+__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED", "PSN_NAME"]
 
 
 def _base_dir() -> Path:
@@ -34,6 +34,9 @@ _DEFAULTS = {
     # PSN name, no IP stored on our end. See gt7trace.netlify.app/privacy.html
     # for the full disclosure. Turn off here or in Settings.
     "ANALYTICS_ENABLED": True,
+    # Remembered PSN name for leaderboard submissions -- pre-fills the
+    # submit dialog each time, editable inline there if you want to change it.
+    "PSN_NAME": "",
 }
 
 MAX_KNOWN_IPS = 3
@@ -82,3 +85,4 @@ SAMPLE_RATE = _cfg["SAMPLE_RATE"]
 KNOWN_IPS = _cfg["KNOWN_IPS"]
 DEBUG_LOG = _cfg["DEBUG_LOG"]
 ANALYTICS_ENABLED = _cfg["ANALYTICS_ENABLED"]
+PSN_NAME = _cfg["PSN_NAME"]

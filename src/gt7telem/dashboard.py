@@ -16,6 +16,7 @@ from tkinter import filedialog, scrolledtext, ttk
 
 from . import cars as car_db
 from . import config as runtime_config
+from . import leaderboard
 from . import tracks as track_db
 from . import udp as telem
 from .config import KNOWN_IPS, LAPS_FOLDER
@@ -97,6 +98,8 @@ class App(tk.Tk):
         self._flash_on   = False
         self._saved_laps = 0
         self._last_autofilled_car_id = None
+        self._submitted_unknown_car_ids = set()
+        self._submitted_unknown_tracks  = set()
         self._session_start_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         self._session_summary  = []
         self._incident_timeline = []   # flat list of incident dicts across the whole session
@@ -859,6 +862,16 @@ class App(tk.Tk):
             if _auto_name:
                 self.car_var.set(_auto_name)
                 self._last_autofilled_car_id = _car_id_val
+            elif _car_id_val not in self._submitted_unknown_car_ids:
+                self._submitted_unknown_car_ids.add(_car_id_val)
+                guessed = self.car_var.get().strip() or None
+                threading.Thread(
+                    target=leaderboard.submit_car_id,
+                    args=(_car_id_val,),
+                    kwargs={"guessed_name": guessed},
+                    daemon=True,
+                ).start()
+                self.log_msg(f"Unrecognized car ID {_car_id_val} -- submitted to community inbox")
         self.f8e_lbl.config(text=f"0x{int(d.get('flags_8e') or 0):02X}")
         self.f8f_lbl.config(text=f"0x{int(d.get('flags_8f') or 0):02X}")
         self.f93_lbl.config(text=f"0x{int(d.get('flags_93') or 0):02X}")
@@ -1110,12 +1123,30 @@ class App(tk.Tk):
     def _record_race_sample(self, d):
         session.race_samples.append(self._sample_dict(d, session.race_start_t))
 
+    def _maybe_submit_unknown_track(self, ui_track):
+        """GT7 never exposes a track ID over telemetry, so the only way to
+        spot a track missing from course_ids.csv is comparing the typed
+        TRACK field against the known name list. Submits at most once per
+        unique name per session -- leaderboard.submit_track_name() is
+        fire-and-forget, stdlib-only, never raises."""
+        if not ui_track or ui_track in self._submitted_unknown_tracks:
+            return
+        known = {n.lower() for n in track_db.all_track_names()}
+        if ui_track.lower() in known:
+            return
+        self._submitted_unknown_tracks.add(ui_track)
+        threading.Thread(
+            target=leaderboard.submit_track_name, args=(ui_track,), daemon=True
+        ).start()
+        self.log_msg(f"New track name '{ui_track}' -- submitted to community inbox")
+
     def _save_race(self, samples):
         ui_track = self.track_var.get().strip()
         ui_car   = self.car_var.get().strip()
         track    = telem.sanitize(ui_track)
         car      = ui_car or "unknown"
         car_safe = telem.sanitize(car)
+        self._maybe_submit_unknown_track(ui_track)
 
         ts     = datetime.now().strftime("%Y%m%d_%H%M%S")
         folder = Path(LAPS_FOLDER) / track / "races"
@@ -1127,6 +1158,8 @@ class App(tk.Tk):
             "recorded_at":     ts,
             "track":           track,
             "car":             car,
+            "track_display":   ui_track or track,
+            "car_display":     ui_car or car,
             "race_duration_s": round(race_duration, 3),
             "total_samples":   len(samples),
             "incidents":       incidents,
@@ -1398,6 +1431,7 @@ class App(tk.Tk):
         ui_car   = self.car_var.get().strip()
         track    = telem.sanitize(ui_track)
         car      = ui_car or "unknown"
+        self._maybe_submit_unknown_track(ui_track)
 
         ts     = datetime.now().strftime("%Y%m%d_%H%M%S")
         folder = Path(LAPS_FOLDER) / track
@@ -1418,6 +1452,8 @@ class App(tk.Tk):
             "recorded_at":    ts,
             "track":          track,
             "car":            car,
+            "track_display":  ui_track or track,
+            "car_display":    ui_car or car,
             "lap_time_s":     round(new_time, 3),
             "lap_distance_m": round(lap_dist, 1),
             "total_samples":  len(samples),

@@ -10,6 +10,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `vX.Y.Z` tag push, same as the macOS app. Replaces manually running
   `rebuild_all.ps1` / building through WSL for those two platforms
 
+## [0.1.6] - 2026-08-24
+- Added the global lap leaderboard (Phase 2 of the Supabase-backed feature
+  set): a new `leaderboard.py` module (stdlib-only, same fire-and-forget
+  pattern as `analytics.py`) backs a "Submit to Leaderboard" button and a
+  live Top-10 panel in Lap Analyst's new LEADERBOARD sidebar section.
+  Identity is a self-reported PSN name, remembered in `settings.json` and
+  editable each time via the submit dialog
+- Server-side anti-cheat on every submission: physically-impossible lap
+  times are rejected outright, and times beating the current record by
+  more than 20% are held in a review queue instead of publishing
+  immediately -- both verified end-to-end against the live `laps` table
+- Full per-sample telemetry is stored with each leaderboard lap (not just
+  the lap time), so upcoming ghost-lap download and consensus racing-line
+  features can build on this table without a schema change
+- Wired crowdsourced car/track ID submission into the Live Dashboard: an
+  unrecognized live `car_id`, or a typed TRACK name not in `course_ids.csv`,
+  is now submitted to the community inbox automatically (once per unique
+  value per session) instead of silently staying unlabeled until manually
+  added via `add_car.py`/`add_track.py`
+- Fixed `launcher.py` so it runs directly (F5 in IDLE, double-click,
+  `python launcher.py`) without hitting "attempted relative import with no
+  known parent package" -- no more `-m` or `runpy` workarounds needed
+
 ## [0.1.5] - 2026-08-24
 - Added anonymous usage analytics (Phase 1 of a Supabase-backed feature set):
   a launch ping (`event`, `tool`, `version`, `os`, `created_at` -- exactly

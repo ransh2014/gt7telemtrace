@@ -4,6 +4,22 @@ Shows a small menu; picks one of the three tools, then launches it as its
 own window. Closing that tool closes the whole app (re-open the exe to
 pick a different tool).
 """
+# Permanent fix for "attempted relative import with no known parent
+# package" -- this file uses relative imports (below) because it's part
+# of the gt7telem package, but people naturally try to run it directly
+# (F5 in IDLE, double-click, `python launcher.py`), which normally breaks
+# relative imports entirely. This block detects that case and patches
+# sys.path + __package__ so it works no matter how it's launched --
+# `python -m gt7telem.launcher`, F5 in an editor, or a plain double-click.
+if __name__ == "__main__" and (not __package__):
+    import sys
+    from pathlib import Path
+    _pkg_dir = Path(__file__).resolve().parent      # .../gt7telem
+    _src_dir = _pkg_dir.parent                       # .../src  (or wherever gt7telem/ lives)
+    if str(_src_dir) not in sys.path:
+        sys.path.insert(0, str(_src_dir))
+    __package__ = _pkg_dir.name                      # "gt7telem"
+
 import tkinter as tk
 
 from . import analytics, lap_analyst, race_analyst

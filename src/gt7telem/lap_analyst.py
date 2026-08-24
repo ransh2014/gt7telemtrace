@@ -4,13 +4,17 @@ import base64
 import io
 import json
 import math
+import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import matplotlib
 import numpy as np
 import pandas as pd
+
+from . import config as runtime_config
+from . import leaderboard
 
 matplotlib.use("TkAgg")
 import warnings
@@ -1342,6 +1346,15 @@ class AnalystApp(tk.Tk):
                   bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
+        fl = _section("LEADERBOARD", YLW)
+        tk.Button(fl, text="🏆  Submit to Leaderboard", command=self._submit_leaderboard,
+                  bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(2,4))
+        self._top10_f = tk.Frame(fl, bg=PNL)
+        self._top10_f.pack(fill="x", padx=8, pady=(0,4))
+        tk.Label(self._top10_f, text="load a lap to see the top 10", fg=DIM, bg=PNL,
+                 font=FONTL, wraplength=190, justify="left").pack(anchor="w")
+
         tk.Label(p, text="SECTORS — LAP A", fg=DIM, bg=PNL2,
                  font=FONTL).pack(anchor="w", padx=12, pady=(6,2))
         self._sec_f = tk.Frame(p, bg=PNL2); self._sec_f.pack(fill="x", padx=6)
@@ -1446,6 +1459,7 @@ class AnalystApp(tk.Tk):
             self._update_sectors(df)
             self._replay.load(df, lbl)
             self._hdr.config(text=f"A: {lbl}")
+            self._refresh_top10()
             for k in list(self._cfigs):
                 if self._cfigs[k]: plt.close(self._cfigs[k])
                 self._cfigs[k] = None
@@ -1537,6 +1551,76 @@ class AnalystApp(tk.Tk):
             if self._nb.index("current") == 1:
                 self._draw_active_chart()
         except Exception: pass
+
+    # ── leaderboard ───────────────────────────────────────────────
+    def _refresh_top10(self):
+        if self._da is None: return
+        car   = self._da.get("car_display")   or self._da.get("car", "?")
+        track = self._da.get("track_display") or self._da.get("track", "?")
+        for w in self._top10_f.winfo_children(): w.destroy()
+        tk.Label(self._top10_f, text="loading top 10…", fg=DIM, bg=PNL,
+                 font=FONTL).pack(anchor="w")
+
+        def worker():
+            rows = leaderboard.get_top_laps(car, track, n=10)
+            self.after(0, lambda: self._render_top10(car, track, rows))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _render_top10(self, car, track, rows):
+        for w in self._top10_f.winfo_children(): w.destroy()
+        tk.Label(self._top10_f, text=f"{car} @ {track}", fg=CYN, bg=PNL,
+                 font=FONTL, wraplength=190, justify="left").pack(anchor="w")
+        if not rows:
+            tk.Label(self._top10_f, text="no times yet — be the first!",
+                     fg=DIM, bg=PNL, font=FONTL, wraplength=190,
+                     justify="left").pack(anchor="w", pady=(2,0))
+            return
+        for i, row in enumerate(rows, 1):
+            ms = row.get("lap_time_ms", 0)
+            m, s = divmod(ms / 1000.0, 60)
+            time_str = f"{int(m)}:{s:06.3f}"
+            name = row.get("psn_name", "?")
+            r = tk.Frame(self._top10_f, bg=PNL); r.pack(fill="x", pady=1)
+            col = YLW if i == 1 else (FG if i <= 3 else DIM)
+            tk.Label(r, text=f"{i}.", fg=col, bg=PNL, font=FONTL, width=3, anchor="w").pack(side="left")
+            tk.Label(r, text=time_str, fg=col, bg=PNL, font=FONTL, width=10, anchor="w").pack(side="left")
+            tk.Label(r, text=name, fg=col, bg=PNL, font=FONTL, anchor="w").pack(side="left")
+
+    def _submit_leaderboard(self):
+        if self._da is None:
+            messagebox.showinfo("Submit to Leaderboard", "Load Lap A first."); return
+        car   = self._da.get("car_display")   or self._da.get("car", "?")
+        track = self._da.get("track_display") or self._da.get("track", "?")
+        lap_time_ms = int(round(self._da.get("lap_time_s", 0) * 1000))
+        samples = self._da.get("samples", [])
+        if not samples:
+            messagebox.showinfo("Submit to Leaderboard", "This lap has no samples to submit."); return
+
+        psn = simpledialog.askstring(
+            "Submit to Leaderboard",
+            f"Submitting: {car} @ {track}  —  {lap_time_ms/1000:.3f}s\n\nPSN name:",
+            initialvalue=runtime_config.PSN_NAME, parent=self)
+        if not psn: return
+        psn = psn.strip()
+        if not psn: return
+        runtime_config.PSN_NAME = psn
+        runtime_config.save(PSN_NAME=psn)
+
+        def worker():
+            ok = leaderboard.submit_lap(car, track, lap_time_ms, psn, samples)
+            self.after(0, lambda: self._after_submit(ok))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _after_submit(self, ok):
+        if ok:
+            messagebox.showinfo("Submit to Leaderboard",
+                                 "Submitted! If it's a new top time it'll appear on the leaderboard shortly.")
+            self._refresh_top10()
+        else:
+            messagebox.showerror("Submit to Leaderboard",
+                                  "Couldn't reach the leaderboard — check your internet connection and try again.")
 
 if __name__ == "__main__":
     app = AnalystApp()
