@@ -218,6 +218,12 @@ class App(tk.Tk):
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=("Consolas", 8)).pack(side="right", padx=(4, 16))
 
+        self.analytics_var = tk.BooleanVar(value=bool(runtime_config.ANALYTICS_ENABLED))
+        tk.Checkbutton(hdr2, text="SHARE USAGE DATA", variable=self.analytics_var,
+                       command=self._on_analytics_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=("Consolas", 8)).pack(side="right", padx=(4, 4))
+
         # ── Recording sample rate ────────────────────────────────────────────
         self.rate_var = tk.StringVar(value=f"{self._record_rate} Hz")
         st_rate = ttk.Style()
@@ -634,6 +640,12 @@ class App(tk.Tk):
         runtime_config.DEBUG_LOG = self.debug_var.get()
         runtime_config.save(DEBUG_LOG=runtime_config.DEBUG_LOG)
         self.log_msg(f"Debug log {'enabled' if runtime_config.DEBUG_LOG else 'disabled'}")
+
+    def _on_analytics_toggle(self):
+        runtime_config.ANALYTICS_ENABLED = self.analytics_var.get()
+        runtime_config.save(ANALYTICS_ENABLED=runtime_config.ANALYTICS_ENABLED)
+        state = "enabled" if runtime_config.ANALYTICS_ENABLED else "disabled"
+        self.log_msg(f"Anonymous usage analytics {state} (see gt7trace.netlify.app/privacy.html)")
 
     def _on_rate_change(self):
         try:

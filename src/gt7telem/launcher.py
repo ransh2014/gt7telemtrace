@@ -11,23 +11,27 @@ import tkinter as tk
 # dynamic __import__() calls, PyInstaller can't see those.
 from . import dashboard as gt7telem
 from . import lap_analyst, race_analyst
+from . import analytics
 
 BG = "#0a0e1a"
 
 
 def launch_dashboard():
+    analytics.track_launch("dashboard")
     root.destroy()
     app = gt7telem.App()
     app.mainloop()
 
 
 def launch_lap_analyst():
+    analytics.track_launch("lap_analyst")
     root.destroy()
     app = lap_analyst.AnalystApp()
     app.mainloop()
 
 
 def launch_race_analyst():
+    analytics.track_launch("race_analyst")
     root.destroy()
     app = race_analyst.AnalystApp()
     app.mainloop()

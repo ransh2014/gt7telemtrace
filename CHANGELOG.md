@@ -4,6 +4,24 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.1.5] - 2026-08-24
+- Added anonymous usage analytics (Phase 1 of a Supabase-backed feature set):
+  a launch ping (`event`, `tool`, `version`, `os`, `created_at` -- exactly
+  those 5 fields, nothing else) sent once per tool launch via a new
+  `analytics.py` module. **On by default**, with a `SHARE USAGE DATA`
+  checkbox in the Live Dashboard header (next to `DEBUG LOG`) to opt out --
+  the setting is shared across all three tools via `settings.json`
+- Added a `privacy.html` page to the site disclosing exactly what's
+  collected and how to turn it off, linked from every page's nav/footer
+  and added to `sitemap.xml`
+- Regenerated `gt7telem-source.zip` to match the current package (it had
+  drifted badly out of sync -- was still the pre-refactor flat-file layout
+  from before the `src/gt7telem/` restructure). Now correctly nested
+  (`gt7telem/` folder at the zip root, matching `python -m gt7telem.launcher`
+  usage) with an updated `requirements.txt` and `README.txt`
+
+## [0.1.4] - 2026-08-22
 - Added real screenshots (Live Dashboard, Lap Analyst, Race Analyst) to the
   README, replacing the placeholder comment
 - Added a real standalone macOS app (`TRACE.app`), built automatically on a

@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS"]
+__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED"]
 
 
 def _base_dir() -> Path:
@@ -29,6 +29,11 @@ _DEFAULTS = {
     "SAMPLE_RATE": 10,
     "KNOWN_IPS": [],   # IPs that have successfully connected before, most-recent-first
     "DEBUG_LOG": False,  # show raw [DEBUG] state-change dumps in the log panel
+    # Anonymous usage analytics -- on by default. Sends only: which tool was
+    # launched, TRACE version, OS, and a timestamp. No telemetry content, no
+    # PSN name, no IP stored on our end. See gt7trace.netlify.app/privacy.html
+    # for the full disclosure. Turn off here or in Settings.
+    "ANALYTICS_ENABLED": True,
 }
 
 MAX_KNOWN_IPS = 3
@@ -76,3 +81,4 @@ LAPS_FOLDER = _cfg["LAPS_FOLDER"]
 SAMPLE_RATE = _cfg["SAMPLE_RATE"]
 KNOWN_IPS = _cfg["KNOWN_IPS"]
 DEBUG_LOG = _cfg["DEBUG_LOG"]
+ANALYTICS_ENABLED = _cfg["ANALYTICS_ENABLED"]

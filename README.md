@@ -25,6 +25,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - [Quick start](#quick-start)
 - [How it works](#how-it-works)
 - [Public data API](#public-data-api)
+- [Privacy & analytics](#privacy--analytics)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [Credits](#credits)
@@ -122,7 +123,17 @@ TRACE talks directly to the console — no server, no browser, no cloud:
 - GT7 streams packets back to your PC on port `33740`.
 - Each packet is decrypted with Salsa20 and unpacked into a `Telemetry` snapshot — the protocol details this library relies on were reverse-engineered by [Bornhall](https://github.com/Bornhall/gt7telemetry) (see [Credits](#credits)).
 - Because TRACE always requests the extended packet, you get motion/sway/heave/surge and filtered-input data automatically — there's no separate "heartbeat type" setting to configure.
-- Settings (last-used IP, sample rate, known-good IPs) persist to a `settings.json` next to wherever you run TRACE from, so there's nothing to reconfigure between sessions.
+- Settings (last-used IP, sample rate, known-good IPs, analytics opt-out) persist to a `settings.json` next to wherever you run TRACE from, so there's nothing to reconfigure between sessions.
+
+---
+
+## Privacy & analytics
+
+TRACE sends a small anonymous usage ping (which tool launched, TRACE version, OS, a timestamp — five fields, nothing else) each time you open Live Dashboard, Lap Analyst, or Race Analyst. It's **on by default** and helps decide where to spend limited development time; it never includes telemetry content, lap data, PSN name, or IP.
+
+Turn it off any time: **Live Dashboard → `SHARE USAGE DATA` checkbox** (next to `DEBUG LOG` in the header) — the setting applies to all three tools since they share the same `settings.json`.
+
+Full disclosure of exactly what's sent: **[gt7trace.netlify.app/privacy.html](https://gt7trace.netlify.app/privacy.html)**
 
 ---
 
