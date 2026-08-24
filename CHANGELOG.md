@@ -4,91 +4,41 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
-- Added `build-windows.yml` and `build-linux.yml` GitHub Actions workflows,
-  mirroring the existing `build-macos.yml` -- Windows `.exe` and Linux
-  binaries now build automatically via GitHub-hosted runners on every
-  `vX.Y.Z` tag push, same as the macOS app. Replaces manually running
-  `rebuild_all.ps1` / building through WSL for those two platforms
 
-## [0.1.10] - 2026-08-24
-- Added the consensus racing-line comparison (Phase 4): a new
-  `get_consensus_line` Postgres function buckets the top N leaderboard
-  laps for a car+track by 10m track-position and averages speed/throttle/
-  brake per bucket entirely server-side; `leaderboard.py` exposes it as
-  `get_consensus_line()`. Bucketed by track_position rather than GPS
-  coordinates, since leaderboard submissions don't carry world_x/world_z
-- Lap Analyst gets a "🌐 Load Community Line" button in the LEADERBOARD
-  panel and a new **Consensus** chart tab overlaying your lap against the
-  community average on speed, throttle, and brake -- verified end-to-end
-  against the live `laps` table and a headless chart render
+## [0.2.0] - 2026-08-24
+Supabase-backed community features, Phases 1-4 (the 0.1.5-0.1.10 releases
+condensed below into one clean version -- those interim numbers existed
+only to work around a PyPI upload snag and are otherwise identical in
+substance to what's listed here):
 
-## [0.1.9] - 2026-08-24
-- Added ghost lap download (Phase 3): a ⬇ button on each Top-10 row in
-  Lap Analyst's LEADERBOARD panel downloads that lap's stored samples and
-  loads it as Lap B, going through the same `Replay.load_b()` / A-vs-B
-  compare path as browsing a local JSON file
-- Refactored `lap_analyst.py`'s `load_lap()` into `load_lap_data(data)` +
-  a thin file-reading wrapper, so downloaded samples and local files share
-  one DataFrame-building code path
-- `leaderboard.py`: `get_top_laps()` now also returns each row's `id`;
-  added `get_lap_samples(lap_id)` to fetch one lap's stored samples for
-  download. A downloaded ghost has no GPS coordinates (leaderboard
-  submissions only store the compact fields), so it shows on the input
-  traces and A/B diffs but not the track map or replay -- verified
-  end-to-end against the live `laps` table
-
-## [0.1.8] - 2026-08-24
-- Version bump for PyPI publish attempt (0.1.7 was skipped without
-  uploading -- no functional change from 0.1.7)
-
-## [0.1.7] - 2026-08-24
-- Republished under 0.1.7 -- 0.1.6's wheel filename got stuck on PyPI
-  after an earlier upload attempt failed mid-transfer (metadata rejected,
-  but the file bytes were already stored server-side), which permanently
-  blocks re-uploading that exact filename. No functional change from 0.1.6
-- Switched `license` to the SPDX expression format (`license = "MIT"`)
-  and dropped the redundant `License :: OSI Approved :: MIT License`
-  classifier -- the old `{text = "MIT"}` + classifier combination trips
-  PyPI's newer metadata validation and gets rejected outright
-
-## [0.1.6] - 2026-08-24 (superseded, never published to PyPI)
-- Added the global lap leaderboard (Phase 2 of the Supabase-backed feature
-  set): a new `leaderboard.py` module (stdlib-only, same fire-and-forget
-  pattern as `analytics.py`) backs a "Submit to Leaderboard" button and a
-  live Top-10 panel in Lap Analyst's new LEADERBOARD sidebar section.
-  Identity is a self-reported PSN name, remembered in `settings.json` and
-  editable each time via the submit dialog
-- Server-side anti-cheat on every submission: physically-impossible lap
-  times are rejected outright, and times beating the current record by
-  more than 20% are held in a review queue instead of publishing
-  immediately -- both verified end-to-end against the live `laps` table
-- Full per-sample telemetry is stored with each leaderboard lap (not just
-  the lap time), so upcoming ghost-lap download and consensus racing-line
-  features can build on this table without a schema change
-- Wired crowdsourced car/track ID submission into the Live Dashboard: an
-  unrecognized live `car_id`, or a typed TRACK name not in `course_ids.csv`,
-  is now submitted to the community inbox automatically (once per unique
-  value per session) instead of silently staying unlabeled until manually
-  added via `add_car.py`/`add_track.py`
-- Fixed `launcher.py` so it runs directly (F5 in IDLE, double-click,
-  `python launcher.py`) without hitting "attempted relative import with no
-  known parent package" -- no more `-m` or `runpy` workarounds needed
-
-## [0.1.5] - 2026-08-24
-- Added anonymous usage analytics (Phase 1 of a Supabase-backed feature set):
-  a launch ping (`event`, `tool`, `version`, `os`, `created_at` -- exactly
-  those 5 fields, nothing else) sent once per tool launch via a new
-  `analytics.py` module. **On by default**, with a `SHARE USAGE DATA`
-  checkbox in the Live Dashboard header (next to `DEBUG LOG`) to opt out --
-  the setting is shared across all three tools via `settings.json`
-- Added a `privacy.html` page to the site disclosing exactly what's
-  collected and how to turn it off, linked from every page's nav/footer
-  and added to `sitemap.xml`
-- Regenerated `gt7telem-source.zip` to match the current package (it had
-  drifted badly out of sync -- was still the pre-refactor flat-file layout
-  from before the `src/gt7telem/` restructure). Now correctly nested
-  (`gt7telem/` folder at the zip root, matching `python -m gt7telem.launcher`
-  usage) with an updated `requirements.txt` and `README.txt`
+- **Anonymous usage analytics** (Phase 1): a launch ping (`event`, `tool`,
+  `version`, `os`, `created_at` -- exactly those 5 fields) sent once per
+  tool launch via `analytics.py`. On by default, with a `SHARE USAGE DATA`
+  checkbox in the Live Dashboard header to opt out
+- **Global lap leaderboard** (Phase 2): a new `leaderboard.py` module
+  backs a "Submit to Leaderboard" button and live Top-10 panel in Lap
+  Analyst. Identity is a self-reported PSN name, remembered locally.
+  Server-side anti-cheat rejects physically-impossible times outright and
+  holds times beating the current record by more than 20% for manual
+  review -- both verified end-to-end. Full per-sample telemetry is stored
+  per leaderboard lap, not just the lap time
+- **Crowdsourced car/track submissions**: an unrecognized live `car_id`,
+  or a typed TRACK name not in `course_ids.csv`, is submitted to the
+  community inbox automatically instead of staying unlabeled
+- **Ghost lap download** (Phase 3): a ⬇ button on each Top-10 row
+  downloads that lap's stored samples and loads it as Lap B, through the
+  same `Replay.load_b()` / A-vs-B compare path as a local file
+- **Consensus racing-line comparison** (Phase 4): a "Load Community Line"
+  button and new Consensus chart tab overlay your lap against the
+  community average speed/throttle/brake, bucketed by 10m track-position
+  entirely server-side via a Postgres function
+- Fixed `launcher.py` so it runs directly (F5, double-click, `python
+  launcher.py`) without a relative-import error
+- Switched `pyproject.toml`'s `license` field to the SPDX expression
+  format, fixing a PyPI metadata-validation rejection
+- Added a `privacy.html` page disclosing what analytics and leaderboard
+  submissions collect and how to turn analytics off, linked from every
+  page's nav/footer
 
 ## [0.1.4] - 2026-08-22
 - Added real screenshots (Live Dashboard, Lap Analyst, Race Analyst) to the
