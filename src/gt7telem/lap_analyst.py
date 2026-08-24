@@ -924,6 +924,43 @@ def draw_extended(fig, df, dfb=None):
         _Lb(axs[1,1], dfb, x, "current_lap_ms")
         _Lb(axs[1,2], dfb, x, "energy_recovery")
 
+# ── NEW: Consensus Racing Line ──────────────────────────────────────────────
+def draw_consensus(fig, df, dfb=None, consensus=None):
+    """Community-average speed/throttle/brake vs track_position, bucketed
+    server-side (Phase 4) -- overlaid against Lap A. No GPS coordinates in
+    leaderboard data, so this is track-position-based rather than a
+    _track_map-style GPS heatmap."""
+    axs = fig.subplots(2, 2); fig.subplots_adjust(hspace=0.5, wspace=0.35)
+    x = "track_position"
+    if not consensus:
+        for ax in axs.flat:
+            ax.text(0.5, 0.5, "No community line loaded yet\n(LEADERBOARD panel → Load Community Line)",
+                    ha="center", va="center", color=DIM, fontsize=10)
+            ax.axis("off")
+        return
+    bx = [c["bucket_start"] for c in consensus]
+    def cy(k): return [c.get(k, 0) for c in consensus]
+
+    _L(axs[0,0], df, x, "speed_kmh", C["speed"], lbl="You")
+    axs[0,0].plot(bx, cy("avg_speed"), color=YLW, lw=1.8, ls="--", label="Community")
+    axs[0,0].legend(fontsize=7); _ax(axs[0,0], "Speed vs Community", yl="km/h")
+
+    _L(axs[0,1], df, x, "throttle", C["throttle"], lbl="You")
+    axs[0,1].plot(bx, cy("avg_throttle"), color=YLW, lw=1.8, ls="--", label="Community")
+    axs[0,1].legend(fontsize=7); _ax(axs[0,1], "Throttle vs Community", yl="0–1")
+
+    _L(axs[1,0], df, x, "brake", C["brake"], lbl="You")
+    axs[1,0].plot(bx, cy("avg_brake"), color=YLW, lw=1.8, ls="--", label="Community")
+    axs[1,0].legend(fontsize=7); _ax(axs[1,0], "Brake vs Community", yl="0–1")
+
+    n_laps = consensus[0].get("lap_count", 0) if consensus else 0
+    n_buckets = len(consensus)
+    axs[1,1].text(0.5, 0.6, f"Consensus from\n{n_laps} top laps", ha="center", va="center",
+                  color=FG, fontsize=13, transform=axs[1,1].transAxes)
+    axs[1,1].text(0.5, 0.3, f"{n_buckets} track-position buckets (10m each)", ha="center", va="center",
+                  color=DIM, fontsize=9, transform=axs[1,1].transAxes)
+    axs[1,1].axis("off")
+
 # ── Groups registry ────────────────────────────────────────────────────────────
 GROUPS = [
     ("Inputs",    draw_inputs,          (3,3), (13,10)),
@@ -941,6 +978,7 @@ GROUPS = [
     ("Heat Maps", draw_minimap_heatmap, (3,3), (13,10)),
     ("Timeline",  draw_timeline,        (3,1), (13, 9)),
     ("Extended",  draw_extended,        (3,3), (13,10)),
+    ("Consensus", draw_consensus,       (2,2), (12, 8)),
 ]
 
 # ── Replay ────────────────────────────────────────────────────────────────────
@@ -1282,6 +1320,7 @@ class AnalystApp(tk.Tk):
         self.minsize(1100, 700)
         self._da = self._dfa = None
         self._db = self._dfb = None
+        self._consensus_line = None
         self._cfigs        = {}
         self._group_names  = []
         self._compare_mode = False
@@ -1360,6 +1399,9 @@ class AnalystApp(tk.Tk):
         tk.Button(fl, text="🏆  Submit to Leaderboard", command=self._submit_leaderboard,
                   bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(2,4))
+        tk.Button(fl, text="🌐  Load Community Line", command=self._load_consensus,
+                  bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
         self._top10_f = tk.Frame(fl, bg=PNL)
         self._top10_f.pack(fill="x", padx=8, pady=(0,4))
         tk.Label(self._top10_f, text="load a lap to see the top 10", fg=DIM, bg=PNL,
@@ -1448,7 +1490,10 @@ class AnalystApp(tk.Tk):
             plt.close(self._cfigs[name])
         fig = plt.figure(figsize=fs, facecolor=BG)
         dfb = self._dfb if self._compare_mode else None
-        fn(fig, self._dfa, dfb)
+        if name == "Consensus":
+            fn(fig, self._dfa, dfb, self._consensus_line)
+        else:
+            fn(fig, self._dfa, dfb)
         cv = FigureCanvasTkAgg(fig, master=f)
         cv.draw(); cv.get_tk_widget().pack(fill="both", expand=True)
         self._cfigs[name] = fig
@@ -1599,6 +1644,29 @@ class AnalystApp(tk.Tk):
             tk.Button(r, text="⬇", command=lambda row=row: self._download_ghost(row),
                       bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=4, pady=0,
                       cursor="hand2").pack(side="right", padx=(2,4))
+
+    def _load_consensus(self):
+        if self._da is None:
+            messagebox.showinfo("Community Line", "Load Lap A first."); return
+        car   = self._da.get("car_display")   or self._da.get("car", "?")
+        track = self._da.get("track_display") or self._da.get("track", "?")
+
+        def worker():
+            rows = leaderboard.get_consensus_line(car, track, n=10)
+            self.after(0, lambda: self._after_consensus(rows))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _after_consensus(self, rows):
+        if not rows:
+            messagebox.showinfo("Community Line",
+                                 "No community data yet for this car+track (or couldn't reach the server).")
+            return
+        self._consensus_line = rows
+        for k in list(self._cfigs):
+            if self._cfigs[k]: plt.close(self._cfigs[k])
+            self._cfigs[k] = None
+        self._draw_active_chart()
 
     def _download_ghost(self, row):
         """Download one leaderboard lap's samples and load it as Lap B --

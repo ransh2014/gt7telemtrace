@@ -20,7 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-__all__ = ["submit_lap", "get_top_laps", "get_lap_samples", "submit_car_id", "submit_track_name"]
+__all__ = ["submit_lap", "get_top_laps", "get_lap_samples", "get_consensus_line", "submit_car_id", "submit_track_name"]
 
 _SUPABASE_URL = "https://hignsvyojdqsjoidgkud.supabase.co"
 _SUPABASE_ANON_KEY = "sb_publishable_OdzGvcypa0GI7TVxxUkusQ_KJ_Apa8i"
@@ -131,6 +131,28 @@ def get_lap_samples(lap_id: int, timeout: float = 8) -> list:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             rows = json.loads(resp.read().decode("utf-8"))
             return rows[0]["samples"] if rows else []
+    except Exception:
+        return []
+
+
+def get_consensus_line(car_name: str, track_name: str, n: int = 10, timeout: float = 8) -> list:
+    """Return the server-computed consensus racing line (Phase 4): the
+    average speed/throttle/brake per 10m track-position bucket across the
+    top `n` laps for this car+track, computed entirely in Postgres (see
+    the `get_consensus_line` SQL function). Each item: {bucket_start,
+    avg_speed, avg_throttle, avg_brake, sample_count, lap_count}. Bucketed
+    by track_position rather than GPS coordinates because leaderboard
+    submissions don't carry world_x/world_z (see _compact_samples).
+    Returns [] on any failure or if there's no data yet for this car+track."""
+    payload = {"p_car_name": car_name, "p_track_name": track_name, "p_n": n}
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{_SUPABASE_URL}/rest/v1/rpc/get_consensus_line",
+            data=data, method="POST", headers=_headers(),
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
     except Exception:
         return []
 

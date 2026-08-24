@@ -10,6 +10,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `vX.Y.Z` tag push, same as the macOS app. Replaces manually running
   `rebuild_all.ps1` / building through WSL for those two platforms
 
+## [0.1.10] - 2026-08-24
+- Added the consensus racing-line comparison (Phase 4): a new
+  `get_consensus_line` Postgres function buckets the top N leaderboard
+  laps for a car+track by 10m track-position and averages speed/throttle/
+  brake per bucket entirely server-side; `leaderboard.py` exposes it as
+  `get_consensus_line()`. Bucketed by track_position rather than GPS
+  coordinates, since leaderboard submissions don't carry world_x/world_z
+- Lap Analyst gets a "🌐 Load Community Line" button in the LEADERBOARD
+  panel and a new **Consensus** chart tab overlaying your lap against the
+  community average on speed, throttle, and brake -- verified end-to-end
+  against the live `laps` table and a headless chart render
+
 ## [0.1.9] - 2026-08-24
 - Added ghost lap download (Phase 3): a ⬇ button on each Top-10 row in
   Lap Analyst's LEADERBOARD panel downloads that lap's stored samples and
