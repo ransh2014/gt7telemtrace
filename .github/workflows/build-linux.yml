@@ -1,0 +1,81 @@
+name: Build Linux Binary
+
+# Produces a standalone TRACE binary via a GitHub-hosted Linux runner --
+# replaces building it locally through WSL. Runs automatically on a version
+# tag (and attaches the zip to the GitHub Release for that tag); can also be
+# triggered manually from the Actions tab to test a build without cutting a
+# release.
+#
+# Mirrors build-macos.yml's approach: PyInstaller can't point directly at
+# src/gt7telem/launcher.py because of the package's relative imports, so we
+# write a plain entry-point script that imports gt7telem as an installed
+# package instead.
+#
+# tkinter needs its system package installed explicitly on Linux runners
+# (python3-tk) -- it isn't bundled with Python the way it is on
+# Windows/macOS.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build TRACE binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system Tk dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+
+      - name: Install package and PyInstaller
+        run: python -m pip install . pyinstaller
+
+      - name: Write PyInstaller entry point
+        run: |
+          cat > entrypoint.py << 'EOF'
+          import sys
+          from gt7telem.launcher import main
+
+          if __name__ == "__main__":
+              sys.exit(main())
+          EOF
+
+      - name: Build TRACE binary
+        run: |
+          PKG_DIR=$(python -c "import gt7telem, os; print(os.path.dirname(gt7telem.__file__))")
+          pyinstaller --onefile --name TRACE \
+            --add-data "$PKG_DIR/car_ids.csv:gt7telem" \
+            --add-data "$PKG_DIR/course_ids.csv:gt7telem" \
+            entrypoint.py
+
+      - name: Zip the binary
+        run: |
+          cd dist
+          zip ../gt7telem-linux.zip TRACE
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gt7telem-linux
+          path: gt7telem-linux.zip
+          retention-days: 30
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: gt7telem-linux.zip

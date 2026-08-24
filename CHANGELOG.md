@@ -4,6 +4,11 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+- Added `build-windows.yml` and `build-linux.yml` GitHub Actions workflows,
+  mirroring the existing `build-macos.yml` -- Windows `.exe` and Linux
+  binaries now build automatically via GitHub-hosted runners on every
+  `vX.Y.Z` tag push, same as the macOS app. Replaces manually running
+  `rebuild_all.ps1` / building through WSL for those two platforms
 
 ## [0.1.5] - 2026-08-24
 - Added anonymous usage analytics (Phase 1 of a Supabase-backed feature set):
