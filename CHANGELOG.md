@@ -10,6 +10,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `vX.Y.Z` tag push, same as the macOS app. Replaces manually running
   `rebuild_all.ps1` / building through WSL for those two platforms
 
+## [0.1.8] - 2026-08-24
+- Version bump for PyPI publish attempt (0.1.7 was skipped without
+  uploading -- no functional change from 0.1.7)
+
 ## [0.1.7] - 2026-08-24
 - Republished under 0.1.7 -- 0.1.6's wheel filename got stuck on PyPI
   after an earlier upload attempt failed mid-transfer (metadata rejected,
