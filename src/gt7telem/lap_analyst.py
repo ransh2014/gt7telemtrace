@@ -62,8 +62,14 @@ plt.rcParams.update({
 })
 
 # ── Data ──────────────────────────────────────────────────────────────────────
-def load_lap(path):
-    with open(path) as f: data = json.load(f)
+def load_lap_data(data):
+    """Build the analysis DataFrame from an already-parsed lap dict --
+    shared by load_lap() (reads a local JSON file) and ghost-lap download
+    (data comes from Supabase instead of disk, via leaderboard.py). A
+    downloaded ghost's samples only carry the compact fields
+    (track_position/speed_kmh/throttle/brake/steering/gear), so every other
+    column below falls back to its 0.0/"" default -- meaning no GPS map or
+    replay for a ghost, but the input-trace charts and A/B diffs work fine."""
     samples = data.get("samples", [])
     if not samples: raise ValueError("No samples in file")
     df = pd.DataFrame(samples)
@@ -95,6 +101,10 @@ def load_lap(path):
     df["lr_t_bal"]     = (df["tyre_temp_fl"] + df["tyre_temp_rl"]) / 2 \
                        - (df["tyre_temp_fr"] + df["tyre_temp_rr"]) / 2
     return data, df
+
+def load_lap(path):
+    with open(path) as f: data = json.load(f)
+    return load_lap_data(data)
 
 def lap_label(data, short=False):
     t = data.get("lap_time_s", 0)
@@ -1585,7 +1595,51 @@ class AnalystApp(tk.Tk):
             col = YLW if i == 1 else (FG if i <= 3 else DIM)
             tk.Label(r, text=f"{i}.", fg=col, bg=PNL, font=FONTL, width=3, anchor="w").pack(side="left")
             tk.Label(r, text=time_str, fg=col, bg=PNL, font=FONTL, width=10, anchor="w").pack(side="left")
-            tk.Label(r, text=name, fg=col, bg=PNL, font=FONTL, anchor="w").pack(side="left")
+            tk.Label(r, text=name, fg=col, bg=PNL, font=FONTL, anchor="w").pack(side="left", fill="x", expand=True)
+            tk.Button(r, text="⬇", command=lambda row=row: self._download_ghost(row),
+                      bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=4, pady=0,
+                      cursor="hand2").pack(side="right", padx=(2,4))
+
+    def _download_ghost(self, row):
+        """Download one leaderboard lap's samples and load it as Lap B --
+        same downstream path (Replay.load_b / self._dfb) as browsing a local
+        JSON file, just sourced from Supabase (Phase 3)."""
+        lap_id = row.get("id")
+        if lap_id is None:
+            messagebox.showerror("Ghost Download", "This row has no lap id -- can't download it.")
+            return
+        threading.Thread(target=self._download_ghost_worker, args=(row,), daemon=True).start()
+
+    def _download_ghost_worker(self, row):
+        samples = leaderboard.get_lap_samples(row["id"])
+        if not samples:
+            self.after(0, lambda: messagebox.showerror(
+                "Ghost Download", "Couldn't download that lap -- check your internet connection and try again."))
+            return
+        data = {
+            "car": row.get("car_name", "?"),
+            "track": row.get("track_name", "?"),
+            "lap_time_s": row.get("lap_time_ms", 0) / 1000.0,
+            "samples": samples,
+        }
+        try:
+            _, dfb = load_lap_data(data)
+        except Exception as e:
+            msg = str(e)
+            self.after(0, lambda: messagebox.showerror("Ghost Download", msg))
+            return
+        self.after(0, lambda: self._load_ghost_result(data, dfb, row))
+
+    def _load_ghost_result(self, data, dfb, row):
+        lbl = f"{row.get('psn_name','?')} (ghost) -- {lap_label(data, short=True)}"
+        self._db, self._dfb = data, dfb
+        self._lb.config(text=lbl, fg=ACC)
+        self._replay.load_b(dfb, lbl)
+        if self._compare_mode:
+            for k in list(self._cfigs):
+                if self._cfigs[k]: plt.close(self._cfigs[k])
+                self._cfigs[k] = None
+            self._draw_active_chart()
 
     def _submit_leaderboard(self):
         if self._da is None:

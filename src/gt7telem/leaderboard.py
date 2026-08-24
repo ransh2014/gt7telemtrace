@@ -20,7 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-__all__ = ["submit_lap", "get_top_laps", "submit_car_id", "submit_track_name"]
+__all__ = ["submit_lap", "get_top_laps", "get_lap_samples", "submit_car_id", "submit_track_name"]
 
 _SUPABASE_URL = "https://hignsvyojdqsjoidgkud.supabase.co"
 _SUPABASE_ANON_KEY = "sb_publishable_OdzGvcypa0GI7TVxxUkusQ_KJ_Apa8i"
@@ -86,13 +86,15 @@ def submit_lap(car_name: str, track_name: str, lap_time_ms: int,
 def get_top_laps(car_name: str, track_name: str, n: int = 10, timeout: float = 8) -> list:
     """Return up to `n` fastest public leaderboard laps for this exact
     car+track, sorted ascending by lap time. Each row is a dict:
-    {car_name, track_name, lap_time_ms, psn_name, created_at}.
-    Returns [] on any failure (offline, nothing submitted yet, etc) --
-    callers should treat an empty list as "nothing to show", not an error."""
+    {id, car_name, track_name, lap_time_ms, psn_name, created_at}. `id` is
+    included so a row can be passed straight to get_lap_samples() for a
+    ghost-lap download. Returns [] on any failure (offline, nothing
+    submitted yet, etc) -- callers should treat an empty list as "nothing
+    to show", not an error."""
     params = urllib.parse.urlencode({
         "car_name": f"eq.{car_name}",
         "track_name": f"eq.{track_name}",
-        "select": "car_name,track_name,lap_time_ms,psn_name,created_at",
+        "select": "id,car_name,track_name,lap_time_ms,psn_name,created_at",
         "order": "lap_time_ms.asc",
         "limit": str(n),
     })
@@ -103,6 +105,32 @@ def get_top_laps(car_name: str, track_name: str, n: int = 10, timeout: float = 8
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return []
+
+
+def get_lap_samples(lap_id: int, timeout: float = 8) -> list:
+    """Return the compact sample list stored for one specific leaderboard
+    lap (by the numeric `id` returned in get_top_laps() rows) -- used for
+    ghost-lap download (Phase 3). Each sample only has the fields
+    _compact_samples() keeps (track_position, speed_kmh, throttle, brake,
+    steering, gear) -- enough for the input-trace charts and A/B diffs, but
+    without world_x/world_z/t there's no GPS track map or replay for a
+    downloaded ghost. Returns [] on any failure or if the lap doesn't
+    exist."""
+    params = urllib.parse.urlencode({
+        "id": f"eq.{int(lap_id)}",
+        "select": "samples",
+        "limit": "1",
+    })
+    try:
+        req = urllib.request.Request(
+            f"{_SUPABASE_URL}/rest/v1/laps?{params}",
+            method="GET", headers=_headers(),
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+            return rows[0]["samples"] if rows else []
     except Exception:
         return []
 

@@ -10,6 +10,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `vX.Y.Z` tag push, same as the macOS app. Replaces manually running
   `rebuild_all.ps1` / building through WSL for those two platforms
 
+## [0.1.9] - 2026-08-24
+- Added ghost lap download (Phase 3): a ⬇ button on each Top-10 row in
+  Lap Analyst's LEADERBOARD panel downloads that lap's stored samples and
+  loads it as Lap B, going through the same `Replay.load_b()` / A-vs-B
+  compare path as browsing a local JSON file
+- Refactored `lap_analyst.py`'s `load_lap()` into `load_lap_data(data)` +
+  a thin file-reading wrapper, so downloaded samples and local files share
+  one DataFrame-building code path
+- `leaderboard.py`: `get_top_laps()` now also returns each row's `id`;
+  added `get_lap_samples(lap_id)` to fetch one lap's stored samples for
+  download. A downloaded ghost has no GPS coordinates (leaderboard
+  submissions only store the compact fields), so it shows on the input
+  traces and A/B diffs but not the track map or replay -- verified
+  end-to-end against the live `laps` table
+
 ## [0.1.8] - 2026-08-24
 - Version bump for PyPI publish attempt (0.1.7 was skipped without
   uploading -- no functional change from 0.1.7)
