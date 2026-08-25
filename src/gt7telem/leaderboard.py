@@ -26,10 +26,14 @@ _SUPABASE_URL = "https://hignsvyojdqsjoidgkud.supabase.co"
 _SUPABASE_ANON_KEY = "sb_publishable_OdzGvcypa0GI7TVxxUkusQ_KJ_Apa8i"
 
 
-def _headers(prefer=None):
+def _headers(prefer=None, access_token=None):
+    """access_token, when given, is used as the Authorization bearer instead
+    of the anon key -- needed for any write that RLS checks auth.uid()
+    against (e.g. submitting a lap). apikey stays the anon key either way;
+    Supabase requires it alongside a user JWT, not instead of one."""
     h = {
         "apikey": _SUPABASE_ANON_KEY,
-        "Authorization": f"Bearer {_SUPABASE_ANON_KEY}",
+        "Authorization": f"Bearer {access_token or _SUPABASE_ANON_KEY}",
         "Content-Type": "application/json",
     }
     if prefer:
@@ -56,13 +60,21 @@ def _compact_samples(samples):
 
 
 def submit_lap(car_name: str, track_name: str, lap_time_ms: int,
-               psn_name: str, samples: list, timeout: float = 8) -> bool:
+               psn_name: str, samples: list, access_token: str = "",
+               user_id: str = "", timeout: float = 8) -> bool:
     """Submit a lap to the global leaderboard. Returns True if the request
     reached Supabase successfully -- this does NOT mean it made the public
     leaderboard, since a flagged or rejected submission also returns True
     here (both are resolved server-side, silently, by design -- see the
     anti-cheat note above). Returns False only on a genuine network/request
-    failure (offline, DNS, timeout, malformed response)."""
+    failure (offline, DNS, timeout, malformed response).
+
+    access_token/user_id come from a signed-in Supabase session (see
+    auth.py); the `laps` table's INSERT RLS policy requires
+    `auth.uid() = user_id`, so a submission with no access_token will be
+    rejected by RLS unless the anon key alone is still permitted. Both
+    default to "" so existing callers (anon-key-only) keep working
+    unchanged."""
     payload = {
         "car_name": car_name,
         "track_name": track_name,
@@ -70,12 +82,14 @@ def submit_lap(car_name: str, track_name: str, lap_time_ms: int,
         "psn_name": psn_name,
         "samples": _compact_samples(samples),
     }
+    if user_id:
+        payload["user_id"] = user_id
     try:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             f"{_SUPABASE_URL}/rest/v1/laps",
             data=data, method="POST",
-            headers=_headers(prefer="return=minimal"),
+            headers=_headers(prefer="return=minimal", access_token=access_token or None),
         )
         urllib.request.urlopen(req, timeout=timeout)
         return True

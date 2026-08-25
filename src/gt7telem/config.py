@@ -9,20 +9,40 @@ import json
 import sys
 from pathlib import Path
 
-__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED", "PSN_NAME"]
+__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED", "PSN_NAME",
+           "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE"]
 
 
 def _base_dir() -> Path:
+    """Where settings.json lives. Frozen (.exe/.app) builds keep it next to
+    the executable -- a deliberate portable-app design, untouched here.
+    Non-frozen (pip/source) runs used to resolve this to the package's own
+    install directory (Path(__file__).parent), which for a pip install
+    means inside site-packages: not reliably writable, and wiped on every
+    `pip install --upgrade` -- silently, since save() swallows write
+    failures. A per-user config dir survives upgrades and reinstalls."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
-    return Path(__file__).parent
+    d = Path.home() / ".gt7telem"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _default_laps_dir() -> Path:
+    """Frozen builds keep laps next to the exe, as before. Non-frozen runs
+    get a visible ~/TRACE/laps instead of nesting inside the hidden
+    ~/.gt7telem config dir, which would be a surprising place to go looking
+    for recorded laps."""
+    if getattr(sys, "frozen", False):
+        return _base_dir() / "laps"
+    return Path.home() / "TRACE" / "laps"
 
 
 _SETTINGS_FILE = _base_dir() / "settings.json"
 
 _DEFAULTS = {
     "PS_IP": "192.168.1.1",
-    "LAPS_FOLDER": str(_base_dir() / "laps"),
+    "LAPS_FOLDER": str(_default_laps_dir()),
     # Recording sample rate in Hz for Record Lap / Record Race (see
     # gt7telem.py's RECORD_RATE_OPTIONS). 10 is the safe default -- it's
     # the one rate we know for certain the app can sustain end-to-end.
@@ -37,6 +57,15 @@ _DEFAULTS = {
     # Remembered PSN name for leaderboard submissions -- pre-fills the
     # submit dialog each time, editable inline there if you want to change it.
     "PSN_NAME": "",
+    # Supabase anonymous-auth session (see auth.py) -- required by the
+    # `laps` table's INSERT RLS policy (auth.uid() = user_id) to submit a
+    # lap. Empty until the user completes onboarding or signs up later.
+    "SUPABASE_ACCESS_TOKEN": "",
+    "SUPABASE_REFRESH_TOKEN": "",
+    "SUPABASE_USER_ID": "",
+    # Set True the first time the onboarding screen is shown (whether the
+    # user creates an account or skips) so launcher.py never shows it again.
+    "ONBOARDING_DONE": False,
 }
 
 MAX_KNOWN_IPS = 3
@@ -86,3 +115,7 @@ KNOWN_IPS = _cfg["KNOWN_IPS"]
 DEBUG_LOG = _cfg["DEBUG_LOG"]
 ANALYTICS_ENABLED = _cfg["ANALYTICS_ENABLED"]
 PSN_NAME = _cfg["PSN_NAME"]
+SUPABASE_ACCESS_TOKEN = _cfg["SUPABASE_ACCESS_TOKEN"]
+SUPABASE_REFRESH_TOKEN = _cfg["SUPABASE_REFRESH_TOKEN"]
+SUPABASE_USER_ID = _cfg["SUPABASE_USER_ID"]
+ONBOARDING_DONE = _cfg["ONBOARDING_DONE"]

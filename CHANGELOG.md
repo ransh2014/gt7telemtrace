@@ -5,6 +5,42 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-25
+Optional accounts + leaderboard identity (the last planned feature --
+TRACE moves to maintenance mode after this: bug fixes and car/track
+database updates only, no further new features):
+
+- **Optional free account** via Supabase anonymous auth (new `auth.py`
+  module) -- just a display name, no email or password ever. Submitting
+  a lap to the leaderboard now requires a real (possibly anonymous)
+  signed-in session instead of trusting a free-typed name; the `laps`
+  table's INSERT policy enforces `auth.uid() = user_id` server-side
+- New `profiles` table (auto-created on signup via trigger); `laps` and
+  `flagged_submissions` both gained a `user_id` column so a submission,
+  including one held for anti-cheat review, traces back to a real
+  identity -- verified end-to-end
+- Closed an abuse hole found in the process: the old anon-key-only INSERT
+  policy on `laps` had let something spam six garbage rows into the
+  public leaderboard table before this release: the new auth-required
+  policy blocks that outright
+- `launcher.py` rebuilt: larger resizable centered window, a one-time
+  onboarding screen (create account or skip -- skipping still allows
+  viewing the leaderboard, ghost downloads, and the consensus line, only
+  submitting needs an account), and a restyled tool menu with a
+  persistent "Sign In / Create Account" link if you skipped
+- `lap_analyst.py`'s Submit-to-Leaderboard flow now prompts inline to
+  create an account if you haven't, instead of failing silently
+- Fixed `config.py`'s `_base_dir()`: for pip/source installs it used to
+  resolve inside site-packages -- not reliably writable, and wiped on
+  every `pip install --upgrade`, which would've silently broken
+  onboarding persistence specifically. Now uses `~/.gt7telem`, verified
+  from a real installed wheel in a clean venv, not just source. Laps
+  default to the more visible `~/TRACE/laps` for non-frozen installs
+- Fixed a stale `__version__ = "0.1.5"` left in `__init__.py` since
+  0.1.6 -- now synced with the package version again
+- Added a `pg_cron` job cleaning up `flagged_submissions` older than 30
+  days, entirely server-side
+
 ## [0.2.0] - 2026-08-24
 Supabase-backed community features, Phases 1-4 (the 0.1.5-0.1.10 releases
 condensed below into one clean version -- those interim numbers existed

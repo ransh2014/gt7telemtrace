@@ -13,8 +13,8 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
+from . import auth, leaderboard
 from . import config as runtime_config
-from . import leaderboard
 
 matplotlib.use("TkAgg")
 import warnings
@@ -1719,6 +1719,10 @@ class AnalystApp(tk.Tk):
         if not samples:
             messagebox.showinfo("Submit to Leaderboard", "This lap has no samples to submit."); return
 
+        if not runtime_config.SUPABASE_ACCESS_TOKEN:
+            if not self._prompt_create_account():
+                return
+
         psn = simpledialog.askstring(
             "Submit to Leaderboard",
             f"Submitting: {car} @ {track}  —  {lap_time_ms/1000:.3f}s\n\nPSN name:",
@@ -1730,10 +1734,102 @@ class AnalystApp(tk.Tk):
         runtime_config.save(PSN_NAME=psn)
 
         def worker():
-            ok = leaderboard.submit_lap(car, track, lap_time_ms, psn, samples)
+            ok = leaderboard.submit_lap(
+                car, track, lap_time_ms, psn, samples,
+                access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
+                user_id=runtime_config.SUPABASE_USER_ID)
             self.after(0, lambda: self._after_submit(ok))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _prompt_create_account(self) -> bool:
+        """Submit to Leaderboard was hit with no signed-in session (the user
+        skipped onboarding earlier) -- offer the same anonymous sign-up flow
+        as launcher.py's onboarding screen, inline, instead of just failing
+        on submit. Returns True once a session exists (freshly created),
+        False if the user cancelled or sign-up failed."""
+        win = tk.Toplevel(self)
+        win.title("Create a Free Account")
+        win.configure(bg=PNL)
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+
+        result = {"ok": False}
+
+        tk.Label(win, text="Create a free account to submit laps",
+                 font=FONTB, fg=YLW, bg=PNL).pack(padx=24, pady=(18, 6))
+        tk.Label(win, text="Just a display name -- no email or password needed.",
+                 font=FONTL, fg=DIM, bg=PNL).pack(padx=24)
+
+        name_var = tk.StringVar(value=runtime_config.PSN_NAME)
+        entry = tk.Entry(win, textvariable=name_var, font=FONT, width=24,
+                          bg=PNL2, fg=FG, insertbackground=CYN, relief="flat",
+                          justify="center")
+        entry.pack(ipady=5, padx=24, pady=14)
+        entry.focus_set()
+
+        status = tk.Label(win, text="", font=FONTL, fg=ACC, bg=PNL,
+                           wraplength=260, justify="center")
+        status.pack(padx=24, pady=(0, 6))
+
+        btn_row = tk.Frame(win, bg=PNL)
+        btn_row.pack(pady=(0, 18))
+
+        create_btn = tk.Button(btn_row, text="Create Account", font=FONTB,
+                                bg=CYN, fg=PNL, bd=0, padx=12, pady=6,
+                                cursor="hand2")
+        create_btn.pack(side="left", padx=6)
+        cancel_btn = tk.Button(btn_row, text="Cancel", font=FONT, bg=DIM2,
+                                fg=FG, bd=0, padx=12, pady=6, cursor="hand2")
+        cancel_btn.pack(side="left", padx=6)
+
+        def set_busy(busy):
+            state = "disabled" if busy else "normal"
+            create_btn.config(state=state)
+            cancel_btn.config(state=state)
+
+        def do_create():
+            name = name_var.get().strip()
+            if not name:
+                status.config(text="Enter a display name first.")
+                return
+            set_busy(True)
+            status.config(text="Creating account…", fg=DIM)
+
+            def worker():
+                session = auth.sign_up_anonymous()
+                if session:
+                    auth.set_display_name(session["access_token"], session["user_id"], name)
+                win.after(0, lambda: after_create(session, name))
+
+            threading.Thread(target=worker, daemon=True).start()
+
+        def after_create(session, name):
+            if not session:
+                set_busy(False)
+                status.config(text="Couldn't reach the server -- try again.", fg=ACC)
+                return
+            runtime_config.SUPABASE_ACCESS_TOKEN = session["access_token"]
+            runtime_config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
+            runtime_config.SUPABASE_USER_ID = session["user_id"]
+            runtime_config.PSN_NAME = name
+            runtime_config.ONBOARDING_DONE = True
+            runtime_config.save(
+                SUPABASE_ACCESS_TOKEN=session["access_token"],
+                SUPABASE_REFRESH_TOKEN=session["refresh_token"],
+                SUPABASE_USER_ID=session["user_id"],
+                PSN_NAME=name,
+                ONBOARDING_DONE=True,
+            )
+            result["ok"] = True
+            win.destroy()
+
+        create_btn.config(command=do_create)
+        cancel_btn.config(command=win.destroy)
+
+        self.wait_window(win)
+        return result["ok"]
 
     def _after_submit(self, ok):
         if ok:
