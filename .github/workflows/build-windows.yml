@@ -58,17 +58,17 @@ jobs:
         shell: bash
         run: |
           cd dist
-          7z a ../gt7telem.zip TRACE.exe
+          7z a ../gt7telem-windows.zip TRACE.exe
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: gt7telem-windows
-          path: gt7telem.zip
+          path: gt7telem-windows.zip
           retention-days: 30
 
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: gt7telem.zip
+          files: gt7telem-windows.zip
