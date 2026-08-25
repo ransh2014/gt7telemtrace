@@ -15,6 +15,8 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 > Community tool — not affiliated with, endorsed by, or connected to Polyphony Digital or Sony Interactive Entertainment.
 
+> **Project status:** feature-complete as of this release. From here on it's maintenance only — bug fixes, and car/track database refreshes as [ddm999's gt7info](https://github.com/ddm999/gt7info) updates. No further new features are planned.
+
 ---
 
 ## Table of contents
@@ -72,6 +74,13 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - `add_car.py` / `add_track.py` — add missing car/track IDs to the local database
 - Ships with **580+ cars** and **120+ tracks** pre-resolved out of the box; the car database is refreshed every time 10 or more new cars have been added since the last update
 
+### Community Leaderboard (Lap Analyst)
+- Submit any recorded lap to a public per-car, per-track leaderboard with one click; live Top-10 panel in the sidebar
+- Server-side anti-cheat — physically-impossible times are rejected outright, times beating the record by more than 20% are held for manual review
+- Ghost lap download — pull any Top-10 lap straight into the A/B compare view as Lap B
+- Consensus racing line — overlay a community-average speed/throttle/brake line, bucketed from the current top 10 laps for your car and track
+- Optional free account (display name only, no email or password) so a submission ties to something real; entirely skippable — viewing the leaderboard, ghost downloads, and the consensus line all work without one
+
 ---
 
 ## Install
@@ -117,13 +126,15 @@ Find your console's IP: **Settings → Network → View Connection Status** on y
 
 ## How it works
 
-TRACE talks directly to the console — no server, no browser, no cloud:
+TRACE talks directly to the console for all core telemetry — no server, no browser, no cloud involved in reading your live data:
 
 - A UDP **heartbeat** (`"C"`) is sent to `<console IP>:33739` roughly once a second, requesting GT7's fullest telemetry packet (the "extended" B + ~ + C fields — motion data, filtered inputs, and energy recovery all in one).
 - GT7 streams packets back to your PC on port `33740`.
 - Each packet is decrypted with Salsa20 and unpacked into a `Telemetry` snapshot — the protocol details this library relies on were reverse-engineered by [Bornhall](https://github.com/Bornhall/gt7telemetry) (see [Credits](#credits)).
 - Because TRACE always requests the extended packet, you get motion/sway/heave/surge and filtered-input data automatically — there's no separate "heartbeat type" setting to configure.
 - Settings (last-used IP, sample rate, known-good IPs, analytics opt-out) persist to a `settings.json` next to wherever you run TRACE from, so there's nothing to reconfigure between sessions.
+
+The one exception is the optional leaderboard: submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS. Nothing about your live session is ever sent unless you press "Submit to Leaderboard."
 
 ---
 
@@ -133,7 +144,9 @@ TRACE sends a small anonymous usage ping (which tool launched, TRACE version, OS
 
 Turn it off any time: **Live Dashboard → `SHARE USAGE DATA` checkbox** (next to `DEBUG LOG` in the header) — the setting applies to all three tools since they share the same `settings.json`.
 
-Full disclosure of exactly what's sent: **[gt7trace.netlify.app/privacy.html](https://gt7trace.netlify.app/privacy.html)**
+Submitting a lap to the leaderboard is a separate, always-explicit opt-in (a button you press), and the optional free account only ever stores a display name and an anonymous ID — no email, no password.
+
+Full disclosure of exactly what's sent for both: **[gt7trace.netlify.app/privacy.html](https://gt7trace.netlify.app/privacy.html)**
 
 ---
 
