@@ -81,6 +81,8 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Consensus racing line — overlay a community-average speed/throttle/brake line, bucketed from the current top 10 laps for your car and track
 - Optional free account (display name only, no email or password) so a submission ties to something real; entirely skippable — viewing the leaderboard, ghost downloads, and the consensus line all work without one
 
+> **Known issue (as of Aug 26, 2026):** account creation and lap submission are currently failing server-side due to an unresolved upstream Supabase auth bug (not a TRACE issue, no ETA from Supabase). Everything else — Live Dashboard, Lap Analyst, Race Analyst, viewing the leaderboard, ghost downloads — is unaffected. See [CHANGELOG.md](CHANGELOG.md) for the latest fixes on our end.
+
 ---
 
 ## Install
