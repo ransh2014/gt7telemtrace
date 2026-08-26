@@ -5,6 +5,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-08-27
+Docs-only release:
+
+- Added `cacheSeconds=300` to all README shields.io badges (PyPI version,
+  Python versions, downloads, license, last commit) so they refresh within
+  5 minutes instead of being stuck on stale cached values for up to an hour.
+
 ## [0.2.4] - 2026-08-26
 Small UX polish (maintenance mode -- no new features):
 
