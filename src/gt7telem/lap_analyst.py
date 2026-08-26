@@ -1799,13 +1799,14 @@ class AnalystApp(tk.Tk):
 
             def worker():
                 session = auth.sign_up_anonymous()
+                name_saved = False
                 if session:
-                    auth.set_display_name(session["access_token"], session["user_id"], name)
-                win.after(0, lambda: after_create(session, name))
+                    name_saved = auth.set_display_name(session["access_token"], session["user_id"], name)
+                win.after(0, lambda: after_create(session, name, name_saved))
 
             threading.Thread(target=worker, daemon=True).start()
 
-        def after_create(session, name):
+        def after_create(session, name, name_saved=True):
             if not session:
                 set_busy(False)
                 status.config(text="Couldn't reach the server -- try again.", fg=ACC)
@@ -1823,7 +1824,17 @@ class AnalystApp(tk.Tk):
                 ONBOARDING_DONE=True,
             )
             result["ok"] = True
-            win.destroy()
+            if name_saved:
+                win.destroy()
+                return
+            # Same known Supabase issue as launcher.py's onboarding screen --
+            # account/session is fine, just the display-name sync failed.
+            # Say so briefly instead of closing as if nothing happened.
+            set_busy(False)
+            status.config(
+                text="Account created — display name didn't sync (known "
+                     "Supabase issue). Continuing anyway...", fg=ACC)
+            win.after(1800, win.destroy)
 
         create_btn.config(command=do_create)
         cancel_btn.config(command=win.destroy)

@@ -166,13 +166,14 @@ def _show_onboarding(from_menu: bool = False):
 
         def worker():
             session = auth.sign_up_anonymous()
+            name_saved = False
             if session:
-                auth.set_display_name(session["access_token"], session["user_id"], name)
-            root.after(0, lambda: after_create(session, name))
+                name_saved = auth.set_display_name(session["access_token"], session["user_id"], name)
+            root.after(0, lambda: after_create(session, name, name_saved))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def after_create(session, name):
+    def after_create(session, name, name_saved=True):
         set_busy(False)
         if not session:
             status.config(
@@ -191,7 +192,19 @@ def _show_onboarding(from_menu: bool = False):
             PSN_NAME=config.PSN_NAME,
             ONBOARDING_DONE=True,
         )
-        _show_menu()
+        if name_saved:
+            _show_menu()
+            return
+        # Account/session creation itself worked -- only the display-name
+        # sync failed (a known upstream Supabase auth issue). Say so
+        # honestly instead of silently swallowing it and looking done;
+        # the account still works fine, submissions just use whatever
+        # name you type at submit time either way.
+        status.config(
+            text="Account created — display name didn't sync to the "
+                 "server (known Supabase issue on their end). Doesn't "
+                 "affect using TRACE.", fg=PINK)
+        root.after(2200, _show_menu)
 
     create_btn.config(command=do_create)
     skip_btn.config(command=do_skip)

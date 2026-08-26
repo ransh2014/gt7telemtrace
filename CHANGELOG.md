@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-26
+Bug fix (maintenance mode -- no new features):
+
+- `launcher.py`'s onboarding screen and `lap_analyst.py`'s inline
+  "Create a Free Account" dialog both ignored the return value of
+  `auth.set_display_name()`, so when the display-name sync to Supabase
+  failed silently -- as it currently does for every anonymous account,
+  due to an unresolved upstream Supabase JWT/RLS auth bug, not anything
+  on our end -- the app still showed the flow as fully successful.
+  Both now check the result and tell you honestly when the name didn't
+  sync, instead of a false "you're all set." The account/session itself
+  still works fine either way; this only affected the display-name field.
+- Fixed `__version__` in `gt7telem/__init__.py` being stuck on "0.2.0"
+  while `pyproject.toml` had already moved on (cosmetic; `pip show`
+  always reported the right version).
+
 ## [0.2.1] - 2026-08-25
 Optional accounts + leaderboard identity (the last planned feature --
 TRACE moves to maintenance mode after this: bug fixes and car/track
