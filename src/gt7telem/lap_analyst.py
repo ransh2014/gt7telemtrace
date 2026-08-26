@@ -1734,11 +1734,11 @@ class AnalystApp(tk.Tk):
         runtime_config.save(PSN_NAME=psn)
 
         def worker():
-            ok = leaderboard.submit_lap(
+            ok, reason = leaderboard.submit_lap(
                 car, track, lap_time_ms, psn, samples,
                 access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
                 user_id=runtime_config.SUPABASE_USER_ID)
-            self.after(0, lambda: self._after_submit(ok))
+            self.after(0, lambda: self._after_submit(ok, reason))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -1842,11 +1842,15 @@ class AnalystApp(tk.Tk):
         self.wait_window(win)
         return result["ok"]
 
-    def _after_submit(self, ok):
+    def _after_submit(self, ok, reason="network"):
         if ok:
             messagebox.showinfo("Submit to Leaderboard",
                                  "Submitted! If it's a new top time it'll appear on the leaderboard shortly.")
             self._refresh_top10()
+        elif reason == "server":
+            messagebox.showerror("Submit to Leaderboard",
+                                  "The server rejected the submission -- this is a server-side issue, "
+                                  "not your connection. Try again later.")
         else:
             messagebox.showerror("Submit to Leaderboard",
                                   "Couldn't reach the leaderboard — check your internet connection and try again.")

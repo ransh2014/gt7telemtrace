@@ -5,6 +5,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-08-26
+Small UX polish (maintenance mode -- no new features):
+
+- `leaderboard.submit_lap()` now distinguishes a genuine network failure
+  from a server-side rejection (e.g. the ongoing Supabase auth bug)
+  instead of collapsing both into one generic exception handler. The
+  Lap Analyst's submit-failure message no longer tells you to "check
+  your internet connection" when the real problem is server-side --
+  it says so, so you're not chasing the wrong fix.
+
 ## [0.2.3] - 2026-08-26
 Re-tag of 0.2.2 -- the v0.2.2 tag push never triggered CI/build/publish
 for reasons unclear (GitHub Actions just didn't pick it up), so bumping

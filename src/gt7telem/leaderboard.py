@@ -6,10 +6,11 @@ Anti-cheat runs server-side (see the `validate_lap_submission` Postgres
 trigger): physically-impossible times are rejected outright and never
 appear anywhere; times that beat the current record by more than 20% are
 held in a review queue instead of hitting the public leaderboard
-immediately. Both cases still return True from submit_lap() below, since
-that return value only means "the request reached Supabase successfully" --
-whether it actually made the leaderboard is a separate question, answered
-by calling get_top_laps() afterward if you want to check.
+immediately. Both cases still return (True, "ok") from submit_lap() below,
+since that success value only means "the request reached Supabase
+successfully" -- whether it actually made the leaderboard is a separate
+question, answered by calling get_top_laps() afterward if you want to
+check.
 
 Like analytics.py, this module is stdlib-only (urllib), never raises to
 the caller, and every function has a short network timeout so a submit
@@ -61,13 +62,20 @@ def _compact_samples(samples):
 
 def submit_lap(car_name: str, track_name: str, lap_time_ms: int,
                psn_name: str, samples: list, access_token: str = "",
-               user_id: str = "", timeout: float = 8) -> bool:
-    """Submit a lap to the global leaderboard. Returns True if the request
-    reached Supabase successfully -- this does NOT mean it made the public
-    leaderboard, since a flagged or rejected submission also returns True
-    here (both are resolved server-side, silently, by design -- see the
-    anti-cheat note above). Returns False only on a genuine network/request
-    failure (offline, DNS, timeout, malformed response).
+               user_id: str = "", timeout: float = 8) -> tuple[bool, str]:
+    """Submit a lap to the global leaderboard. Returns (True, "ok") if the
+    request reached Supabase successfully -- this does NOT mean it made the
+    public leaderboard, since a flagged or rejected submission also
+    succeeds here (both are resolved server-side, silently, by design --
+    see the anti-cheat note above).
+
+    On failure, returns (False, reason) with reason one of:
+      "network" -- couldn't reach Supabase at all (offline, DNS, timeout)
+      "server"  -- reached Supabase but it rejected the request (bad/expired
+                   token, RLS policy rejection, malformed payload, etc.)
+    The distinction matters because "server" failures aren't fixed by
+    checking your internet connection -- callers should say so rather than
+    pointing the user at their network for a server-side problem.
 
     access_token/user_id come from a signed-in Supabase session (see
     auth.py); the `laps` table's INSERT RLS policy requires
@@ -92,9 +100,11 @@ def submit_lap(car_name: str, track_name: str, lap_time_ms: int,
             headers=_headers(prefer="return=minimal", access_token=access_token or None),
         )
         urllib.request.urlopen(req, timeout=timeout)
-        return True
+        return True, "ok"
+    except urllib.error.HTTPError:
+        return False, "server"
     except Exception:
-        return False
+        return False, "network"
 
 
 def get_top_laps(car_name: str, track_name: str, n: int = 10, timeout: float = 8) -> list:
