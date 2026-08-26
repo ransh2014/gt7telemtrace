@@ -5,6 +5,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-26
+Re-tag of 0.2.2 -- the v0.2.2 tag push never triggered CI/build/publish
+for reasons unclear (GitHub Actions just didn't pick it up), so bumping
+and re-tagging clean rather than chasing it further. No code changes
+beyond the version bump.
+
 ## [0.2.2] - 2026-08-26
 Bug fix (maintenance mode -- no new features):
 
