@@ -4,10 +4,10 @@
 
 [![CI](https://github.com/ransh2014/gt7telemtrace/actions/workflows/ci.yml/badge.svg)](https://github.com/ransh2014/gt7telemtrace/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/gt7tracetelem?color=00e5ff&label=PyPI&cacheSeconds=300)](https://pypi.org/project/gt7tracetelem/)
-[![Python versions](https://img.shields.io/pypi/pyversions/gt7tracetelem?color=7c5cff)](https://pypi.org/project/gt7tracetelem/)
-[![Downloads](https://img.shields.io/pypi/dm/gt7tracetelem?color=ff5c8a)](https://pypi.org/project/gt7tracetelem/)
-[![License: MIT](https://img.shields.io/github/license/ransh2014/gt7telemtrace)](LICENSE)
-[![Last commit](https://img.shields.io/github/last-commit/ransh2014/gt7telemtrace)](https://github.com/ransh2014/gt7telemtrace/commits/main)
+[![Python versions](https://img.shields.io/pypi/pyversions/gt7tracetelem?color=7c5cff&cacheSeconds=300)](https://pypi.org/project/gt7tracetelem/)
+[![Downloads](https://img.shields.io/pypi/dm/gt7tracetelem?color=ff5c8a&cacheSeconds=300)](https://pypi.org/project/gt7tracetelem/)
+[![License: MIT](https://img.shields.io/github/license/ransh2014/gt7telemtrace?cacheSeconds=300)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/ransh2014/gt7telemtrace?cacheSeconds=300)](https://github.com/ransh2014/gt7telemtrace/commits/main)
 
 A live telemetry dashboard, lap analyst, and race analyst for **Gran Turismo 7** — reads the UDP telemetry stream straight off your PS4/PS5 over your local network. No mods, no jailbreak, just the game's own broadcast data, wrapped in three desktop tools you can install with one `pip install`.
 
