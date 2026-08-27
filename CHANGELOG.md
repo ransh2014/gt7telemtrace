@@ -5,6 +5,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-08-27
+- Added a Log Out link to the tool menu (launcher.py) for signed-in users
+  -- clears the local Supabase session without deleting the account.
+
 ## [0.2.5] - 2026-08-27
 Docs-only release:
 

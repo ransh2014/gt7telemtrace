@@ -250,6 +250,28 @@ def _show_menu():
                          cursor="hand2")
         link.pack(side="right", padx=24)
         link.bind("<Button-1>", lambda e: _show_onboarding(from_menu=True))
+    else:
+        logout_link = tk.Label(foot, text="Log Out",
+                         font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG,
+                         cursor="hand2")
+        logout_link.pack(side="right", padx=24)
+        logout_link.bind("<Button-1>", lambda e: _do_logout())
+
+
+def _do_logout():
+    """Clear the local Supabase session so the account menu shows signed-out
+    state again. This only forgets the session on this machine -- it does
+    not delete the account itself. PSN_NAME is left alone so it still
+    pre-fills next time this or another account signs in."""
+    config.SUPABASE_ACCESS_TOKEN = ""
+    config.SUPABASE_REFRESH_TOKEN = ""
+    config.SUPABASE_USER_ID = ""
+    config.save(
+        SUPABASE_ACCESS_TOKEN="",
+        SUPABASE_REFRESH_TOKEN="",
+        SUPABASE_USER_ID="",
+    )
+    _show_menu()
 
 
 def _build_card(parent, title, desc, color, cmd):
