@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED", "PSN_NAME",
-           "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE"]
+           "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
+           "METRICS_ENABLED", "METRICS_PORT"]
 
 
 def _base_dir() -> Path:
@@ -66,6 +67,12 @@ _DEFAULTS = {
     # Set True the first time the onboarding screen is shown (whether the
     # user creates an account or skips) so launcher.py never shows it again.
     "ONBOARDING_DONE": False,
+    # Prometheus/Grafana metrics export (see metrics_server.py) -- off by
+    # default. When on, the Live Dashboard exposes speed/rpm/throttle/
+    # brake/fuel/lap-time gauges on METRICS_PORT for Grafana or any other
+    # Prometheus-compatible scraper to pull from.
+    "METRICS_ENABLED": False,
+    "METRICS_PORT": 9109,
 }
 
 MAX_KNOWN_IPS = 3
@@ -119,3 +126,5 @@ SUPABASE_ACCESS_TOKEN = _cfg["SUPABASE_ACCESS_TOKEN"]
 SUPABASE_REFRESH_TOKEN = _cfg["SUPABASE_REFRESH_TOKEN"]
 SUPABASE_USER_ID = _cfg["SUPABASE_USER_ID"]
 ONBOARDING_DONE = _cfg["ONBOARDING_DONE"]
+METRICS_ENABLED = _cfg["METRICS_ENABLED"]
+METRICS_PORT = _cfg["METRICS_PORT"]

@@ -1,6 +1,7 @@
 # lap_analyst.py — GT7 Lap Analyst
 # pip install pandas matplotlib numpy
 import base64
+import csv
 import io
 import json
 import math
@@ -13,7 +14,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import auth, leaderboard
+from . import auth, leaderboard, tracks
 from . import config as runtime_config
 
 matplotlib.use("TkAgg")
@@ -105,6 +106,65 @@ def load_lap_data(data):
 def load_lap(path):
     with open(path) as f: data = json.load(f)
     return load_lap_data(data)
+
+def export_csv(df, out_path):
+    """Dump a lap's per-sample telemetry to CSV. distance_m is derived by
+    integrating speed_kmh over each frame's dt (same dt pattern used to
+    build long_g in load_lap_data), since GT7's telemetry has no raw
+    distance field of its own."""
+    dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
+    distance_m = (df["speed_kmh"] / 3.6 * dt).cumsum()
+    cols = ["distance_m","speed_kmh","throttle","brake","rpm","gear","steering"]
+    with open(out_path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(cols)
+        for i in range(len(df)):
+            row = df.iloc[i]
+            w.writerow([
+                round(float(distance_m.iloc[i]), 2),
+                round(float(row.get("speed_kmh", 0)), 2),
+                round(float(row.get("throttle", 0)), 4),
+                round(float(row.get("brake", 0)), 4),
+                round(float(row.get("rpm", 0)), 1),
+                int(row.get("gear", 0)),
+                round(float(row.get("steering", 0)), 4),
+            ])
+
+def compute_sector_deltas(df_a, df_b, sector_length_m=25):
+    """Per-point time-delta-to-reference, bucketed into fixed-distance
+    sectors, for coloring the race-line map as a micro-sector heatmap.
+    Alignment is by lap-percentage (same convention as the Replay tab's
+    'synced' dual mode) since GT7 laps rarely share identical sample
+    counts or timestamps. Returns an array the same length as df_a --
+    positive = slower than reference in that sector, negative = faster."""
+    dt_a = df_a["t"].diff().replace(0, 0.1).fillna(0.1)
+    dist_a = (df_a["speed_kmh"] / 3.6 * dt_a).cumsum().values
+    t_a = df_a["t"].values
+
+    t_b = df_b["t"].values
+
+    n = len(df_a)
+    total_dist = max(dist_a[-1], 1.0)
+    n_sectors = max(1, int(total_dist // sector_length_m) + 1)
+
+    deltas = np.zeros(n)
+    for s in range(n_sectors):
+        lo, hi = s * sector_length_m, (s + 1) * sector_length_m
+        mask_a = (dist_a >= lo) & (dist_a < hi)
+        if not mask_a.any(): continue
+        idx_a_in_sector = np.where(mask_a)[0]
+
+        pct_lo = idx_a_in_sector[0] / max(1, n - 1)
+        pct_hi = idx_a_in_sector[-1] / max(1, n - 1)
+        idx_b_lo = int(pct_lo * (len(df_b) - 1))
+        idx_b_hi = int(pct_hi * (len(df_b) - 1))
+        idx_b_hi = max(idx_b_hi, idx_b_lo)
+
+        sector_time_a = t_a[idx_a_in_sector[-1]] - t_a[idx_a_in_sector[0]]
+        sector_time_b = t_b[idx_b_hi] - t_b[idx_b_lo]
+        deltas[idx_a_in_sector] = sector_time_a - sector_time_b
+
+    return deltas
 
 def lap_label(data, short=False):
     t = data.get("lap_time_s", 0)
@@ -1006,6 +1066,9 @@ class Replay:
         self._dual_mode = "synced"
         self._b_visible = False
         self._after_id  = None
+        self._heatmap_mode = False
+        self._current_track = ""
+        self._boundary  = None
         self._build(parent)
 
     def _compute_headings(self, df):
@@ -1067,6 +1130,16 @@ class Replay:
         self._mode_btn = tk.Button(ctrl, text="🔀 Synced", command=self._toggle_mode,
                                     bg=DIM2, fg=CYN, relief="flat", font=FONTL,
                                     padx=8, pady=2, cursor="hand2")
+        self._heatmap_btn = tk.Button(ctrl, text="🌡 Heatmap", command=self._toggle_heatmap,
+                                    bg=DIM2, fg=DIM, relief="flat", font=FONTL,
+                                    padx=8, pady=2, cursor="hand2")
+        self._boundary_btn = tk.Button(ctrl, text="💾 Save Boundary", command=self._save_boundary,
+                                    bg=DIM2, fg=DIM, relief="flat", font=FONTL,
+                                    padx=8, pady=2, cursor="hand2")
+        self._boundary_btn.pack(side="right", padx=(8,0))
+        tk.Button(ctrl, text="📄 Export CSV", command=self._export_csv,
+                  bg=DIM2, fg=FG, relief="flat", font=FONTL,
+                  padx=8, pady=2, cursor="hand2").pack(side="right", padx=8)
 
         info_wrap = tk.Frame(parent, bg=BG)
         info_wrap.pack(fill="x", padx=4, pady=2)
@@ -1123,13 +1196,67 @@ class Replay:
             self._mode_btn.config(text="🔀 Synced", fg=CYN)
         self._update()
 
-    def load(self, df, label=""):
+    def _toggle_heatmap(self):
+        self._heatmap_mode = not self._heatmap_mode
+        if self._heatmap_mode:
+            self._heatmap_btn.config(text="🌡 Heatmap ON", fg=ORG)
+        else:
+            self._heatmap_btn.config(text="🌡 Heatmap", fg=DIM)
+        if self._df is not None:
+            self._draw_base()
+            self._update()
+
+    def _export_csv(self):
+        if self._df is None:
+            messagebox.showinfo("Export CSV", "Load a lap first.")
+            return
+        default_name = (self._la_label or "lap").replace(" ", "_").replace(":", "") + ".csv"
+        out_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv")],
+            initialfile=default_name,
+        )
+        if not out_path: return
+        try:
+            export_csv(self._df, out_path)
+            messagebox.showinfo("Export CSV", f"Saved to:\n{out_path}")
+        except Exception as e:
+            messagebox.showerror("Export CSV", f"Failed to export:\n{e}")
+
+    def _save_boundary(self):
+        if self._df is None:
+            messagebox.showinfo("Save Boundary", "Load a lap first.")
+            return
+        if not self._has_map:
+            messagebox.showinfo("Save Boundary", "This lap has no GPS data to extract a boundary from.")
+            return
+        if not self._current_track:
+            messagebox.showinfo("Save Boundary", "This lap has no track name recorded, so there's nothing to key the boundary cache by.")
+            return
+        samples = self._df[["world_x", "world_z", "track_position"]].to_dict("records")
+        boundary = tracks.extract_boundary(samples)
+        if not boundary["bins"]:
+            messagebox.showinfo("Save Boundary", "Not enough GPS samples in this lap to extract a boundary.")
+            return
+        tracks.save_boundary(self._current_track, boundary)
+        self._boundary = boundary
+        self._boundary_btn.config(fg=CYN)
+        self._draw_base(); self._update()
+        messagebox.showinfo("Save Boundary", f"Saved track boundary for '{self._current_track}' ({len(boundary['bins'])} sectors).")
+
+    def load(self, df, label="", track=""):
         self._df = df.reset_index(drop=True)
         self._la_label = label
+        self._current_track = track or ""
+        self._boundary = tracks.load_boundary(self._current_track) if self._current_track else None
         self._hdg_a = self._compute_headings(self._df)
         self._idx = 0; self._playing = False
         self._pbtn.config(text="▶  Play", fg=GRN)
         self._sv.set(0); self._delta_var.set("")
+        if self._boundary:
+            self._boundary_btn.config(fg=CYN)
+        else:
+            self._boundary_btn.config(fg=DIM)
         self._draw_base(); self._update()
 
     def load_b(self, df, label=""):
@@ -1139,6 +1266,7 @@ class Replay:
         if not self._b_visible:
             self._info_b_frame.pack(side="left", fill="x", expand=True, padx=(1,0))
             self._mode_btn.pack(side="right", padx=8)
+            self._heatmap_btn.pack(side="right", padx=(8,0))
             self._b_visible = True
         if self._df is not None:
             self._draw_base()
@@ -1162,12 +1290,28 @@ class Replay:
         xr = x.max()-x.min(); zr = z.max()-z.min()
         self._car_size = max(xr, zr) * 0.022
 
+        if self._boundary and self._boundary.get("bins"):
+            bins = self._boundary["bins"]
+            lx = [b["left_x"] for b in bins] + [bins[0]["left_x"]]
+            lz = [b["left_z"] for b in bins] + [bins[0]["left_z"]]
+            rx = [b["right_x"] for b in bins] + [bins[0]["right_x"]]
+            rz = [b["right_z"] for b in bins] + [bins[0]["right_z"]]
+            self._ax.plot(lx, lz, color=DIM, lw=1.0, alpha=0.4, ls="--", zorder=0)
+            self._ax.plot(rx, rz, color=DIM, lw=1.0, alpha=0.4, ls="--", zorder=0)
+
+        use_heatmap = self._heatmap_mode and self._dfb is not None
+        if use_heatmap:
+            color_vals = compute_sector_deltas(df, self._dfb, sector_length_m=25)
+            vmax = max(abs(color_vals.min()), abs(color_vals.max()), 0.01)
+            cmap_name, norm = "RdYlGn_r", plt.Normalize(-vmax, vmax)
+        else:
+            color_vals, cmap_name, norm = spd, "turbo", plt.Normalize(spd.min(), spd.max())
+
         self._ax.plot(x, z, color=DIM, lw=0.8, alpha=0.25, zorder=1)
         pts  = np.array([x,z]).T.reshape(-1,1,2)
         segs = np.concatenate([pts[:-1],pts[1:]],axis=1)
-        norm = plt.Normalize(spd.min(), spd.max())
-        lc   = LineCollection(segs, cmap="turbo", norm=norm, lw=2.5, alpha=0.65, zorder=2)
-        lc.set_array(spd); self._ax.add_collection(lc)
+        lc   = LineCollection(segs, cmap=cmap_name, norm=norm, lw=2.5, alpha=0.65, zorder=2)
+        lc.set_array(color_vals); self._ax.add_collection(lc)
         self._ax.plot(x[0], z[0], "o", color=GRN, ms=7, zorder=5)
         self._ax.plot(x[-1],z[-1], "s", color=YLW, ms=7, zorder=5)
 
@@ -1196,7 +1340,7 @@ class Replay:
             title += f"  vs  {self._lb_label}"
         self._ax.set_title(title, color=FG, fontsize=9)
         cb = self._fig.colorbar(lc, ax=self._ax, fraction=0.025, pad=0.01)
-        cb.set_label("km/h", color=DIM, fontsize=7)
+        cb.set_label("Δs/sector (slower→red)" if use_heatmap else "km/h", color=DIM, fontsize=7)
         cb.ax.tick_params(colors=DIM, labelsize=6)
         self._canvas.draw()
 
@@ -1512,7 +1656,7 @@ class AnalystApp(tk.Tk):
             self._la.config(text=lbl, fg=CYN)
             self._update_stats(data, df)
             self._update_sectors(df)
-            self._replay.load(df, lbl)
+            self._replay.load(df, lbl, track=data.get("track", ""))
             self._hdr.config(text=f"A: {lbl}")
             self._refresh_top10()
             for k in list(self._cfigs):

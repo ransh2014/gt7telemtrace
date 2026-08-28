@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-08-28
+- Lap Analyst: CSV export button on the Replay tab (distance_m, speed_kmh,
+  throttle, brake, rpm, gear, steering).
+- Lap Analyst: micro-sector heatmap toggle on the Replay tab, recolors the
+  race-line by 25m-sector time-delta vs. a loaded reference lap.
+- Lap Analyst: "Save Boundary" button estimates a track's left/right edge
+  from the loaded lap's GPS trace and renders it under the race-line map;
+  cached per-track and auto-loaded on future laps for that track.
+- Live Dashboard: optional Prometheus metrics export (off by default) --
+  exposes speed/rpm/throttle/brake/fuel/lap-time gauges for Grafana or any
+  Prometheus-compatible scraper.
+
 ## [0.2.6] - 2026-08-27
 - Added a Log Out link to the tool menu (launcher.py) for signed-in users
   -- clears the local Supabase session without deleting the account.

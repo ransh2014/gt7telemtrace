@@ -16,7 +16,7 @@ from tkinter import filedialog, scrolledtext, ttk
 
 from . import cars as car_db
 from . import config as runtime_config
-from . import leaderboard
+from . import leaderboard, metrics_server
 from . import tracks as track_db
 from . import udp as telem
 from .config import KNOWN_IPS, LAPS_FOLDER
@@ -118,6 +118,11 @@ class App(tk.Tk):
         self._last_rec_race_sample_t = 0.0
 
         self._build()
+
+        if runtime_config.METRICS_ENABLED:
+            if not metrics_server.start(runtime_config.METRICS_PORT):
+                self.log_msg(f"Metrics export: failed to bind port {runtime_config.METRICS_PORT} (already in use?)")
+
         telem.register_event("race_start", self._on_race_start)
         telem.register_event("race_end",   self._on_race_end)
         telem.register_event("pause",      self._on_pause)
@@ -224,6 +229,12 @@ class App(tk.Tk):
         self.analytics_var = tk.BooleanVar(value=bool(runtime_config.ANALYTICS_ENABLED))
         tk.Checkbutton(hdr2, text="SHARE USAGE DATA", variable=self.analytics_var,
                        command=self._on_analytics_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=("Consolas", 8)).pack(side="right", padx=(4, 4))
+
+        self.metrics_var = tk.BooleanVar(value=bool(runtime_config.METRICS_ENABLED))
+        tk.Checkbutton(hdr2, text=f"METRICS :{runtime_config.METRICS_PORT}", variable=self.metrics_var,
+                       command=self._on_metrics_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=("Consolas", 8)).pack(side="right", padx=(4, 4))
 
@@ -650,6 +661,21 @@ class App(tk.Tk):
         state = "enabled" if runtime_config.ANALYTICS_ENABLED else "disabled"
         self.log_msg(f"Anonymous usage analytics {state} (see gt7trace.netlify.app/privacy.html)")
 
+    def _on_metrics_toggle(self):
+        runtime_config.METRICS_ENABLED = self.metrics_var.get()
+        runtime_config.save(METRICS_ENABLED=runtime_config.METRICS_ENABLED)
+        if runtime_config.METRICS_ENABLED:
+            if metrics_server.start(runtime_config.METRICS_PORT):
+                self.log_msg(f"Metrics export enabled on http://localhost:{runtime_config.METRICS_PORT}/metrics")
+            else:
+                self.metrics_var.set(False)
+                runtime_config.METRICS_ENABLED = False
+                runtime_config.save(METRICS_ENABLED=False)
+                self.log_msg(f"Metrics export: failed to bind port {runtime_config.METRICS_PORT} (already in use?)")
+        else:
+            metrics_server.stop()
+            self.log_msg("Metrics export disabled")
+
     def _on_rate_change(self):
         try:
             rate = int(self.rate_var.get().split()[0])
@@ -719,6 +745,9 @@ class App(tk.Tk):
             return
         self._was_connected = True
         self._drop_logged = False
+
+        if runtime_config.METRICS_ENABLED:
+            metrics_server.update(d)
 
         FG = "#c0c0e0"
 
