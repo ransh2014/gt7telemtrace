@@ -1,0 +1,51 @@
+name: Update WinGet Package
+
+# One-time setup required: add a *classic* PAT (public_repo scope) as the
+# WINGET_TOKEN repo secret (Settings -> Secrets and variables -> Actions).
+# That PAT must belong to the account that owns the winget-pkgs fork
+# (ransh2014/winget-pkgs) -- wingetcreate pushes the updated manifest
+# branch there and opens the PR against microsoft/winget-pkgs from it.
+# Fine-grained PATs are not supported by wingetcreate for this.
+#
+# NOTE: `wingetcreate update` builds the new manifest from the package's
+# most recently *merged* manifest in microsoft/winget-pkgs. The very first
+# submission (0.2.6, PR #425267) is still pending review as of when this
+# workflow was added -- this workflow's first run will only succeed once
+# that PR is merged. Until then it will fail with a "package not found"
+# style error, which is expected and not a bug in this workflow.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  winget:
+    name: Submit to Windows Package Manager
+    runs-on: windows-latest
+    steps:
+      - name: Wait for release asset
+        shell: pwsh
+        run: |
+          $installerUrl = "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/gt7telem-windows.zip"
+          $ready = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri $installerUrl -Method Head -UseBasicParsing
+              if ($resp.StatusCode -eq 200) { $ready = $true; break }
+            } catch {
+              Write-Host "asset not ready yet (attempt $i), waiting 30s..."
+            }
+            Start-Sleep -Seconds 30
+          }
+          if (-not $ready) {
+            Write-Error "gt7telem-windows.zip never showed up on this release -- did build-windows.yml fail?"
+            exit 1
+          }
+          echo "INSTALLER_URL=$installerUrl" >> $env:GITHUB_ENV
+
+      - name: Submit updated manifest via wingetcreate
+        shell: pwsh
+        run: |
+          iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          $version = "${{ github.event.release.tag_name }}".TrimStart("v")
+          .\wingetcreate.exe update ransh2014.TRACE -s -v $version -u "$env:INSTALLER_URL" -t "${{ secrets.WINGET_TOKEN }}"

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>gt7telem</id>
+    <version>__VERSION__</version>
+    <packageSourceUrl>https://github.com/ransh2014/gt7telemtrace/tree/main/choco</packageSourceUrl>
+    <owners>ransh2014</owners>
+    <title>TRACE (GT7 Telemetry Suite)</title>
+    <authors>ransh2014</authors>
+    <projectUrl>https://gt7trace.netlify.app</projectUrl>
+    <copyright>2026 ransh2014</copyright>
+    <licenseUrl>https://github.com/ransh2014/gt7telemtrace/blob/main/LICENSE</licenseUrl>
+    <projectSourceUrl>https://github.com/ransh2014/gt7telemtrace</projectSourceUrl>
+    <docsUrl>https://gt7trace.netlify.app</docsUrl>
+    <bugTrackerUrl>https://github.com/ransh2014/gt7telemtrace/issues</bugTrackerUrl>
+    <tags>gt7 gran-turismo telemetry racing sim-racing dashboard</tags>
+    <summary>TRACE -- GT7 Telemetry Suite: live dashboard, lap analyst, and race analyst for Gran Turismo 7.</summary>
+    <description>TRACE is a telemetry capture and analysis toolkit for Gran Turismo 7, reading the UDP stream from a PS4/PS5 over the local network. Includes a live dashboard, a 14-chart lap analyst, and a race analyst.</description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

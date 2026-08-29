@@ -1,0 +1,69 @@
+name: Publish to Chocolatey
+
+# One-time setup required: add your Chocolatey API key (from
+# https://community.chocolatey.org/account -> API Keys, after the
+# gt7telem package moderation clears) as the CHOCO_API_KEY repo secret
+# (Settings -> Secrets and variables -> Actions).
+#
+# choco/gt7telem.nuspec and choco/tools/chocolateyinstall.ps1 are templates
+# (with __VERSION__/__URL64__/__CHECKSUM64__ placeholders) -- this workflow
+# fills them in per-release and packs/pushes the result. The templates
+# themselves are never modified/committed back.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  choco:
+    name: Pack and push to Chocolatey
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for release asset and compute checksum
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.release.tag_name }}".TrimStart("v")
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/gt7telem-windows.zip"
+          $ready = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri $url -Method Head -UseBasicParsing
+              if ($resp.StatusCode -eq 200) { $ready = $true; break }
+            } catch {
+              Write-Host "asset not ready yet (attempt $i), waiting 30s..."
+            }
+            Start-Sleep -Seconds 30
+          }
+          if (-not $ready) {
+            Write-Error "gt7telem-windows.zip never showed up on this release -- did build-windows.yml fail?"
+            exit 1
+          }
+          Invoke-WebRequest -Uri $url -OutFile gt7telem-windows.zip
+          $hash = (Get-FileHash gt7telem-windows.zip -Algorithm SHA256).Hash
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+          echo "CHECKSUM=$hash" >> $env:GITHUB_ENV
+          echo "ASSET_URL=$url" >> $env:GITHUB_ENV
+
+      - name: Fill in nuspec and install script templates
+        shell: pwsh
+        run: |
+          (Get-Content choco\gt7telem.nuspec) `
+            -replace "__VERSION__", $env:VERSION `
+            | Set-Content choco\gt7telem.nuspec
+
+          (Get-Content choco\tools\chocolateyinstall.ps1) `
+            -replace "__URL64__", $env:ASSET_URL `
+            -replace "__CHECKSUM64__", $env:CHECKSUM `
+            | Set-Content choco\tools\chocolateyinstall.ps1
+
+      - name: choco pack
+        shell: pwsh
+        run: |
+          cd choco
+          choco pack --outputdirectory ..
+
+      - name: choco push
+        shell: pwsh
+        run: choco push "gt7telem.$env:VERSION.nupkg" --source https://push.chocolatey.org/ --api-key "${{ secrets.CHOCO_API_KEY }}"
