@@ -23,6 +23,11 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.2.8) -- only needed for a manual re-run of a release this didn't fire for"
+        required: false
+        type: string
 
 jobs:
   choco:
@@ -31,11 +36,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve target tag
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          echo "TARGET_TAG=$tag" >> $env:GITHUB_ENV
+
       - name: Wait for release asset and compute checksum
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/gt7telem-windows.zip"
+          $version = "$env:TARGET_TAG".TrimStart("v")
+          $url = "https://github.com/${{ github.repository }}/releases/download/$env:TARGET_TAG/gt7telem-windows.zip"
           $ready = $false
           for ($i = 0; $i -lt 30; $i++) {
             try {

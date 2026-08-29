@@ -27,16 +27,28 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.2.8) -- only needed for a manual re-run of a release this didn't fire for"
+        required: false
+        type: string
 
 jobs:
   winget:
     name: Submit to Windows Package Manager
     runs-on: windows-latest
     steps:
+      - name: Resolve target tag
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          echo "TARGET_TAG=$tag" >> $env:GITHUB_ENV
+
       - name: Wait for release asset
         shell: pwsh
         run: |
-          $installerUrl = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/gt7telem-windows.zip"
+          $installerUrl = "https://github.com/${{ github.repository }}/releases/download/$env:TARGET_TAG/gt7telem-windows.zip"
           $ready = $false
           for ($i = 0; $i -lt 30; $i++) {
             try {
@@ -57,5 +69,5 @@ jobs:
         shell: pwsh
         run: |
           iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-          $version = "${{ github.ref_name }}".TrimStart("v")
+          $version = "$env:TARGET_TAG".TrimStart("v")
           .\wingetcreate.exe update ransh2014.TRACE -s -v $version -u "$env:INSTALLER_URL" -t "${{ secrets.WINGET_TOKEN }}"
