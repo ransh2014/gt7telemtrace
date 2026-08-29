@@ -14,9 +14,19 @@ name: Update WinGet Package
 # that PR is merged. Until then it will fail with a "package not found"
 # style error, which is expected and not a bug in this workflow.
 
+# NOTE: this triggers on the tag push directly (not `release: published`).
+# The release itself is created by build-windows.yml using the default
+# GITHUB_TOKEN, and GitHub Actions does not let GITHUB_TOKEN-triggered
+# events fire other workflows -- so a release-published trigger here would
+# never actually run. Triggering on the same tag push everything else
+# already uses sidesteps that entirely; the wait-loop below covers the
+# asset-not-uploaded-yet race instead.
+
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
 
 jobs:
   winget:
@@ -26,7 +36,7 @@ jobs:
       - name: Wait for release asset
         shell: pwsh
         run: |
-          $installerUrl = "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/gt7telem-windows.zip"
+          $installerUrl = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/gt7telem-windows.zip"
           $ready = $false
           for ($i = 0; $i -lt 30; $i++) {
             try {
@@ -47,5 +57,5 @@ jobs:
         shell: pwsh
         run: |
           iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-          $version = "${{ github.event.release.tag_name }}".TrimStart("v")
+          $version = "${{ github.ref_name }}".TrimStart("v")
           .\wingetcreate.exe update ransh2014.TRACE -s -v $version -u "$env:INSTALLER_URL" -t "${{ secrets.WINGET_TOKEN }}"

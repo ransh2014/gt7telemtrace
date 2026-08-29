@@ -10,9 +10,19 @@ name: Publish to Chocolatey
 # fills them in per-release and packs/pushes the result. The templates
 # themselves are never modified/committed back.
 
+# NOTE: this triggers on the tag push directly (not `release: published`).
+# The release itself is created by build-windows.yml using the default
+# GITHUB_TOKEN, and GitHub Actions does not let GITHUB_TOKEN-triggered
+# events fire other workflows -- so a release-published trigger here would
+# never actually run. Triggering on the same tag push everything else
+# already uses sidesteps that entirely; the wait-loop below covers the
+# asset-not-uploaded-yet race instead.
+
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
 
 jobs:
   choco:
@@ -24,8 +34,8 @@ jobs:
       - name: Wait for release asset and compute checksum
         shell: pwsh
         run: |
-          $version = "${{ github.event.release.tag_name }}".TrimStart("v")
-          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/gt7telem-windows.zip"
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/gt7telem-windows.zip"
           $ready = $false
           for ($i = 0; $i -lt 30; $i++) {
             try {
