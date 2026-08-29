@@ -5,6 +5,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-08-29
+- Car database refresh from the ddm999/gt7info community database: 4 new
+  cars added (Caterham Seven Superlight R500 '08, Hyundai IONIQ 6N '25,
+  Toyota Mark II Tourer V '97, Toyota Chaser Tourer V '97), bringing
+  `car_ids.csv` to 584 entries.
+- Corrected 7 existing car names in the same refresh: restored the accent in
+  "Chevelle SS 454 Sport Coupe" and "R8 Coupe V10 plus", added the missing
+  space before the year on the four 2023-25 prototypes (M Hybrid V8 '25,
+  499P '23, 9X8 '25, 963 '24), and expanded "911 Safety Car" to
+  "911 Turbo S Safety Car (992)".
+
 ## [0.2.7] - 2026-08-28
 - Lap Analyst: CSV export button on the Replay tab (distance_m, speed_kmh,
   throttle, brake, rpm, gear, steering).
