@@ -5,13 +5,18 @@ No manual editing needed. On first run it uses sensible defaults; whenever
 you change the PS4/PS5 IP in the app, it's saved to settings.json right
 next to the .exe (or script) so it's remembered next time.
 """
+import base64
 import json
+import os
 import sys
 from pathlib import Path
 
 __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED", "PSN_NAME",
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT"]
+
+_SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
+_ENC_PREFIX = "enc:v1:"
 
 
 def _base_dir() -> Path:
@@ -40,6 +45,59 @@ def _default_laps_dir() -> Path:
 
 
 _SETTINGS_FILE = _base_dir() / "settings.json"
+_KEY_FILE = _base_dir() / ".settings.key"
+
+
+def _get_or_create_key() -> bytes:
+    """32-byte local key used to encrypt the Supabase session tokens at
+    rest, kept in a separate file from settings.json so a copy/paste/upload
+    of settings.json alone (bug report, backup, accidental share) doesn't
+    hand over a usable session token in plain text."""
+    try:
+        if _KEY_FILE.exists():
+            key = _KEY_FILE.read_bytes()
+            if len(key) == 32:
+                return key
+        key = os.urandom(32)
+        _KEY_FILE.write_bytes(key)
+        try:
+            os.chmod(_KEY_FILE, 0o600)
+        except OSError:
+            pass  # best-effort on platforms/filesystems without POSIX perms (e.g. Windows)
+        return key
+    except Exception:
+        return b""  # caller falls back to storing the value unencrypted
+
+
+def _encrypt(value: str) -> str:
+    if not value or value.startswith(_ENC_PREFIX):
+        return value
+    try:
+        from Crypto.Cipher import AES
+        key = _get_or_create_key()
+        if not key:
+            return value
+        nonce = os.urandom(12)
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+        ciphertext, tag = cipher.encrypt_and_digest(value.encode("utf-8"))
+        blob = base64.urlsafe_b64encode(nonce + tag + ciphertext).decode("ascii")
+        return _ENC_PREFIX + blob
+    except Exception:
+        return value  # never lose the value over an encryption failure
+
+
+def _decrypt(value: str) -> str:
+    if not value or not value.startswith(_ENC_PREFIX):
+        return value  # empty, or a pre-existing plaintext token from before this fix
+    try:
+        from Crypto.Cipher import AES
+        key = _get_or_create_key()
+        raw = base64.urlsafe_b64decode(value[len(_ENC_PREFIX):].encode("ascii"))
+        nonce, tag, ciphertext = raw[:12], raw[12:28], raw[28:]
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+        return cipher.decrypt_and_verify(ciphertext, tag).decode("utf-8")
+    except Exception:
+        return ""  # undecryptable (key lost/rotated) -- treat as logged out, not a crash
 
 _DEFAULTS = {
     "PS_IP": "192.168.1.1",
@@ -99,17 +157,23 @@ def load() -> dict:
             data = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
             merged = dict(_DEFAULTS)
             merged.update(data)
-            return merged
         except Exception:
-            pass
-    return dict(_DEFAULTS)
+            merged = dict(_DEFAULTS)
+    else:
+        merged = dict(_DEFAULTS)
+    for k in _SUPABASE_SECRET_KEYS:
+        merged[k] = _decrypt(merged.get(k, ""))
+    return merged
 
 
 def save(**kwargs) -> None:
     data = load()
     data.update(kwargs)
+    out = dict(data)
+    for k in _SUPABASE_SECRET_KEYS:
+        out[k] = _encrypt(out.get(k, ""))
     try:
-        _SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        _SETTINGS_FILE.write_text(json.dumps(out, indent=2), encoding="utf-8")
     except Exception:
         pass
 

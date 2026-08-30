@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gt7tracetelem"
-version = "0.2.8"
+version = "0.2.9"
 description = "TRACE - GT7 telemetry capture, live dashboard, and lap/race analysis toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -42,11 +42,11 @@ classifiers = [
     "Natural Language :: English",
 ]
 dependencies = [
-    "numpy",
-    "pandas",
-    "matplotlib",
-    "pycryptodome",
-    "prometheus_client",
+    "numpy>=1.26,<3",
+    "pandas>=2.0,<3",
+    "matplotlib>=3.7,<4",
+    "pycryptodome>=3.19,<4",
+    "prometheus_client>=0.19,<1",
 ]
 
 [project.urls]

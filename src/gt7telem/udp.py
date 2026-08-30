@@ -24,6 +24,8 @@ __all__ = [
 ]
 
 _ps4_ip         = PS_IP    # mutable — updated by set_ip()
+_ps4_ip_resolved     = None   # numeric IP for _ps4_ip, cached (it may be a hostname)
+_ps4_ip_resolved_for = None   # which _ps4_ip value _ps4_ip_resolved is for
 SEND_PORT       = 33739
 RECV_PORT       = 33740
 HEARTBEAT_MSG   = b"C"   # 'C' requests the extended 368-byte packet (B + ~ + C fields)
@@ -47,7 +49,8 @@ _diag_lock            = threading.Lock()
 _diag = {
     "heartbeats_sent":    0,
     "heartbeat_errors":   0,
-    "packets_received":   0,   # raw UDP datagrams received on RECV_PORT
+    "packets_received":   0,   # raw UDP datagrams accepted (from the configured PS4/PS5) on RECV_PORT
+    "unexpected_source":  0,   # datagrams on RECV_PORT from some other host on the network, ignored
     "decrypt_failures":   0,   # datagrams that failed Salsa20 decrypt / bad magic
     "parse_failures":     0,   # decrypted but failed to parse into a dict
     "last_heartbeat_error": None,
@@ -120,7 +123,8 @@ _debug_prev_state = {}
 
 # ── Incident detection (tyre slip / body motion spikes) ───────────────────────
 _incidents           = []   # list of dicts, reset each race_start
-SLIP_THRESHOLD       = 1.5  # |slip - 1.0| ... actually raw slip ratio value
+SLIP_THRESHOLD       = 1.5  # raw slip ratio >= this = wheelspin (wheel outrunning ground)
+LOCKUP_THRESHOLD     = 0.5  # raw slip ratio <= this = lockup/skid (wheel under-rotating vs ground)
 SWAY_THRESHOLD       = 3.0  # sway/heave/surge magnitude (m/s^2-ish, tune per car)
 INCIDENT_COOLDOWN_S  = 2.0  # min seconds between logged incidents of the same type
 _last_incident_t      = {}  # type -> last fire time (time.time())
@@ -155,9 +159,13 @@ def _check_incidents(parsed, now):
     incidents -- e.g. a spin, rear step-out, or big kerb strike."""
     for wheel in ("fl", "fr", "rl", "rr"):
         slip = parsed.get(f"tyre_slip_{wheel}")
-        if slip is not None and slip >= SLIP_THRESHOLD:
-            axle = "front" if wheel in ("fl", "fr") else "rear"
+        if slip is None:
+            continue
+        axle = "front" if wheel in ("fl", "fr") else "rear"
+        if slip >= SLIP_THRESHOLD:
             _log_incident(f"{axle}_slip", parsed, slip)
+        elif slip <= LOCKUP_THRESHOLD:
+            _log_incident(f"{axle}_lockup", parsed, slip)
 
     for axis in ("sway", "heave", "surge"):
         val = parsed.get(axis)
@@ -574,12 +582,15 @@ def _parse(data):
         asm_active       = bool(flags16 & (1 << 10))
         tcs_active       = bool(flags16 & (1 << 11))
 
-        # NOTE: `in_pit` below is NOT part of the documented 12-bit flags table --
-        # there's no known "in pit" bit in flags16. This flags_8f & 0x02 check
-        # (== bit 9 / low-beams per the table above) looks like a leftover/guess
-        # from an older offset mapping. Left as-is but flagged here -- verify
-        # against real pit-lane footage before trusting it.
-        in_pit   = bool(flags_8f & 0x02)
+        # NOTE: there's no known "in pit" bit in flags16. `flags_8f & 0x02` is
+        # bit 9 (low_beams) per the table above -- using it as an "in pit"
+        # signal produces false positives any time headlights are toggled
+        # (tunnels, night races, manual toggle). Disabled until a real
+        # pit-lane bit is identified and verified against footage; left as
+        # `False` (rather than None) so downstream bool/float consumers
+        # (race_analyst.pit_flag, dashboard's PIT label) degrade safely
+        # instead of crashing or misreporting.
+        in_pit   = False
 
         return {
             "track_name":       _track,
@@ -709,7 +720,7 @@ def _classify_send_error(e):
 
 def _heartbeat_thread():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    print(f"[gt7udp] Heartbeat → {_ps4_ip}:{SEND_PORT}")
+    print(f"[gt7udp] Heartbeat -> {_ps4_ip}:{SEND_PORT}")
     while True:
         try:
             sock.sendto(HEARTBEAT_MSG, (_ps4_ip, SEND_PORT))
@@ -733,6 +744,21 @@ def _classify_bind_error(e):
         return f"Couldn't bind UDP port {RECV_PORT}: {e.strerror or e} (errno {e.errno})"
     return f"Couldn't bind UDP port {RECV_PORT}: {e}"
 
+def _expected_ps4_ip():
+    """Numeric IP `_ps4_ip` should currently resolve to, cached so the
+    receive loop doesn't do a DNS lookup per packet. Returns None (meaning
+    "don't filter") if `_ps4_ip` has never resolved successfully yet --
+    better to accept an unverified sender than drop real telemetry because
+    of a transient DNS hiccup on a hostname-configured console."""
+    global _ps4_ip_resolved, _ps4_ip_resolved_for
+    if _ps4_ip_resolved_for != _ps4_ip:
+        try:
+            _ps4_ip_resolved = socket.gethostbyname(_ps4_ip)
+            _ps4_ip_resolved_for = _ps4_ip
+        except OSError:
+            pass  # keep the last-known-good value (if any) until this succeeds
+    return _ps4_ip_resolved
+
 def _udp_thread():
     global _source
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -748,7 +774,11 @@ def _udp_thread():
     print(f"[gt7udp] Listening on :{RECV_PORT}")
     while True:
         try:
-            raw, _ = sock.recvfrom(4096)
+            raw, addr = sock.recvfrom(4096)
+            expected_ip = _expected_ps4_ip()
+            if expected_ip is not None and addr[0] != expected_ip:
+                _diag_incr("unexpected_source")
+                continue  # not our configured PS4/PS5 -- ignore rather than parse/trust it
             _diag_incr("packets_received")
             if _source is None:
                 _source = "udp"
@@ -791,7 +821,7 @@ def get_float(key: str) -> float:
 
 def wait_for_connection(timeout: int = 60) -> str | None:
     _ensure_started()
-    print(f"[gt7udp] Heartbeat → {_ps4_ip}:{SEND_PORT}  |  Listening on :{RECV_PORT}")
+    print(f"[gt7udp] Heartbeat -> {_ps4_ip}:{SEND_PORT}  |  Listening on :{RECV_PORT}")
     deadline = time.time() + timeout
     dots = 0
     while time.time() < deadline:
@@ -813,5 +843,5 @@ def wait_for_connection(timeout: int = 60) -> str | None:
         time.sleep(0.1)
     reason = get_last_error() or "no reason determined"
     print(f"\n[gt7udp] Timeout after {timeout}s.")
-    print(f"  → {reason}")
+    print(f"  -> {reason}")
     return None

@@ -37,17 +37,23 @@ def is_running() -> bool:
     return _started
 
 
-def start(port: int = DEFAULT_PORT) -> bool:
+def start(port: int = DEFAULT_PORT, addr: str = "127.0.0.1") -> bool:
     """Start the metrics HTTP server on `port`, if not already running.
     Safe to call more than once -- a no-op after the first successful
     call. Returns True if the server is running afterward, False if it
-    failed to bind (e.g. port already in use)."""
+    failed to bind (e.g. port already in use).
+
+    Binds to localhost only by default -- prometheus_client's own default
+    is 0.0.0.0 (all interfaces), which would put unauthenticated live
+    telemetry (speed/rpm/throttle/brake/fuel/lap-time) on the network for
+    anyone else on the same Wi-Fi/LAN to read. Pass addr="0.0.0.0" if you
+    deliberately want a remote Grafana/Prometheus to scrape this."""
     global _httpd, _thread, _started
     with _lock:
         if _started:
             return True
         try:
-            _httpd, _thread = start_http_server(port)
+            _httpd, _thread = start_http_server(port, addr=addr)
         except OSError:
             return False
         _started = True
