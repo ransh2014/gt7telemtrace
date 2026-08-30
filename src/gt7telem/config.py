@@ -13,7 +13,7 @@ from pathlib import Path
 
 __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED", "PSN_NAME",
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
-           "METRICS_ENABLED", "METRICS_PORT"]
+           "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL"]
 
 _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
 _ENC_PREFIX = "enc:v1:"
@@ -131,6 +131,11 @@ _DEFAULTS = {
     # Prometheus-compatible scraper to pull from.
     "METRICS_ENABLED": False,
     "METRICS_PORT": 9109,
+    # Off by default: the metrics server binds localhost-only unless this
+    # is on, in which case it binds 0.0.0.0 -- reachable from anyone else
+    # on the same Wi-Fi/LAN, not just this machine. Turn on only if you're
+    # scraping from a remote Grafana/Prometheus on a network you trust.
+    "METRICS_BIND_ALL": False,
 }
 
 MAX_KNOWN_IPS = 3
@@ -192,3 +197,4 @@ SUPABASE_USER_ID = _cfg["SUPABASE_USER_ID"]
 ONBOARDING_DONE = _cfg["ONBOARDING_DONE"]
 METRICS_ENABLED = _cfg["METRICS_ENABLED"]
 METRICS_PORT = _cfg["METRICS_PORT"]
+METRICS_BIND_ALL = _cfg["METRICS_BIND_ALL"]
