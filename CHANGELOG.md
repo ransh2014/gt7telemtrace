@@ -5,6 +5,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-31
+- Fixed leaderboard lap submissions silently failing once the Supabase
+  session's access token expired (~1h). `_submit_leaderboard` now retries
+  once with a refreshed access token (via the previously-unused
+  `auth.refresh_session`) whenever a submit comes back with a "server"
+  (RLS/auth) rejection.
+
 ## [0.2.8] - 2026-08-29
 - Car database refresh from the ddm999/gt7info community database: 4 new
   cars added (Caterham Seven Superlight R500 '08, Hyundai IONIQ 6N '25,

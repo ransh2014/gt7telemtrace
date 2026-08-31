@@ -1882,6 +1882,19 @@ class AnalystApp(tk.Tk):
                 car, track, lap_time_ms, psn, samples,
                 access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
                 user_id=runtime_config.SUPABASE_USER_ID)
+            if not ok and reason == "server":
+                session = auth.refresh_session(runtime_config.SUPABASE_REFRESH_TOKEN)
+                if session:
+                    runtime_config.SUPABASE_ACCESS_TOKEN = session["access_token"]
+                    runtime_config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
+                    runtime_config.save(
+                        SUPABASE_ACCESS_TOKEN=session["access_token"],
+                        SUPABASE_REFRESH_TOKEN=session["refresh_token"],
+                    )
+                    ok, reason = leaderboard.submit_lap(
+                        car, track, lap_time_ms, psn, samples,
+                        access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
+                        user_id=runtime_config.SUPABASE_USER_ID)
             self.after(0, lambda: self._after_submit(ok, reason))
 
         threading.Thread(target=worker, daemon=True).start()
