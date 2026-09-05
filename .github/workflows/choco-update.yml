@@ -67,6 +67,7 @@ jobs:
         run: |
           $version = "${{ github.event.inputs.choco_version }}"
           if ([string]::IsNullOrWhiteSpace($version)) { $version = "$env:TARGET_TAG".TrimStart("v") }
+          $version = $version.TrimStart("v")
 
           Invoke-WebRequest -Uri "$env:INSTALLER_URL" -OutFile installer.zip -UseBasicParsing
           $hash = (Get-FileHash -Path installer.zip -Algorithm SHA256).Hash.ToLower()
