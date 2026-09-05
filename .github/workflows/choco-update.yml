@@ -1,0 +1,77 @@
+name: Update Chocolatey Package
+
+# One-time setup required: add your Chocolatey.org API key as the
+# CHOCO_API_KEY repo secret (Settings -> Secrets and variables -> Actions).
+# Get it from https://community.chocolatey.org/account -> API Keys.
+#
+# NOTE: the nuspec/install script in choco/ use __VERSION__, __URL64__,
+# __CHECKSUM64__ placeholders -- this workflow substitutes them into a
+# scratch copy at build time and pushes that, leaving the templates in
+# the repo untouched.
+#
+# NOTE: same as winget-update.yml, this triggers on the tag push directly
+# (not `release: published`), since GITHUB_TOKEN-triggered events can't
+# fire other workflows.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.3.3) -- only needed for a manual re-run of a release this didn't fire for"
+        required: false
+        type: string
+
+jobs:
+  choco:
+    name: Push to Chocolatey
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target tag
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          echo "TARGET_TAG=$tag" >> $env:GITHUB_ENV
+
+      - name: Wait for release asset
+        shell: pwsh
+        run: |
+          $installerUrl = "https://github.com/${{ github.repository }}/releases/download/$env:TARGET_TAG/gt7telem-windows.zip"
+          $ready = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri $installerUrl -Method Head -UseBasicParsing
+              if ($resp.StatusCode -eq 200) { $ready = $true; break }
+            } catch {
+              Write-Host "asset not ready yet (attempt $i), waiting 30s..."
+            }
+            Start-Sleep -Seconds 30
+          }
+          if (-not $ready) {
+            Write-Error "gt7telem-windows.zip never showed up on this release -- did build-windows.yml fail?"
+            exit 1
+          }
+          echo "INSTALLER_URL=$installerUrl" >> $env:GITHUB_ENV
+
+      - name: Build and push nupkg
+        shell: pwsh
+        run: |
+          $version = "$env:TARGET_TAG".TrimStart("v")
+          $hash = (Invoke-WebRequest -Uri "$env:INSTALLER_URL" -UseBasicParsing).Content |
+                  ForEach-Object { [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash($_)).Replace('-','').ToLower() }
+
+          New-Item -ItemType Directory -Path build -Force | Out-Null
+          Copy-Item choco/gt7telem.nuspec build/gt7telem.nuspec
+          New-Item -ItemType Directory -Path build/tools -Force | Out-Null
+          Copy-Item choco/tools/chocolateyinstall.ps1 build/tools/chocolateyinstall.ps1
+
+          (Get-Content build/gt7telem.nuspec) -replace '__VERSION__', $version | Set-Content build/gt7telem.nuspec
+          (Get-Content build/tools/chocolateyinstall.ps1) -replace '__URL64__', "$env:INSTALLER_URL" -replace '__CHECKSUM64__', $hash | Set-Content build/tools/chocolateyinstall.ps1
+
+          choco pack build/gt7telem.nuspec --outputdirectory build
+          choco push "build/gt7telem.$version.nupkg" --source https://push.chocolatey.org/ --api-key "${{ secrets.CHOCO_API_KEY }}"
