@@ -23,6 +23,10 @@ on:
         description: "Release tag to publish (e.g. v0.3.3) -- only needed for a manual re-run of a release this didn't fire for"
         required: false
         type: string
+      choco_version:
+        description: "Override the Chocolatey package version (e.g. 0.3.3.1) -- use this to re-publish a fixed build under the same release tag, since Chocolatey rejects re-pushing an identical version"
+        required: false
+        type: string
 
 jobs:
   choco:
@@ -61,9 +65,11 @@ jobs:
       - name: Build and push nupkg
         shell: pwsh
         run: |
-          $version = "$env:TARGET_TAG".TrimStart("v")
-          $hash = (Invoke-WebRequest -Uri "$env:INSTALLER_URL" -UseBasicParsing).Content |
-                  ForEach-Object { [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash($_)).Replace('-','').ToLower() }
+          $version = "${{ github.event.inputs.choco_version }}"
+          if ([string]::IsNullOrWhiteSpace($version)) { $version = "$env:TARGET_TAG".TrimStart("v") }
+
+          Invoke-WebRequest -Uri "$env:INSTALLER_URL" -OutFile installer.zip -UseBasicParsing
+          $hash = (Get-FileHash -Path installer.zip -Algorithm SHA256).Hash.ToLower()
 
           New-Item -ItemType Directory -Path build -Force | Out-Null
           Copy-Item choco/gt7telem.nuspec build/gt7telem.nuspec
