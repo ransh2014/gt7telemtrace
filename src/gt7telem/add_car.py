@@ -6,8 +6,8 @@ ddm999's gt7info database. If you're driving a car GT7 added after that
 snapshot was taken, it won't have a name yet and will just show as a
 raw numeric ID. Run this to add it manually.
 
-Usage: python3 add_car.py
-(run from the same folder as car_ids.csv)
+Usage (any install):  gt7telem-add-car
+   or:              python -m gt7telem.add_car
 """
 import csv
 from pathlib import Path
@@ -72,12 +72,14 @@ def main():
 
     print(f"\nSaved. \"{name}\" is now car ID {car_id} (Maker {maker_id}).")
     print()
-    print("This only updated your local car_ids.csv. To push it into the")
-    print("shipped apps:")
-    print("  1. Run rebuild_all.ps1 (one folder up) -- rebuilds the Windows")
-    print("     .exe and the source zip automatically.")
-    print("  2. For the Linux zip: open a chat with Claude and ask it to")
-    print("     rebuild it -- that one only builds in Claude's sandbox.")
+    print("This updated your local car_ids.csv only -- the name will show up")
+    print("next time you open the Dashboard. Note that reinstalling or")
+    print("upgrading TRACE replaces this file, so the edit won't survive an")
+    print("upgrade.")
+    print()
+    print("To get the car into the official database for everyone, open an")
+    print("issue with the ID and the in-game name:")
+    print("  https://github.com/ransh2014/gt7telemtrace/issues")
 
 
 if __name__ == "__main__":

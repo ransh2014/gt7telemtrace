@@ -53,6 +53,11 @@ def start(port: int = DEFAULT_PORT, addr: str = "127.0.0.1") -> bool:
         if _started:
             return True
         try:
+            # Needs prometheus_client >= 0.20 -- that's the release where
+            # start_http_server began returning (server, thread). On 0.19.x
+            # it returns None and this unpack raises TypeError, which the
+            # OSError handler below would NOT catch. Don't lower the pin in
+            # pyproject.toml without changing this too.
             _httpd, _thread = start_http_server(port, addr=addr)
         except OSError:
             return False

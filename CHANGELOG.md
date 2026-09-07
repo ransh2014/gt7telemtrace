@@ -5,12 +5,91 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-09-07
+- Removed the duplicate `choco-publish.yml` workflow -- it fired on the same
+  version tag as `choco-update.yml` and pushed the same package version, so
+  one of the two always failed on Chocolatey's duplicate-version rejection.
+  `choco-update.yml` (the one with the corrected checksum step and the
+  `choco_version` override) is now the only Chocolatey publisher.
+- Raised the `prometheus_client` floor from `>=0.19` to `>=0.20`.
+  `metrics_server.start()` unpacks `start_http_server()`'s `(server, thread)`
+  return, which only exists from 0.20.0 onward; on 0.19.x it returns `None`
+  and the unpack raised a `TypeError` that the surrounding `except OSError`
+  didn't catch, taking the Dashboard down when metrics export was enabled.
+- `add_car.py` / `add_track.py` no longer print maintainer-only build
+  instructions (a `rebuild_all.ps1` that isn't in the repo, and a note about
+  asking Claude to rebuild the Linux zip) to end users. They now point at the
+  issue tracker and warn that a local CSV edit doesn't survive an upgrade.
+- Added `gt7telem-add-car` / `gt7telem-add-track` console scripts, so the two
+  CLI helpers are actually reachable from a pip install instead of only by
+  locating them inside site-packages.
+- Added `tools/build_source_zip.py`, which builds `gt7telem-source.zip` from
+  the live package source and refuses to run if `pyproject.toml` and
+  `__init__.py` disagree on the version. The source download had been
+  assembled by hand and was shipping 0.3.2 after 0.3.3 released.
+- Docs: corrected the Lap Analyst chart-group count (16, not 15 -- the
+  Consensus tab was never counted), the settings/laps locations for
+  pip and from-source installs (`~/.gt7telem/` and `~/TRACE/laps`, not
+  "next to the app"), and stale `gt7telem.py` / `gt7udp.py` / `car_db.py` /
+  `runtime_config.py` filenames left in module docstrings.
+- Credits: added MacManley's gt7-udp and Nenkai's PDTools, which `udp.py`
+  cross-references for packet lengths and extended-field offsets but which
+  were credited only in source comments, never in the README or on the site.
+- Added Python 3.14 to the CI matrix and the PyPI classifiers.
+- `udp.py`'s receive socket no longer sets `SO_REUSEADDR`. On UDP that let a
+  second copy of TRACE share (Linux/macOS) or steal (Windows) port 33740, so
+  two instances silently split the packet stream and the "another copy is
+  already running" `EADDRINUSE` message almost never fired. A failed bind is
+  now retried every 5s instead of killing the receive path for the life of
+  the process, so freeing the port recovers without restarting TRACE.
+- `udp.py`'s diagnostics no longer use bare `print()`. The shipped builds are
+  PyInstaller `--windowed`, where `sys.stdout` isn't a real stream; the new
+  `_log()` can't raise and retains the last 50 lines, exposed as
+  `get_log_lines()`.
+- `auth.set_display_name()` now asks PostgREST for the updated row
+  (`Prefer: return=representation`) instead of treating any 2xx as success --
+  a PATCH matching zero rows also returns 204, so the honest "name didn't
+  sync" message added in 0.2.2 could report success on a silent no-op.
+- `leaderboard.py` quotes `eq.` filter values, so a car or track name
+  containing a comma can no longer truncate the query and match the wrong
+  rows.
+- Removed the README's "account creation and lap submission are currently
+  failing server-side" notice -- the upstream Supabase auth issue behind it
+  is resolved.
+
+## [0.3.3] - 2026-09-05
+Version bump only -- no code changes. Re-tagged to re-trigger the release
+build and publish workflows.
+
 ## [0.3.2] - 2026-08-31
 - Fixed leaderboard lap submissions silently failing once the Supabase
   session's access token expired (~1h). `_submit_leaderboard` now retries
   once with a refreshed access token (via the previously-unused
   `auth.refresh_session`) whenever a submit comes back with a "server"
   (RLS/auth) rejection.
+
+## [0.3.1] - 2026-08-30
+- Live Dashboard: new `ALLOW REMOTE` toggle for the Prometheus metrics
+  server. The metrics endpoint binds `127.0.0.1` by default; turning this
+  on rebinds it to `0.0.0.0` so a Grafana/Prometheus instance elsewhere on
+  the LAN can scrape it. Off by default, and the log panel says plainly
+  that anyone on the network can then read live telemetry.
+
+  (There is no 0.3.0 -- 0.2.9 was followed directly by 0.3.1.)
+
+## [0.2.9] - 2026-08-30
+- Fixed a Unicode crash and tightened incident / pit-flag detection in
+  `udp.py`.
+- Supabase session tokens (`SUPABASE_ACCESS_TOKEN` / `REFRESH_TOKEN` /
+  `USER_ID`) are now encrypted at rest with AES-GCM under a 32-byte key
+  kept in a separate `.settings.key` file, so sharing a `settings.json`
+  in a bug report or backup no longer hands over a usable session.
+- Hardened UDP and metrics-server binding, including a cached
+  `_expected_ps4_ip()` so the receive loop drops datagrams from hosts
+  other than the configured console without a DNS lookup per packet.
+- Pinned all runtime dependencies to compatible ranges (`numpy>=1.26,<3`,
+  `pandas>=2.0,<3`, `matplotlib>=3.7,<4`, `pycryptodome>=3.19,<4`,
+  `prometheus_client>=0.19,<1`) instead of leaving them unbounded.
 
 ## [0.2.8] - 2026-08-29
 - Car database refresh from the ddm999/gt7info community database: 4 new

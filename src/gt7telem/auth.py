@@ -100,10 +100,18 @@ def set_display_name(access_token: str, user_id: str, display_name: str, timeout
                 "apikey": _SUPABASE_ANON_KEY,
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json",
-                "Prefer": "return=minimal",
+                # return=representation, not return=minimal: a PATCH that
+                # matches zero rows (missing profile, or RLS filtering it out)
+                # still comes back 204, so "no exception" was never proof the
+                # name actually landed. Asking for the row back means we can
+                # tell a real write from a silent no-op -- which is the whole
+                # point of the honest "name didn't sync" message added in 0.2.2.
+                "Prefer": "return=representation",
             },
         )
-        urllib.request.urlopen(req, timeout=timeout)
-        return True
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8")
+        rows = json.loads(body) if body.strip() else []
+        return bool(rows) and rows[0].get("display_name") == display_name
     except Exception:
         return False

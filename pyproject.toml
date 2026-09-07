@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gt7tracetelem"
-version = "0.3.3"
+version = "0.3.4"
 description = "TRACE - GT7 telemetry capture, live dashboard, and lap/race analysis toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -39,6 +39,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Natural Language :: English",
 ]
 dependencies = [
@@ -46,7 +47,7 @@ dependencies = [
     "pandas>=2.0,<3",
     "matplotlib>=3.7,<4",
     "pycryptodome>=3.19,<4",
-    "prometheus_client>=0.19,<1",
+    "prometheus_client>=0.20,<1",
 ]
 
 [project.urls]
@@ -57,6 +58,8 @@ Changelog = "https://github.com/ransh2014/gt7telemtrace/blob/main/CHANGELOG.md"
 
 [project.scripts]
 gt7telem = "gt7telem.launcher:main"
+gt7telem-add-car = "gt7telem.add_car:main"
+gt7telem-add-track = "gt7telem.add_track:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

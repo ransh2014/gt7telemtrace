@@ -7,8 +7,8 @@ in the packet), so course_ids.csv only exists to back the TRACK dropdown's
 name list, not a live lookup. If GT7 adds a new track that isn't in the
 picker yet, just type its name here.
 
-Usage: python3 add_track.py
-(run from the same folder as course_ids.csv)
+Usage (any install):  gt7telem-add-track
+   or:              python -m gt7telem.add_track
 """
 import csv
 from pathlib import Path
@@ -86,11 +86,13 @@ def main():
     print(f"\nSaved. \"{name}\" added (local ID {new_id}) -- it'll show up")
     print("in the TRACK dropdown next time you open the Dashboard.")
     print()
-    print("This only updated your local course_ids.csv. To push it into the")
-    print("shipped apps:")
-    print("  1. Run rebuild_all.ps1 (one folder up) -- rebuilds the Windows")
-    print("     .exe, Linux binary (via WSL), and source zip.")
-    print("  2. Or open a chat with Claude and ask it to rebuild.")
+    print("This updated your local course_ids.csv only. Note that")
+    print("reinstalling or upgrading TRACE replaces this file, so the edit")
+    print("won't survive an upgrade.")
+    print()
+    print("To get the track into the official database for everyone, open an")
+    print("issue with the in-game name:")
+    print("  https://github.com/ransh2014/gt7telemtrace/issues")
 
 
 if __name__ == "__main__":

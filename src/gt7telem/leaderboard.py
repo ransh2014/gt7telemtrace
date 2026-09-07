@@ -42,6 +42,17 @@ def _headers(prefer=None, access_token=None):
     return h
 
 
+def _eq(value: str) -> str:
+    """PostgREST `eq.` filter value, safely quoted.
+
+    Unquoted values terminate at a comma, so a car or track name containing
+    one would silently truncate the filter and match the wrong rows (or
+    nothing). Double quotes make it a literal; inner quotes and backslashes
+    are escaped. urlencode() then percent-encodes the result."""
+    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'eq."{escaped}"'
+
+
 def _compact_samples(samples):
     """Strip a full recorded-lap sample list (as saved by dashboard.py, one
     dict per sample with 40+ fields) down to just what the leaderboard and
@@ -116,8 +127,8 @@ def get_top_laps(car_name: str, track_name: str, n: int = 10, timeout: float = 8
     submitted yet, etc) -- callers should treat an empty list as "nothing
     to show", not an error."""
     params = urllib.parse.urlencode({
-        "car_name": f"eq.{car_name}",
-        "track_name": f"eq.{track_name}",
+        "car_name": _eq(car_name),
+        "track_name": _eq(track_name),
         "select": "id,car_name,track_name,lap_time_ms,psn_name,created_at",
         "order": "lap_time_ms.asc",
         "limit": str(n),

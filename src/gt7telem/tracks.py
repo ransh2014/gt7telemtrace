@@ -4,9 +4,9 @@ same folder). To refresh: download
 https://raw.githubusercontent.com/ddm999/gt7info/web-new/_data/db/course.csv
 and overwrite course_ids.csv.
 
-Note -- unlike car_db.py, this is NOT a live autofill. GT7's telemetry stream
+Note -- unlike cars.py, this is NOT a live autofill. GT7's telemetry stream
 does not expose a track/course ID anywhere in the packet (confirmed against
-gt7udp.py's own byte-offset parsing, plus every other community GT7 telemetry
+udp.py's own byte-offset parsing, plus every other community GT7 telemetry
 tool we could find -- none of them get a track ID from the stream either).
 So there's nothing to auto-detect from. What this backs instead is a
 searchable track picker for the TRACK field: pick a real track name from the

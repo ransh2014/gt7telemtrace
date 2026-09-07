@@ -1,4 +1,4 @@
-# gt7udp.py — GT7 telemetry direct from PS4
+# udp.py — GT7 telemetry direct from PS4/PS5
 # Decryption method and packet offsets from Bornhall's gt7telemetry
 # https://github.com/Bornhall/gt7telemetry
 #
@@ -9,6 +9,7 @@ import errno
 import math
 import socket
 import struct
+import sys
 import threading
 import time
 from collections import deque
@@ -20,7 +21,7 @@ __all__ = [
     "get_snapshot", "get", "get_int", "get_float",
     "set_ip", "set_car", "set_track", "is_connected", "wait_for_connection",
     "get_diagnostics", "get_last_error", "get_incidents", "register_event",
-    "reset_lap",
+    "reset_lap", "get_log_lines",
 ]
 
 _ps4_ip         = PS_IP    # mutable — updated by set_ip()
@@ -58,6 +59,31 @@ _diag = {
     "bind_error":            None,   # fatal: couldn't bind RECV_PORT at all
     "last_good_packet_at":  None,
 }
+
+# ── Diagnostic logging ────────────────────────────────────────────────────
+# These used to be bare print() calls. The shipped Windows/macOS builds are
+# PyInstaller --windowed, where sys.stdout is not a real stream, so those
+# lines went nowhere at best and could raise at worst. _log() never raises,
+# and keeps the last few lines so get_diagnostics() can surface them in the
+# Dashboard's log panel instead of dropping them on the floor.
+_log_lines = deque(maxlen=50)
+
+def _log(msg: str, end: str = "\n") -> None:
+    try:
+        _log_lines.append(str(msg))
+    except Exception:
+        pass
+    try:
+        stream = sys.stdout
+        if stream is not None:
+            stream.write(f"{msg}{end}")
+            stream.flush()
+    except Exception:
+        pass  # frozen --windowed build, closed stream, or redirected to nothing
+
+def get_log_lines() -> list:
+    """Recent [gt7udp] diagnostic lines, newest last."""
+    return list(_log_lines)
 
 def _diag_update(**kwargs):
     with _diag_lock:
@@ -244,7 +270,7 @@ def _fire_event(name, parsed):
         try:
             fn(parsed)
         except Exception as e:
-            print(f"[gt7udp] Event callback error ({name}): {e}")
+            _log(f"[gt7udp] Event callback error ({name}): {e}")
 
 def _check_events(parsed):
     """Called once per parsed packet. Detects race start/end and pause/resume
@@ -720,7 +746,7 @@ def _classify_send_error(e):
 
 def _heartbeat_thread():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    print(f"[gt7udp] Heartbeat -> {_ps4_ip}:{SEND_PORT}")
+    _log(f"[gt7udp] Heartbeat -> {_ps4_ip}:{SEND_PORT}")
     while True:
         try:
             sock.sendto(HEARTBEAT_MSG, (_ps4_ip, SEND_PORT))
@@ -729,7 +755,7 @@ def _heartbeat_thread():
             msg = _classify_send_error(e)
             _diag_incr("heartbeat_errors")
             _diag_update(last_heartbeat_error=msg)
-            print(f"[gt7udp] Heartbeat error: {msg}")
+            _log(f"[gt7udp] Heartbeat error: {msg}")
         time.sleep(HEARTBEAT_EVERY)
 
 # ── Thread 2: receive ──────────────────────────────────────────────────────────
@@ -759,19 +785,45 @@ def _expected_ps4_ip():
             pass  # keep the last-known-good value (if any) until this succeeds
     return _ps4_ip_resolved
 
-def _udp_thread():
-    global _source
+BIND_RETRY_EVERY = 5.0   # seconds between re-bind attempts after a bind failure
+
+def _bind_recv_socket():
+    """Bind the telemetry receive socket, or return None and record why.
+
+    Deliberately does NOT set SO_REUSEADDR. On UDP that option lets a second
+    process share (Linux/macOS) or steal (Windows) an already-bound port,
+    which meant two running copies of TRACE would silently split the packet
+    stream between them, each seeing half a lap -- and _classify_bind_error's
+    "another copy is already running" EADDRINUSE message, which is the single
+    most useful thing we can tell someone here, would almost never fire.
+    Letting the bind fail loudly is the more helpful behaviour."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         sock.bind(("0.0.0.0", RECV_PORT))
     except OSError as e:
+        sock.close()
         msg = _classify_bind_error(e)
         _diag_update(bind_error=msg)
-        print(f"[gt7udp] FATAL: {msg}")
-        return  # nothing more this thread can do without the socket
+        return None, msg
     sock.settimeout(1.0)
-    print(f"[gt7udp] Listening on :{RECV_PORT}")
+    _diag_update(bind_error=None)
+    return sock, None
+
+def _udp_thread():
+    global _source
+    sock, msg = _bind_recv_socket()
+    if sock is None:
+        # Keep retrying rather than killing the receive path for the life of
+        # the process: the usual cause is another telemetry tool holding the
+        # port, and closing that used to require restarting TRACE too because
+        # _ensure_started() had already latched and would never respawn us.
+        _log(f"[gt7udp] {msg}")
+        _log(f"[gt7udp] Retrying every {BIND_RETRY_EVERY:.0f}s -- close the other tool and it will connect itself.")
+        while sock is None:
+            time.sleep(BIND_RETRY_EVERY)
+            sock, msg = _bind_recv_socket()
+        _log(f"[gt7udp] Port {RECV_PORT} free now -- bound successfully.")
+    _log(f"[gt7udp] Listening on :{RECV_PORT}")
     while True:
         try:
             raw, addr = sock.recvfrom(4096)
@@ -782,14 +834,14 @@ def _udp_thread():
             _diag_incr("packets_received")
             if _source is None:
                 _source = "udp"
-                print("[gt7udp] Source: direct UDP")
+                _log("[gt7udp] Source: direct UDP")
             if _source == "udp":
                 _ingest(raw)
         except socket.timeout:
             pass
         except Exception as e:
             _diag_update(last_recv_error=str(e))
-            print(f"[gt7udp] Receive error: {e}")
+            _log(f"[gt7udp] Receive error: {e}")
             time.sleep(1.0)
 
 # ── Start ──────────────────────────────────────────────────────────────────────
@@ -821,7 +873,7 @@ def get_float(key: str) -> float:
 
 def wait_for_connection(timeout: int = 60) -> str | None:
     _ensure_started()
-    print(f"[gt7udp] Heartbeat -> {_ps4_ip}:{SEND_PORT}  |  Listening on :{RECV_PORT}")
+    _log(f"[gt7udp] Heartbeat -> {_ps4_ip}:{SEND_PORT}  |  Listening on :{RECV_PORT}")
     deadline = time.time() + timeout
     dots = 0
     while time.time() < deadline:
@@ -831,17 +883,17 @@ def wait_for_connection(timeout: int = 60) -> str | None:
             spd = _latest.get("speed_kmh")
             pos = (_latest.get("world_x", 0), _latest.get("world_z", 0))
         if ok:
-            print(f"\n[gt7udp] Connected via {src}!  "
+            _log(f"\n[gt7udp] Connected via {src}!  "
                   f"speed={spd:.1f} km/h  pos=({pos[0]:.0f}, {pos[1]:.0f})")
             return _track
         # Fail fast on a fatal bind error instead of burning the full timeout.
         if get_diagnostics()["bind_error"]:
-            print(f"\n[gt7udp] {get_diagnostics()['bind_error']}")
+            _log(f"\n[gt7udp] {get_diagnostics()['bind_error']}")
             return None
-        if dots % 10 == 0: print("  ...", end="", flush=True)
+        if dots % 10 == 0: _log("  ...", end="")
         dots += 1
         time.sleep(0.1)
     reason = get_last_error() or "no reason determined"
-    print(f"\n[gt7udp] Timeout after {timeout}s.")
-    print(f"  -> {reason}")
+    _log(f"\n[gt7udp] Timeout after {timeout}s.")
+    _log(f"  -> {reason}")
     return None

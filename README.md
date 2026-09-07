@@ -59,7 +59,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Lap history table with alerts
 
 ### Lap Analyst
-- **15 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended
+- **16 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus
 - A/B lap comparison across every chart group
 - Dual replay — synced and realtime
 - Driver ratings radar
@@ -71,7 +71,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Race timeline, minimap heatmap, replay with speed control up to 32×
 
 ### Tooling
-- `add_car.py` / `add_track.py` — add missing car/track IDs to the local database
+- `gt7telem-add-car` / `gt7telem-add-track` — add a missing car/track ID to the local database from the terminal (also runnable as `python -m gt7telem.add_car` / `python -m gt7telem.add_track`)
 - Ships with **580+ cars** and **120+ tracks** pre-resolved out of the box; the car database is refreshed every time 10 or more new cars have been added since the last update
 
 ### Community Leaderboard (Lap Analyst)
@@ -80,8 +80,6 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Ghost lap download — pull any Top-10 lap straight into the A/B compare view as Lap B
 - Consensus racing line — overlay a community-average speed/throttle/brake line, bucketed from the current top 10 laps for your car and track
 - Optional free account (display name only, no email or password) so a submission ties to something real; entirely skippable — viewing the leaderboard, ghost downloads, and the consensus line all work without one
-
-> **Known issue (as of Aug 26, 2026):** account creation and lap submission are currently failing server-side due to an unresolved upstream Supabase auth bug (not a TRACE issue, no ETA from Supabase). Everything else — Live Dashboard, Lap Analyst, Race Analyst, viewing the leaderboard, ghost downloads — is unaffected. See [CHANGELOG.md](CHANGELOG.md) for the latest fixes on our end.
 
 ---
 
@@ -120,7 +118,7 @@ No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.
 2. Launch `gt7telem` (or run the source/binary).
 3. Pick **Live Dashboard**, **Lap Analyst**, or **Race Analyst** from the menu.
 4. Enter your console's IP in the Dashboard field and hit Enter — it's remembered for next time.
-5. Recorded laps save to a `laps/` folder next to wherever you run it from.
+5. Recorded laps save to `~/TRACE/laps` (pip/source installs) or a `laps/` folder next to the executable (standalone .exe/.app builds, which are portable). The folder is configurable in the Dashboard.
 
 Find your console's IP: **Settings → Network → View Connection Status** on your PS4/PS5. Your PC and console need to be on the same local network.
 
@@ -134,7 +132,7 @@ TRACE talks directly to the console for all core telemetry — no server, no bro
 - GT7 streams packets back to your PC on port `33740`.
 - Each packet is decrypted with Salsa20 and unpacked into a `Telemetry` snapshot — the protocol details this library relies on were reverse-engineered by [Bornhall](https://github.com/Bornhall/gt7telemetry) (see [Credits](#credits)).
 - Because TRACE always requests the extended packet, you get motion/sway/heave/surge and filtered-input data automatically — there's no separate "heartbeat type" setting to configure.
-- Settings (last-used IP, sample rate, known-good IPs, analytics opt-out) persist to a `settings.json` next to wherever you run TRACE from, so there's nothing to reconfigure between sessions.
+- Settings (last-used IP, sample rate, known-good IPs, analytics opt-out) persist to a `settings.json`, so there's nothing to reconfigure between sessions. Standalone .exe/.app builds keep it next to the executable so the app stays portable; pip and from-source installs use `~/.gt7telem/` instead, which survives `pip install --upgrade`.
 
 The one exception is the optional leaderboard: submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS. Nothing about your live session is ever sent unless you press "Submit to Leaderboard."
 
@@ -182,7 +180,7 @@ dashboard.App().mainloop()
 | Heartbeats sending but nothing comes back | Firewall is blocking inbound UDP on port `33740` — allow it for Python/the TRACE executable |
 | Packets arriving but not decrypting | Something else is bound to port 33740, an unexpected console/game version, or a mid-stream corrupt packet (usually self-resolves) |
 | A module named `gt7telem` already exists | You (or another package) installed an unrelated `gt7telem`; run `pip show gt7telem` to check before installing |
-| Car/track shows as a blank name | The ID isn't in the local database yet — run `add_car.py` / `add_track.py`, or wait for the next scheduled DB refresh |
+| Car/track shows as a blank name | The ID isn't in the local database yet — run `gt7telem-add-car` / `gt7telem-add-track`, or wait for the next scheduled DB refresh |
 
 Live connection diagnostics (heartbeat count, packet loss, last error) are always visible in the Dashboard, and available programmatically via `gt7telem.get_diagnostics()`.
 
@@ -196,10 +194,11 @@ Issues and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the qu
 
 ## Credits
 
-TRACE stands on the shoulders of two people who did the hard, unglamorous work this project depends on:
+TRACE stands on the shoulders of people who did the hard, unglamorous work this project depends on:
 
 - **[Bornhall](https://github.com/Bornhall/gt7telemetry)** — reverse-engineered GT7's UDP telemetry protocol, including the Salsa20 decryption key and full packet byte structure. Every telemetry value TRACE reads comes from this work.
 - **[ddm999](https://github.com/ddm999/gt7info)** — maintains [gt7info](https://ddm999.github.io/gt7info/), the community car and track database that resolves every car/track ID to a real name shown anywhere in TRACE.
+- **[MacManley](https://github.com/MacManley/gt7-udp)** and **[Nenkai](https://github.com/Nenkai/PDTools)** — the community packet documentation `udp.py` cross-references for the per-version packet lengths (A/B/~/C) and the extended-field byte offsets.
 
 Full writeup and credits: **[gt7trace.netlify.app/about.html](https://gt7trace.netlify.app/about.html)**.
 

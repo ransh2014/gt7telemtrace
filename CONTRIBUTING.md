@@ -37,7 +37,13 @@ session or a previously recorded lap.
   `course_ids.csv` — ID → name lookups, sourced from
   [ddm999/gt7info](https://ddm999.github.io/gt7info/).
 - `add_car.py` / `add_track.py` — CLI helpers for adding a missing ID to the
-  local database without hand-editing the CSVs.
+  local database without hand-editing the CSVs. Installed as the
+  `gt7telem-add-car` / `gt7telem-add-track` console scripts.
+- `tools/build_source_zip.py` — builds `gt7telem-source.zip`, the "Python
+  Source" download on the website. Run it after every release (`python
+  tools/build_source_zip.py -o <website-dir>`); the three binary downloads
+  are built by GitHub Actions, but this one isn't, and it has silently
+  shipped a release behind before.
 
 ## Reporting a bug
 
@@ -58,9 +64,22 @@ added to the next scheduled refresh.
 ## Pull requests
 
 Keep PRs focused — one fix or one feature per PR is easier to review than a
-batch of unrelated changes. Please bump `version` in `pyproject.toml` **and**
-`__version__` in `src/gt7telem/__init__.py` together when a PR is meant to
-ship as a release; the two have drifted out of sync before.
+batch of unrelated changes.
+
+Release checklist (all four, every time — items 2 and 3 have both been
+missed before, leaving released versions undocumented and the source
+download a release behind):
+
+1. Bump `version` in `pyproject.toml` **and** `__version__` in
+   `src/gt7telem/__init__.py` together — the two have drifted apart twice.
+2. Add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`, even for a
+   version-only bump (say so explicitly). `pyproject.toml`'s `Changelog`
+   URL points here, so a missing entry means PyPI links to a file that
+   never mentions the version being served.
+3. After the tag builds, run `python tools/build_source_zip.py -o
+   <website-dir>` and redeploy the site, so the source download matches.
+4. Check the Homebrew and Scoop taps picked the release up — both poll
+   every 6h and will fail loudly now rather than committing a bad hash.
 
 CI runs `pytest` and `ruff check .` on every PR — make sure both pass
 locally first. Pushing a `vX.Y.Z` tag on `main` (after merging a version

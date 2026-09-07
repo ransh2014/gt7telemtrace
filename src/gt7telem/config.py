@@ -1,5 +1,5 @@
 """
-runtime_config.py — replaces config.py for the standalone .exe builds.
+config.py — runtime settings for TRACE.
 
 No manual editing needed. On first run it uses sensible defaults; whenever
 you change the PS4/PS5 IP in the app, it's saved to settings.json right
@@ -11,7 +11,8 @@ import os
 import sys
 from pathlib import Path
 
-__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "KNOWN_IPS", "ANALYTICS_ENABLED", "PSN_NAME",
+__all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_RATE", "KNOWN_IPS", "DEBUG_LOG",
+           "ANALYTICS_ENABLED", "PSN_NAME",
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL"]
 
@@ -103,7 +104,7 @@ _DEFAULTS = {
     "PS_IP": "192.168.1.1",
     "LAPS_FOLDER": str(_default_laps_dir()),
     # Recording sample rate in Hz for Record Lap / Record Race (see
-    # gt7telem.py's RECORD_RATE_OPTIONS). 10 is the safe default -- it's
+    # dashboard.py's RECORD_RATE_OPTIONS). 10 is the safe default -- it's
     # the one rate we know for certain the app can sustain end-to-end.
     "SAMPLE_RATE": 10,
     "KNOWN_IPS": [],   # IPs that have successfully connected before, most-recent-first
