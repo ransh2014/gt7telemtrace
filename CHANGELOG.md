@@ -4,6 +4,8 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [0.3.5] - 2026-09-07
 Second audit pass -- everything below came out of reading the GUI/analysis
 modules and probing the live backend, neither of which the first pass covered.
 
