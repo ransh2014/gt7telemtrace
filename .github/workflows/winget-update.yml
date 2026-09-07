@@ -8,11 +8,17 @@ name: Update WinGet Package
 # Fine-grained PATs are not supported by wingetcreate for this.
 #
 # NOTE: `wingetcreate update` builds the new manifest from the package's
-# most recently *merged* manifest in microsoft/winget-pkgs. The very first
-# submission (0.2.6, PR #425267) is still pending review as of when this
-# workflow was added -- this workflow's first run will only succeed once
-# that PR is merged. Until then it will fail with a "package not found"
-# style error, which is expected and not a bug in this workflow.
+# most recently *merged* manifest in microsoft/winget-pkgs, so it can't do
+# anything until an initial manifest exists there. The first submission
+# (0.2.6, PR #425267) is still queued for a community moderator.
+#
+# Rather than failing every release until that merges -- which trains you to
+# ignore red X's on release runs, and is how a real failure slips past -- the
+# job now checks whether the package is published upstream and skips cleanly
+# if it isn't. Note the check only treats a 404 as "not published yet": any
+# other API response (rate limit, 5xx, auth) still fails the job, so this
+# can't quietly swallow a genuine problem. Once the PR merges, this starts
+# submitting on the next tag with no change needed here.
 
 # NOTE: this triggers on the tag push directly (not `release: published`).
 # The release itself is created by build-windows.yml using the default
@@ -33,6 +39,12 @@ on:
         required: false
         type: string
 
+env:
+  # winget-pkgs lays manifests out as manifests/<lowercase first letter of
+  # publisher>/<Publisher>/<Package>. Keep these two in sync.
+  WINGET_PACKAGE_ID: ransh2014.TRACE
+  WINGET_MANIFEST_PATH: manifests/r/ransh2014/TRACE
+
 jobs:
   winget:
     name: Submit to Windows Package Manager
@@ -45,7 +57,62 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
           echo "TARGET_TAG=$tag" >> $env:GITHUB_ENV
 
+      - name: Check the package is published in winget-pkgs
+        id: pkgcheck
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $api = "https://api.github.com/repos/microsoft/winget-pkgs/contents/$env:WINGET_MANIFEST_PATH"
+          $headers = @{
+            "Accept"               = "application/vnd.github+json"
+            "User-Agent"           = "gt7telemtrace-release"
+            "X-GitHub-Api-Version" = "2022-11-28"
+            "Authorization"        = "Bearer $env:GH_TOKEN"
+          }
+
+          try {
+            $resp = Invoke-WebRequest -Uri $api -Headers $headers -Method Get -UseBasicParsing
+            $status = $resp.StatusCode
+          } catch {
+            $status = $_.Exception.Response.StatusCode.value__
+            if (-not $status) {
+              # No HTTP response at all (DNS, TLS, network). That's a real
+              # failure, not evidence the package is missing.
+              Write-Error "Couldn't reach the GitHub API to check winget-pkgs: $($_.Exception.Message)"
+              exit 1
+            }
+          }
+
+          if ($status -eq 200) {
+            "published=true" >> $env:GITHUB_OUTPUT
+            Write-Host "$env:WINGET_PACKAGE_ID is published upstream -- proceeding with the update."
+          }
+          elseif ($status -eq 404) {
+            "published=false" >> $env:GITHUB_OUTPUT
+            Write-Host "$env:WINGET_PACKAGE_ID is not in microsoft/winget-pkgs yet."
+          }
+          else {
+            # 403 rate limit, 5xx, bad auth -- do NOT treat as "not published",
+            # or a transient API problem would silently skip a real release.
+            Write-Error "Unexpected status $status from the winget-pkgs contents API -- refusing to guess whether the package is published."
+            exit 1
+          }
+
+      - name: Skip -- package not published yet
+        if: steps.pkgcheck.outputs.published != 'true'
+        shell: pwsh
+        run: |
+          $msg = "$env:WINGET_PACKAGE_ID has no merged manifest in microsoft/winget-pkgs yet, so ``wingetcreate update`` has no baseline to build from. Skipping this release; it will submit automatically on the next tag once the initial submission is merged."
+          Write-Host $msg
+          "### WinGet submission skipped" >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          $msg >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          "Tracking: https://github.com/microsoft/winget-pkgs/pull/425267" >> $env:GITHUB_STEP_SUMMARY
+
       - name: Wait for release asset
+        if: steps.pkgcheck.outputs.published == 'true'
         shell: pwsh
         run: |
           $installerUrl = "https://github.com/${{ github.repository }}/releases/download/$env:TARGET_TAG/gt7telem-windows.zip"
@@ -66,8 +133,9 @@ jobs:
           echo "INSTALLER_URL=$installerUrl" >> $env:GITHUB_ENV
 
       - name: Submit updated manifest via wingetcreate
+        if: steps.pkgcheck.outputs.published == 'true'
         shell: pwsh
         run: |
           iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
           $version = "$env:TARGET_TAG".TrimStart("v")
-          .\wingetcreate.exe update ransh2014.TRACE -s -v $version -u "$env:INSTALLER_URL" -t "${{ secrets.WINGET_TOKEN }}"
+          .\wingetcreate.exe update $env:WINGET_PACKAGE_ID -s -v $version -u "$env:INSTALLER_URL" -t "${{ secrets.WINGET_TOKEN }}"
