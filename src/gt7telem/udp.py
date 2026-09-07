@@ -363,11 +363,37 @@ def set_ip(new_ip: str) -> None:
         _source    = None
         _latest    = {}
 
+# Device names Windows refuses to create as files/folders at any path depth.
+# A track legitimately called "Con" is unlikely, but hitting one turns every
+# save into an OSError, so it costs nothing to sidestep.
+_WIN_RESERVED = {
+    "con", "prn", "aux", "nul",
+    *(f"com{i}" for i in range(1, 10)),
+    *(f"lpt{i}" for i in range(1, 10)),
+}
+_MAX_NAME_LEN = 64   # keeps LAPS_FOLDER/<track>/<car>_<ts>.json clear of MAX_PATH
+
+
 def sanitize(name: str) -> str:
+    """Fold an arbitrary user-typed car/track name into a safe path segment.
+
+    Everything non-alphanumeric becomes "_", which is what makes this
+    traversal-proof: "..", "/" and "\\" can't survive it. Three cases beyond
+    that are handled explicitly, because each one silently misplaces or fails
+    a save otherwise:
+      - input that sanitizes to nothing ("...", "   ") -> "unknown", so laps
+        land in a track folder rather than the laps root
+      - Windows reserved device names -> suffixed, so mkdir doesn't OSError
+      - very long names -> truncated, to stay under MAX_PATH on Windows
+    """
     if not name: return "unknown"
     safe = "".join(c if c.isalnum() else "_" for c in name.lower().strip())
     while "__" in safe: safe = safe.replace("__", "_")
-    return safe.strip("_")
+    safe = safe.strip("_")
+    if not safe: return "unknown"
+    if len(safe) > _MAX_NAME_LEN: safe = safe[:_MAX_NAME_LEN].rstrip("_")
+    if safe in _WIN_RESERVED: safe = f"{safe}_"
+    return safe or "unknown"
 
 def reset_lap() -> None:
     global _prev_x, _prev_z, _prev_heading, _cum_dist

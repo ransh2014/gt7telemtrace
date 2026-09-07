@@ -118,7 +118,7 @@ No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.
 2. Launch `gt7telem` (or run the source/binary).
 3. Pick **Live Dashboard**, **Lap Analyst**, or **Race Analyst** from the menu.
 4. Enter your console's IP in the Dashboard field and hit Enter — it's remembered for next time.
-5. Recorded laps save to `~/TRACE/laps` (pip/source installs) or a `laps/` folder next to the executable (standalone .exe/.app builds, which are portable). The folder is configurable in the Dashboard.
+5. Recorded laps save to `~/TRACE/laps` (pip/source installs) or a `laps/` folder next to the executable (standalone .exe/.app builds, which are portable). To move it, edit `LAPS_FOLDER` in `settings.json` — there's no in-app control for it.
 
 Find your console's IP: **Settings → Network → View Connection Status** on your PS4/PS5. Your PC and console need to be on the same local network.
 

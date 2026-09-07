@@ -14,7 +14,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import auth, leaderboard, tracks
+from . import __version__, auth, leaderboard, tracks
 from . import config as runtime_config
 
 matplotlib.use("TkAgg")
@@ -104,7 +104,7 @@ def load_lap_data(data):
     return data, df
 
 def load_lap(path):
-    with open(path) as f: data = json.load(f)
+    with open(path, encoding="utf-8") as f: data = json.load(f)
     return load_lap_data(data)
 
 def export_csv(df, out_path):
@@ -115,7 +115,7 @@ def export_csv(df, out_path):
     dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
     distance_m = (df["speed_kmh"] / 3.6 * dt).cumsum()
     cols = ["distance_m","speed_kmh","throttle","brake","rpm","gear","steering"]
-    with open(out_path, "w", newline="") as f:
+    with open(out_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(cols)
         for i in range(len(df)):
@@ -1458,7 +1458,7 @@ class Replay:
 class AnalystApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("GT7 Lap Analyst")
+        self.title(f"TRACE {__version__} - Lap Analyst")
         self.configure(bg=BG)
         self.geometry("1380x860")
         self.minsize(1100, 700)

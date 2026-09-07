@@ -24,7 +24,7 @@ if __name__ == "__main__" and (not __package__):
 import threading
 import tkinter as tk
 
-from . import analytics, auth, config, lap_analyst, race_analyst
+from . import __version__, analytics, auth, config, lap_analyst, race_analyst
 
 # Static imports so PyInstaller's analysis bundles these (and their deps:
 # numpy, pandas, matplotlib, pycryptodome) -- do NOT switch these back to
@@ -311,7 +311,7 @@ def _build_card(parent, title, desc, color, cmd):
 def main():
     global root
     root = tk.Tk()
-    root.title("TRACE - GT7 Telemetry Suite")
+    root.title(f"TRACE {__version__} - GT7 Telemetry Suite")
     root.configure(bg=BG)
     root.resizable(True, True)
     root.minsize(760, 560)

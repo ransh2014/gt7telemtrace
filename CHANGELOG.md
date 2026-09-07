@@ -4,6 +4,47 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+Second audit pass -- everything below came out of reading the GUI/analysis
+modules and probing the live backend, neither of which the first pass covered.
+
+- Live Dashboard: added a `WM_DELETE_WINDOW` handler. It was the only one of
+  the three windows without one, and an in-progress recording lives purely in
+  memory until the lap or race ends -- so closing mid-race silently discarded
+  everything. Closing now offers save / discard / cancel, and stops the
+  Prometheus exporter (which was only ever stopped from its own toggle).
+- Recording: `gear_ratios` is a per-car constant that was being written onto
+  every single sample -- 9.9% of a measured race file, and never read back off
+  a sample by anything. It is now stored once at file level. Existing
+  recordings in the old shape still load unchanged.
+- Recording: a race is buffered entirely in memory until it ends, at ~1.6 KB
+  per sample -- about 328 MB for an hour at 60 Hz, and json.dump doubles that
+  on save. It now warns once at 150k samples and hard-stops (saving) at 400k
+  rather than running the machine out of memory.
+- `sanitize()`: input that reduced to nothing ("...", "   ") returned "" and
+  dumped laps in the laps root instead of a track folder; Windows reserved
+  device names (con/nul/prn/aux/com1..lpt9) made `mkdir` raise; and there was
+  no length cap, so a very long name could push the path past MAX_PATH. All
+  three are handled, and the function finally has tests.
+- All file I/O in the GUI modules now passes an explicit `encoding="utf-8"`
+  (11 call sites) instead of depending on the platform's locale codepage.
+- Race Analyst: exported HTML now declares `<meta charset="utf-8">`. It was
+  written as UTF-8 but had no declaration, so a browser opening it over
+  file:// fell back to the locale encoding and mangled the em dash.
+- Every window title now reads "TRACE <version> - <tool>". The Dashboard
+  still said "GT7 Telemetry v2" (a name predating the TRACE rename), the two
+  analysts had no TRACE branding, and no window showed the version at all --
+  despite bug reports asking for it.
+- `dashboard.py` reads `LAPS_FOLDER` from config at use time instead of
+  binding it once at import.
+- Tests: 19 -> 80. New coverage for `sanitize()`, the at-rest token
+  encryption from 0.2.9, `leaderboard._eq`/`_compact_samples`, and the
+  metrics server (including a regression guard on the prometheus_client
+  >=0.20 requirement).
+- Docs: corrected a claim that the laps folder is configurable from the
+  Dashboard -- there is no such control; it is a `settings.json` edit.
+- Minor: dropped a no-op `np.interp(pa_s, pa_s, ...)` in the Race Analyst's
+  telemetry diff, and a dead `.btn-gold` CSS rule on the site.
+
 
 ## [0.3.4] - 2026-09-07
 - Removed the duplicate `choco-publish.yml` workflow -- it fired on the same

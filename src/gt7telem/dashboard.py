@@ -12,14 +12,14 @@ import tkinter as tk
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from tkinter import filedialog, scrolledtext, ttk
+from tkinter import filedialog, messagebox, scrolledtext, ttk
 
+from . import __version__, leaderboard, metrics_server
 from . import cars as car_db
 from . import config as runtime_config
-from . import leaderboard, metrics_server
 from . import tracks as track_db
 from . import udp as telem
-from .config import KNOWN_IPS, LAPS_FOLDER
+from .config import KNOWN_IPS
 from .config import PS_IP as PS4_IP
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -36,6 +36,17 @@ from .config import PS_IP as PS4_IP
 # return the same latest packet more than once -- we never fabricate or
 # interpolate values to hit a higher rate (no upsampling).
 RECORD_RATE_OPTIONS = [10, 20, 30, 60]
+
+# A race is buffered entirely in memory until it ends, so the sample count is
+# the only thing bounding RAM. Measured at ~1.6 KB per sample, which is fine
+# for a 20-minute race but not for a long one at a high rate:
+#     20 min @ 10Hz =  12k samples ~  18 MB
+#      1 h  @ 60Hz  = 216k samples ~ 328 MB   (json.dump then doubles it on save)
+#      3 h  @ 60Hz  = 648k samples ~ 984 MB   -- enough to thrash a small laptop
+# Warn once on the way up, and hard-stop (saving what we have) before the
+# save itself becomes the thing that fails.
+RACE_SAMPLE_WARN = 150_000   # ~230 MB
+RACE_SAMPLE_MAX  = 400_000   # ~610 MB
 _RECORD_TICK_MS = 1000 // max(RECORD_RATE_OPTIONS)  # fast enough to thin down to any option above
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -87,7 +98,7 @@ session = Session()
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("GT7 Telemetry v2")
+        self.title(f"TRACE {__version__} - Live Dashboard")
         self.configure(bg="#0a0a12")
         self.geometry("1280x920")
         self.minsize(1100, 700)
@@ -123,6 +134,8 @@ class App(tk.Tk):
             addr = "0.0.0.0" if runtime_config.METRICS_BIND_ALL else "127.0.0.1"
             if not metrics_server.start(runtime_config.METRICS_PORT, addr=addr):
                 self.log_msg(f"Metrics export: failed to bind port {runtime_config.METRICS_PORT} (already in use?)")
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         telem.register_event("race_start", self._on_race_start)
         telem.register_event("race_end",   self._on_race_end)
@@ -634,10 +647,10 @@ class App(tk.Tk):
         if self._delta_ref_cache["track"] != track_sanitized:
             self._delta_ref_cache["track"]   = track_sanitized
             self._delta_ref_cache["samples"] = None
-            ref_path = Path(LAPS_FOLDER) / track_sanitized / "reference_lap.json"
+            ref_path = Path(runtime_config.LAPS_FOLDER) / track_sanitized / "reference_lap.json"
             try:
                 if ref_path.exists():
-                    with open(ref_path) as f:
+                    with open(ref_path, encoding="utf-8") as f:
                         ref_data = json.load(f)
                     samples = sorted(
                         ref_data.get("samples", []),
@@ -1041,6 +1054,64 @@ class App(tk.Tk):
         self.after(100, self._poll)
 
     # ─────────────────────────────────────────────────────────────────────────
+    # Shutdown
+    # ─────────────────────────────────────────────────────────────────────────
+    def _on_close(self):
+        """Window-close handler. The Dashboard used to have no
+        WM_DELETE_WINDOW protocol at all (unlike Lap/Race Analyst, which both
+        bind _quit), which meant two things went wrong silently: an
+        in-progress recording lives only in session.samples/race_samples
+        until a lap or race completes, so closing mid-race threw away
+        everything with no prompt; and metrics_server.stop() was only ever
+        called from the toggle, so the exporter was left running."""
+        pending = []
+        lap_pending  = (session.recording or session.waiting) and bool(session.samples)
+        race_pending = session.race_recording and bool(session.race_samples)
+        if lap_pending:
+            pending.append(f"a lap in progress ({len(session.samples)} samples)")
+        if race_pending:
+            pending.append(f"a race in progress ({len(session.race_samples)} samples)")
+
+        if pending:
+            answer = messagebox.askyesnocancel(
+                "Still recording",
+                "TRACE is still recording:\n\n  - " + "\n  - ".join(pending) +
+                "\n\nSave before closing?\n\n"
+                "Yes  = save, then close\n"
+                "No   = discard, then close\n"
+                "Cancel = keep recording",
+                parent=self)
+            if answer is None:
+                return  # keep the window (and the recording) alive
+            if answer:
+                # Save the race first: it is usually the longer recording, so
+                # if one of the two fails we would rather have kept that one.
+                if race_pending:
+                    try:
+                        session.race_recording = False
+                        self._save_race(list(session.race_samples))
+                    except Exception as e:
+                        messagebox.showerror("Save failed",
+                                             f"Couldn't save the in-progress race:\n{e}",
+                                             parent=self)
+                if lap_pending:
+                    try:
+                        session.recording = session.waiting = False
+                        self._save_lap(list(session.samples), lap_time_ms=None,
+                                       incomplete=True, prompt=False)
+                    except Exception as e:
+                        messagebox.showerror("Save failed",
+                                             f"Couldn't save the in-progress lap:\n{e}",
+                                             parent=self)
+
+        session.recording = session.waiting = session.race_recording = False
+        try:
+            metrics_server.stop()
+        except Exception:
+            pass  # never block the close on exporter teardown
+        self.destroy()
+
+    # ─────────────────────────────────────────────────────────────────────────
     # Recording tick -- runs on its own timer, independent of the 10Hz GUI
     # redraw poll above, so the user-selected recording rate (self._record_rate,
     # up to RECORD_RATE_OPTIONS' max) isn't capped by that UI-only cadence.
@@ -1177,7 +1248,27 @@ class App(tk.Tk):
             self.log_msg("Race recording stopped -- no samples recorded.")
 
     def _record_race_sample(self, d):
+        # Re-check the flag here rather than trusting the caller: _stop_record_race()
+        # below can fire from inside this very method, and an already-queued tick
+        # must not append (or re-trip the limit) after the race has been saved.
+        if not session.race_recording:
+            return
         session.race_samples.append(self._sample_dict(d, session.race_start_t))
+
+        n = len(session.race_samples)
+        if n == RACE_SAMPLE_WARN:
+            mins = n / max(self._record_rate, 1) / 60
+            self.log_msg(
+                f"Race recording is large ({n:,} samples, ~{mins:.0f} min at "
+                f"{self._record_rate} Hz). It is held in memory until the race ends -- "
+                f"consider stopping to save, or recording at a lower REC RATE."
+            )
+        elif n >= RACE_SAMPLE_MAX:
+            self.log_msg(
+                f"Race recording hit the {RACE_SAMPLE_MAX:,}-sample limit -- "
+                f"stopping and saving now so the recording isn't lost to memory pressure."
+            )
+            self._stop_record_race()
 
     def _maybe_submit_unknown_track(self, ui_track):
         """GT7 never exposes a track ID over telemetry, so the only way to
@@ -1205,7 +1296,7 @@ class App(tk.Tk):
         self._maybe_submit_unknown_track(ui_track)
 
         ts     = datetime.now().strftime("%Y%m%d_%H%M%S")
-        folder = Path(LAPS_FOLDER) / track / "races"
+        folder = Path(runtime_config.LAPS_FOLDER) / track / "races"
         folder.mkdir(parents=True, exist_ok=True)
 
         race_duration = time.time() - session.race_start_t
@@ -1219,12 +1310,15 @@ class App(tk.Tk):
             "race_duration_s": round(race_duration, 3),
             "total_samples":   len(samples),
             "incidents":       incidents,
+            # See the matching note in _save_lap -- per-car constant, stored
+            # once here instead of on every sample.
+            "gear_ratios":     telem.get("gear_ratios") or [],
             "samples":         samples,
         }
 
         race_filename = f"race_{car_safe}_{ts}.json"
         race_path     = folder / race_filename
-        with open(race_path, "w") as f:
+        with open(race_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         self.log_msg(f"Race saved: laps/{track}/races/{race_filename}  "
                      f"({len(samples)} samples, {race_duration:.1f}s, "
@@ -1260,10 +1354,10 @@ class App(tk.Tk):
         }
         self._session_summary.append(summary)
 
-        session_folder = Path(LAPS_FOLDER) / "_session"
+        session_folder = Path(runtime_config.LAPS_FOLDER) / "_session"
         session_folder.mkdir(parents=True, exist_ok=True)
         session_path = session_folder / f"session_{self._session_start_ts}.json"
-        with open(session_path, "w") as f:
+        with open(session_path, "w", encoding="utf-8") as f:
             json.dump({
                 "session_started": self._session_start_ts,
                 "races":           self._session_summary,
@@ -1389,7 +1483,6 @@ class App(tk.Tk):
             "rpm":              _f("rpm"),       "max_rpm":    _i("max_rpm"),
             "rpm_warning":      _i("rpm_warning"), "rpm_limiter": _i("rpm_limiter"),
             "rpm_after_clutch": _f("rpm_after_clutch"),
-            "gear_ratios":      d.get("gear_ratios", []),
             "boost":            _f("boost"),
             "tyre_temp_fl":     _f("tyre_temp_fl"), "tyre_temp_fr": _f("tyre_temp_fr"),
             "tyre_temp_rl":     _f("tyre_temp_rl"), "tyre_temp_rr": _f("tyre_temp_rr"),
@@ -1460,7 +1553,10 @@ class App(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
     # Save lap
     # ─────────────────────────────────────────────────────────────────────────
-    def _save_lap(self, samples, lap_time_ms=None, incomplete=False):
+    def _save_lap(self, samples, lap_time_ms=None, incomplete=False, prompt=True):
+        """prompt=False saves an incomplete lap straight to disk instead of
+        asking Save/Discard. Used by the window-close path, where popping a
+        modal we are about to destroy would lose the recording silently."""
         import math as _math
 
         has_coords = any(s.get("world_x", 0) != 0 for s in samples)
@@ -1490,7 +1586,7 @@ class App(tk.Tk):
         self._maybe_submit_unknown_track(ui_track)
 
         ts     = datetime.now().strftime("%Y%m%d_%H%M%S")
-        folder = Path(LAPS_FOLDER) / track
+        folder = Path(runtime_config.LAPS_FOLDER) / track
         folder.mkdir(parents=True, exist_ok=True)
         ref    = folder / "reference_lap.json"
 
@@ -1514,17 +1610,26 @@ class App(tk.Tk):
             "lap_distance_m": round(lap_dist, 1),
             "total_samples":  len(samples),
             "incomplete":     incomplete,
+            # Per-car constant, so it lives here rather than being repeated on
+            # every sample -- it was ~9% of each saved file's bytes and nothing
+            # ever read it back off a sample.
+            "gear_ratios":    telem.get("gear_ratios") or [],
             "samples":        samples,
         }
 
         lap_num = int(samples[-1].get("lap_number", 0)) if samples else 0
 
         def _do_save(path, label):
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             session.laps_saved.append(data)
             self.log_msg(f"Saved: laps/{track}/{label}")
             self._add_lap_to_history(lap_num, new_time, track, car, incomplete)
+
+        if incomplete and not prompt:
+            car_safe = telem.sanitize(car)
+            _do_save(folder / f"{car_safe}_{ts}.json", f"{car_safe}_{ts}.json")
+            return
 
         if incomplete:
             dlg = tk.Toplevel(self)
@@ -1553,7 +1658,7 @@ class App(tk.Tk):
         car_safe     = telem.sanitize(car)
         lap_filename = f"{car_safe}_{ts}.json"
         lap_path     = folder / lap_filename
-        with open(lap_path, "w") as f:
+        with open(lap_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         session.laps_saved.append(data)
         self.log_msg(f"Saved: laps/{track}/{lap_filename}")
@@ -1562,13 +1667,13 @@ class App(tk.Tk):
         ref_time = 0.0
         if ref.exists():
             try:
-                with open(ref) as f:
+                with open(ref, encoding="utf-8") as f:
                     ref_time = float(json.load(f).get("lap_time_s") or 0)
             except Exception:
                 ref_time = 0.0
 
         if ref_time <= 0 or new_time < ref_time:
-            with open(ref, "w") as f:
+            with open(ref, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             diff_str = (f"  (new best by {ref_time - new_time:.3f}s)"
                         if ref_time > 0 else "  (first lap)")
@@ -1614,7 +1719,7 @@ class App(tk.Tk):
         )
         if not path:
             return
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump({
                 "exported_at": datetime.now().isoformat(),
                 "laps":        session.laps_saved,

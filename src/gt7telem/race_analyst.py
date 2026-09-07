@@ -23,6 +23,8 @@ from matplotlib.patches import Polygon as MplPolygon
 
 warnings.filterwarnings("ignore")
 
+from . import __version__  # noqa: E402  (kept with the other package imports)
+
 # ── Theme (matches lap_analyst.py) ─────────────────────────────────────────────
 BG   = "#07080f"
 PNL  = "#0d0e1a"
@@ -62,7 +64,7 @@ X = "t"          # race charts are plotted against elapsed race time, not track_
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 def load_race(path):
-    with open(path) as f: data = json.load(f)
+    with open(path, encoding="utf-8") as f: data = json.load(f)
     samples = data.get("samples", [])
     if not samples: raise ValueError("No samples in file")
     df = pd.DataFrame(samples)
@@ -690,7 +692,9 @@ def draw_telediff(fig, df, dfb=None):
     pb = (dfb["t"] / dur_b).values
     pa_s = np.sort(pa); pb_s = np.sort(pb)
 
-    def va(col): return np.interp(pa_s, pa_s, df.sort_values("t")[col].values)
+    # A is already on its own timebase -- np.interp(pa_s, pa_s, y) just
+    # returns y, so only B needs resampling onto A's normalised time points.
+    def va(col): return df.sort_values("t")[col].values
     def vb(col): return np.interp(pa_s, pb_s, dfb.sort_values("t")[col].values)
     def diff(col): return vb(col) - va(col)
 
@@ -1258,7 +1262,7 @@ class Replay:
 class AnalystApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("GT7 Race Analyst")
+        self.title(f"TRACE {__version__} - Race Analyst")
         self.configure(bg=BG)
         self.geometry("1380x860")
         self.minsize(1100, 700)
@@ -1526,12 +1530,16 @@ class AnalystApp(tk.Tk):
         b64 = base64.b64encode(buf.getvalue()).decode()
         html = (
             "<!DOCTYPE html><html><head>"
-            f"<title>GT7 Race Analyst — {name}</title>"
+            # Written as UTF-8 below; without this meta a browser opening the
+            # file over file:// falls back to the locale encoding and the em
+            # dash in the title renders as mojibake.
+            '<meta charset="utf-8">'
+            f"<title>TRACE Race Analyst — {name}</title>"
             "<style>body{background:#07080f;display:flex;justify-content:center;"
             "align-items:flex-start;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}"
             "img{max-width:100%;border-radius:8px;box-shadow:0 0 30px #00f0d444}"
             "h3{color:#00f0d4;font-family:monospace;text-align:center}</style></head>"
-            f"<body><div><h3>GT7 Race Analyst — {name}</h3>"
+            f"<body><div><h3>TRACE Race Analyst — {name}</h3>"
             f"<img src='data:image/png;base64,{b64}'></div></body></html>"
         )
         Path(path).write_text(html, encoding="utf-8")
