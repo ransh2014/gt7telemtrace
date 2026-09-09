@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-09-09
+- UDP parser: `gear_ratios[0]` was actually `TransmissionTopSpeed` (offset
+  0x100), not gear 1's ratio -- confirmed against Nenkai/PDTools'
+  SimulatorPacket.cs, which every other field offset in this parser already
+  matches byte-for-byte. Every gear ratio read since was off by one, and the
+  true 8th-gear slot (rare, only populated on 8+-gear cars) was silently
+  folded into the array under the wrong label. Real gear ratios now come from
+  0x104 (8 slots); the top-speed value is exposed separately as
+  `transmission_top_speed`. Old saved lap/race JSON keeps its previous
+  (off-by-one) `gear_ratios` values as-is -- nothing re-derives them from a
+  loaded file.
+
 ## [0.3.5] - 2026-09-07
 Second audit pass -- everything below came out of reading the GUI/analysis
 modules and probing the live backend, neither of which the first pass covered.

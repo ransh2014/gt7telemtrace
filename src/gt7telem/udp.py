@@ -576,8 +576,15 @@ def _parse(data):
         clutch_engaged   = f(0xF8)
         rpm_after_clutch = f(0xFC)
 
-        gear_ratios = [f(0x100 + i*4) for i in range(9)]
-        car_id      = i(0x124)
+        # 0x100 is TransmissionTopSpeed (per Nenkai/PDTools' SimulatorPacket.cs),
+        # a distinct field -- NOT gear 1's ratio. Real gear ratios start at 0x104:
+        # 7 fixed slots, then one more slot at 0x120 that's normally 0 and only
+        # populated for 8+-gear cars (GT7 quirk). Gear ratios previously read
+        # from 0x100 were off by one, with gear_ratios[0] silently holding the
+        # top-speed value instead of gear 1.
+        transmission_top_speed = f(0x100)
+        gear_ratios            = [f(0x104 + i*4) for i in range(8)]
+        car_id                 = i(0x124)
 
         # ── Extended fields (Packet B / ~ / C) ────────────────────────────
         # Only present when the PS console is sent heartbeat 'C' and replies
@@ -694,6 +701,7 @@ def _parse(data):
             "clutch_engaged":   clutch_engaged,
             "rpm_after_clutch": rpm_after_clutch,
             "gear_ratios":      gear_ratios,
+            "transmission_top_speed": transmission_top_speed,
             "total_laps":       total_laps,
             "current_position": current_pos,
             "total_positions":  total_positions,
