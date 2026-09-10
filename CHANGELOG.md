@@ -5,6 +5,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-09-10
+- Live Dashboard: the remembered-good-IP list (the dropdown next to the
+  console IP field) is no longer capped at 3 -- every console you've ever
+  successfully connected to stays in it now.
+- Live Dashboard: added an "Auto-Detect" button next to the IP field. It
+  broadcasts a PS4/PS5 device-discovery query on the local network (UDP
+  port 9302, the same protocol Sony's own apps use) and fills in whichever
+  console answers first -- entirely optional, manual entry still works
+  exactly as before. New `gt7telem.discover_ps_ip()` in the public API.
+
 ## [0.3.6] - 2026-09-09
 - UDP parser: `gear_ratios[0]` was actually `TransmissionTopSpeed` (offset
   0x100), not gear 1's ratio -- confirmed against Nenkai/PDTools'

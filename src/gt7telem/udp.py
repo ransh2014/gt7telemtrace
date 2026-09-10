@@ -21,7 +21,7 @@ __all__ = [
     "get_snapshot", "get", "get_int", "get_float",
     "set_ip", "set_car", "set_track", "is_connected", "wait_for_connection",
     "get_diagnostics", "get_last_error", "get_incidents", "register_event",
-    "reset_lap", "get_log_lines",
+    "reset_lap", "get_log_lines", "discover_ps_ip",
 ]
 
 _ps4_ip         = PS_IP    # mutable — updated by set_ip()
@@ -931,3 +931,28 @@ def wait_for_connection(timeout: int = 60) -> str | None:
     _log(f"\n[gt7udp] Timeout after {timeout}s.")
     _log(f"  -> {reason}")
     return None
+
+# ── Console auto-discovery ───────────────────────────────────────────────────
+# Entirely separate from the heartbeat/receive sockets above -- its own
+# throwaway broadcast socket, opened and closed within the call. Purely a
+# convenience for filling in the console-IP field; nothing else here depends
+# on it, and it's never started automatically.
+DISCOVERY_PORT  = 9302
+DISCOVERY_QUERY = b"SRCH * HTTP/1.1\ndevice-discovery-protocol-version:00030010"
+
+def discover_ps_ip(timeout: float = 2.0) -> str | None:
+    """Broadcast a PS4/PS5 device-discovery query on the local network and
+    return the IP of whichever console answers first, or None if nothing
+    replies within `timeout` seconds (no console on, wrong network/subnet,
+    or a router that blocks broadcast traffic)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.settimeout(timeout)
+        sock.sendto(DISCOVERY_QUERY, ("<broadcast>", DISCOVERY_PORT))
+        _, addr = sock.recvfrom(1024)
+        return addr[0]
+    except (OSError, socket.timeout):
+        return None
+    finally:
+        sock.close()

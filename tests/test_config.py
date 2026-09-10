@@ -42,11 +42,13 @@ def test_remember_good_ip_dedupes_and_moves_to_front():
     assert result == ["1.1.1.1", "2.2.2.2"]
 
 
-def test_remember_good_ip_caps_at_max_known_ips():
-    for ip in ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4"]:
+def test_remember_good_ip_keeps_all_uncapped():
+    ips = ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5"]
+    for ip in ips:
         result = config.remember_good_ip(ip)
-    assert len(result) == config.MAX_KNOWN_IPS
-    assert result[0] == "4.4.4.4"
+    assert len(result) == len(ips)
+    assert result[0] == "5.5.5.5"
+    assert result[-1] == "1.1.1.1"
 
 
 def test_remember_good_ip_ignores_blank():

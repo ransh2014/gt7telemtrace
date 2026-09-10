@@ -214,6 +214,12 @@ class App(tk.Tk):
         ip_entry.bind("<FocusOut>",   lambda e: self._on_ip_change())
         ip_entry.bind("<<ComboboxSelected>>", lambda e: self._on_ip_change())
 
+        self.discover_btn = tk.Button(hdr2, text="Auto-Detect",
+                                       command=self._on_discover_ip,
+                                       bg="#16213e", fg=HI, relief="flat",
+                                       font=("Consolas", 8), padx=6, pady=1)
+        self.discover_btn.pack(side="left", padx=(0, 12))
+
         tk.Label(hdr2, text="TRACK", fg=DIM, bg="#0f3460",
                  font=("Consolas", 9)).pack(side="left", padx=(8, 2))
         self.track_var = tk.StringVar(value="")
@@ -669,6 +675,29 @@ class App(tk.Tk):
         runtime_config.save(PS_IP=new_ip)
         self.log_msg(f"IP changed to {new_ip}  reconnecting...")
         threading.Thread(target=self._connect_thread, daemon=True).start()
+
+    def _on_discover_ip(self):
+        """Optional convenience: broadcast for a PS4/PS5 on the local network
+        instead of typing its IP in by hand. Purely additive -- manual entry
+        and the KNOWN_IPS dropdown both still work exactly as before."""
+        self.discover_btn.config(state="disabled", text="Searching...")
+        self.log_msg("Auto-detect: searching for a PS4/PS5 on your network...")
+        threading.Thread(target=self._discover_ip_thread, daemon=True).start()
+
+    def _discover_ip_thread(self):
+        found_ip = telem.discover_ps_ip()
+        self.after(0, self._on_discover_done, found_ip)
+
+    def _on_discover_done(self, found_ip):
+        self.discover_btn.config(state="normal", text="Auto-Detect")
+        if found_ip:
+            self.ip_var.set(found_ip)
+            self.log_msg(f"Auto-detect: found a console at {found_ip}")
+            self._on_ip_change()
+        else:
+            self.log_msg("Auto-detect: no PS4/PS5 responded on the local network "
+                          "-- make sure the console is on and on the same "
+                          "Wi-Fi/network, then try again or enter the IP manually.")
 
     def _on_debug_toggle(self):
         runtime_config.DEBUG_LOG = self.debug_var.get()

@@ -139,20 +139,17 @@ _DEFAULTS = {
     "METRICS_BIND_ALL": False,
 }
 
-MAX_KNOWN_IPS = 3
-
-
 def remember_good_ip(ip: str) -> list:
-    """Push `ip` to the front of the known-good IP list (dedup, capped at
-    MAX_KNOWN_IPS), persist it, and return the updated list. Only call this
-    once a connection has actually been confirmed -- not on every keystroke."""
+    """Push `ip` to the front of the known-good IP list (dedup, uncapped --
+    every console you've ever successfully connected to stays in the
+    dropdown), persist it, and return the updated list. Only call this once
+    a connection has actually been confirmed -- not on every keystroke."""
     ip = (ip or "").strip()
     if not ip:
         return load().get("KNOWN_IPS", [])
     data  = load()
     known = [x for x in data.get("KNOWN_IPS", []) if x != ip]
     known.insert(0, ip)
-    known = known[:MAX_KNOWN_IPS]
     save(KNOWN_IPS=known)
     return known
 
