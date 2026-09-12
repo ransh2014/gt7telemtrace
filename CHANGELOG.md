@@ -5,6 +5,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-09-12
+- Live Dashboard: Auto-Detect stopped reconnecting when the console it found
+  was already the IP in the box -- a regression from 0.3.8's IP-box fix
+  below, caught in a follow-up re-review of that release. Auto-Detect is a
+  manual action, so it now always (re)connects, the same as pressing Enter.
+
 ## [0.3.8] - 2026-09-12
 Final audit pass -- every module read end to end; the race-event and
 Salsa20 bugs were reproduced before fixing and are now pinned by tests.

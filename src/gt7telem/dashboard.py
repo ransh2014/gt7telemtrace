@@ -711,7 +711,10 @@ class App(tk.Tk):
         if found_ip:
             self.ip_var.set(found_ip)
             self.log_msg(f"Auto-detect: found a console at {found_ip}")
-            self._on_ip_change()
+            # force=True: a manual action like this should always (re)try the
+            # connection, even if it happens to find the IP already in the
+            # box (e.g. retrying after a non-IP connection problem).
+            self._on_ip_change(force=True)
         else:
             self.log_msg("Auto-detect: no PS4/PS5 responded on the local network "
                           "-- make sure the console is on and on the same "
