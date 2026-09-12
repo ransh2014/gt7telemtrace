@@ -13,7 +13,7 @@ import pytest
 
 Salsa20 = pytest.importorskip("Crypto.Cipher.Salsa20", reason="pycryptodome not installed")
 
-from gt7telem.udp import _decrypt, _parse  # noqa: E402
+from gt7telem.udp import _decrypt, _parse, _salsa20_pure  # noqa: E402
 
 MAGIC = 0x47375330
 KEY = b"Simulator Interface Packet GT7 ver 0.0"[:32]
@@ -94,3 +94,11 @@ def test_parse_packet_a_has_no_extended_fields():
     assert parsed["wheel_rotation"] is None
     assert parsed["sway"] is None
     assert parsed["surface_type"] is None
+
+
+def test_pure_python_salsa20_fallback_matches_pycryptodome():
+    """Only used when pycryptodome is missing. It used to run 40 rounds and
+    decrypt just the first 64 bytes, so it never produced a valid packet."""
+    iv = bytes(range(8))
+    data = bytes((i * 7 + 3) & 0xFF for i in range(368))
+    assert _salsa20_pure(data, KEY, iv) == Salsa20.new(key=KEY, nonce=iv).decrypt(data)

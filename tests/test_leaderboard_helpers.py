@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from gt7telem.leaderboard import _compact_samples, _eq
+from gt7telem.leaderboard import _compact_samples, _eq, lap_submission_error
 
 
 def test_eq_quotes_the_value():
@@ -72,3 +72,28 @@ def test_compact_samples_handles_an_empty_lap():
 def test_compact_output_is_json_serialisable():
     out = _compact_samples([{"speed_kmh": 1.5, "gear": 3}])
     json.dumps(out)
+
+
+COMPLETE_LAP = {"lap_time_s": 92.345, "samples": [{"speed_kmh": 100.0}], "incomplete": False}
+
+
+def test_complete_lap_can_be_submitted():
+    assert lap_submission_error(COMPLETE_LAP) is None
+
+
+def test_lap_files_from_before_the_incomplete_flag_are_accepted():
+    lap = {k: v for k, v in COMPLETE_LAP.items() if k != "incomplete"}
+    assert lap_submission_error(lap) is None
+
+
+def test_incomplete_lap_is_refused():
+    """An incomplete lap's time only covers part of a lap -- submitting it
+    would post a bogus record."""
+    assert "incomplete" in lap_submission_error({**COMPLETE_LAP, "incomplete": True}).lower()
+
+
+@pytest.mark.parametrize("bad", [
+    {"samples": []}, {"lap_time_s": 0}, {"lap_time_s": None}, {"lap_time_s": "abc"},
+])
+def test_lap_without_samples_or_a_time_is_refused(bad):
+    assert lap_submission_error({**COMPLETE_LAP, **bad})

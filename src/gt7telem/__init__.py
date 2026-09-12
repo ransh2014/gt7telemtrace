@@ -13,7 +13,7 @@ GUI apps (Live Dashboard, Lap Analyst, Race Analyst) are not re-exported
 here -- run `gt7telem` from the command line, or import the submodules
 directly: gt7telem.dashboard, gt7telem.lap_analyst, gt7telem.race_analyst.
 """
-__version__ = "0.3.7"
+__version__ = "0.3.8"
 
 from .cars import get_car_name
 from .config import load, remember_good_ip, save

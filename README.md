@@ -54,7 +54,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Configurable recording sample rate (10/20/30/60 Hz)
 - Live delta vs. a reference lap
 - Connection diagnostics — heartbeats, packet loss, decrypt/parse failures, actionable error messages
-- Remembers known-good PS4/PS5 IPs (up to 3, most recent first)
+- Remembers every PS4/PS5 IP you've connected to (most recent first), plus an Auto-Detect button that finds the console on your network
 - Incident timeline
 - Lap history table with alerts
 
@@ -118,7 +118,7 @@ No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.
 2. Launch `gt7telem` (or run the source/binary).
 3. Pick **Live Dashboard**, **Lap Analyst**, or **Race Analyst** from the menu.
 4. Enter your console's IP in the Dashboard field and hit Enter — it's remembered for next time.
-5. Recorded laps save to `~/TRACE/laps` (pip/source installs) or a `laps/` folder next to the executable (standalone .exe/.app builds, which are portable). To move it, edit `LAPS_FOLDER` in `settings.json` — there's no in-app control for it.
+5. Recorded laps save to `~/TRACE/laps`. The one exception is a standalone .exe/binary unzipped into a folder you can write to — that stays portable and keeps a `laps/` folder next to the executable. (Chocolatey/WinGet installs and the macOS `.app` always use `~/TRACE/laps`, so a package upgrade can't take your laps with it.) To move it, edit `LAPS_FOLDER` in `settings.json` — there's no in-app control for it.
 
 Find your console's IP: **Settings → Network → View Connection Status** on your PS4/PS5. Your PC and console need to be on the same local network.
 
@@ -132,7 +132,7 @@ TRACE talks directly to the console for all core telemetry — no server, no bro
 - GT7 streams packets back to your PC on port `33740`.
 - Each packet is decrypted with Salsa20 and unpacked into a `Telemetry` snapshot — the protocol details this library relies on were reverse-engineered by [Bornhall](https://github.com/Bornhall/gt7telemetry) (see [Credits](#credits)).
 - Because TRACE always requests the extended packet, you get motion/sway/heave/surge and filtered-input data automatically — there's no separate "heartbeat type" setting to configure.
-- Settings (last-used IP, sample rate, known-good IPs, analytics opt-out) persist to a `settings.json`, so there's nothing to reconfigure between sessions. Standalone .exe/.app builds keep it next to the executable so the app stays portable; pip and from-source installs use `~/.gt7telem/` instead, which survives `pip install --upgrade`.
+- Settings (last-used IP, sample rate, known-good IPs, analytics opt-out) persist to a `settings.json`, so there's nothing to reconfigure between sessions. It lives in `~/.gt7telem/`, which survives `pip install --upgrade` and package-manager upgrades — except for a standalone .exe/binary unzipped into a folder you can write to, which keeps it next to the executable so it stays portable.
 
 The one exception is the optional leaderboard: submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS. Nothing about your live session is ever sent unless you press "Submit to Leaderboard."
 
@@ -159,8 +159,9 @@ gt7telem.set_ip("192.168.1.X")
 gt7telem.wait_for_connection()
 
 snap = gt7telem.get_snapshot()
-print(gt7telem.get_car_name(snap))
-print(gt7telem.get_diagnostics())   # heartbeat / packet-loss / decrypt status as a human-readable string
+print(gt7telem.get_car_name(snap.get("car_id")))
+print(gt7telem.get_diagnostics())   # dict of heartbeat / packet / decrypt counters
+print(gt7telem.get_last_error())    # one-line explanation when not connected, else None
 ```
 
 See `gt7telem.__all__` for the full list of exported functions (`get_snapshot`, `set_car`, `set_track`, `get_diagnostics`, `get_car_name`, `get_track_name`, `all_track_names`, settings persistence, and more). The GUI apps (`dashboard`, `lap_analyst`, `race_analyst`) are available as submodules for anyone building on top of TRACE directly:

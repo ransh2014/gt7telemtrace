@@ -5,6 +5,55 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-09-12
+Final audit pass -- every module read end to end; the race-event and
+Salsa20 bugs were reproduced before fixing and are now pinned by tests.
+
+- Race detection: after the chequered flag, a car still above 80 km/h on the
+  cool-down lap re-triggered race start + race end every 2 s until the
+  results screen, so the Dashboard started and saved a near-empty race each
+  time. Neither start condition can fire once `lap_number > total_laps`.
+- Live delta: `track_position` now restarts in udp.py whenever GT7's lap
+  counter changes. It used to reset only from Record Lap, so without a lap
+  recording running the DELTA readout was wrong from lap 2 onward. Race
+  recordings' `track_position` now restarts per lap too.
+- Leaderboard: incomplete laps (stopped mid-lap, or saved on close) can no
+  longer be submitted -- their time only covered part of a lap. New
+  `leaderboard.lap_submission_error()`.
+- Recording: a failed save (disk full, folder not writable) no longer loses
+  the recording or silently stops recording for the rest of the session.
+  Saves are logged, written via a temp file, and fall back to
+  `~/TRACE/unsaved/`; if even that fails the lap/race stays in memory for
+  Export Session. Closing with a recording that couldn't be saved now asks
+  before discarding it. The display and recording timers always reschedule
+  after an error.
+- Standalone builds: settings and laps stay next to the executable only in a
+  folder the user owns. Chocolatey/WinGet installs, the macOS `.app`, and
+  read-only folders now use `~/.gt7telem` and `~/TRACE/laps` like pip
+  installs -- under Chocolatey, settings silently never saved and lap saves
+  failed, and a package upgrade replaces that folder. Existing portable
+  installs (settings.json already beside the exe) are unchanged.
+- Auto-Detect now also finds PS4s (UDP 987, protocol 00020020); it only ever
+  sent the PS5 query (9302). Non-console replies are ignored.
+- Replay (Lap and Race Analyst): 1x now plays in real time at any recording
+  rate, and 0.25x/0.5x actually slow down (they were identical to 1x). A
+  quick pause/play no longer doubles playback speed.
+- Dashboard IP box: losing focus no longer reconnects when the IP hasn't
+  changed (it dropped the live connection and logged "Connection dropped");
+  Enter still forces a retry. New `udp.get_ip()`.
+- Changing the console IP resets the connection diagnostics, so a wrong new
+  IP gets a real explanation instead of "unknown error".
+- Onboarding: pressing Enter while an account is being created no longer
+  creates extra accounts.
+- Session summary: the "Fuel %" column was litres (kWh for EVs); it's now
+  "Fuel Used" with the unit. Session JSON key `fuel_used_pct` is now
+  `fuel_used` (+ `fuel_unit`).
+- udp.py's pure-Python Salsa20 fallback (used only without pycryptodome) was
+  wrong -- 40 rounds instead of 20, and only the first 64 bytes decrypted.
+- Docs: README's "up to 3" IPs and `get_car_name(snap)` example corrected;
+  the source-zip README no longer claims an in-app laps-folder control or a
+  Settings screen; data-location notes updated for the standalone change.
+
 ## [0.3.7] - 2026-09-10
 - Live Dashboard: the remembered-good-IP list (the dropdown next to the
   console IP field) is no longer capped at 3 -- every console you've ever

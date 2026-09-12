@@ -51,12 +51,13 @@ gt7telem/         The TRACE package itself (same source that ships on
                     consensus racing-line client
   analytics.py      Anonymous usage ping (on by default) — see
                     gt7trace.netlify.app/privacy.html for exactly what it
-                    sends. Turn off in Settings.
+                    sends. Turn off with the SHARE USAGE DATA checkbox
+                    in the Live Dashboard.
   metrics_server.py Optional Prometheus metrics export (off by default) —
                     exposes speed/rpm/throttle/brake/fuel/lap-time gauges
                     for Grafana or any Prometheus-compatible scraper.
-                    Binds to localhost only unless you enable "ALLOW
-                    REMOTE" in Settings.
+                    Binds to localhost only unless you tick "ALLOW
+                    REMOTE" in the Live Dashboard header.
   cars.py           Car ID -> name lookup (car_ids.csv)
   tracks.py         Track ID -> name lookup (course_ids.csv), plus track
                     boundary extraction from a lap's GPS trace
@@ -73,9 +74,10 @@ Running from this source download (not the standalone .exe/.app):
   Laps:      ~/TRACE/laps
 
 (`~` is your home folder — C:\Users\<you> on Windows, /home/<you> or
-/Users/<you> elsewhere.) The laps folder is configurable in the Dashboard.
-The standalone .exe/.app builds are portable instead and keep both next to
-the executable.
+/Users/<you> elsewhere.) To move the laps folder, edit LAPS_FOLDER in
+settings.json -- there's no in-app control for it. A standalone .exe/binary
+unzipped into a folder you can write to is portable instead and keeps both
+next to the executable.
 
 PREFER `python -m gt7telem.launcher` INSTEAD?
 ----------------------------------------------

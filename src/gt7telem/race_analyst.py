@@ -4,6 +4,7 @@ import base64
 import io
 import json
 import math
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -947,6 +948,9 @@ class Replay:
         self._idx      = 0
         self._playing  = False
         self._si       = 2
+        self._play_pos = 0.0    # fractional sample index while playing (see _tick)
+        self._rate     = 10.0   # recorded samples per second (see _sample_rate)
+        self._last_tick_t = None
         self._has_map  = False
         self._car_size = 10
         self._car_patch_a  = None
@@ -960,6 +964,15 @@ class Replay:
         self._b_visible = False
         self._after_id  = None
         self._build(parent)
+
+    @staticmethod
+    def _sample_rate(df):
+        """Recorded samples per second -- what 1x playback has to advance by
+        to run in real time. Median, so gaps where recording was paused
+        don't drag it down."""
+        dt = np.diff(df["t"].values)
+        dt = dt[dt > 0]
+        return float(1.0 / np.median(dt)) if len(dt) else 10.0
 
     def _compute_headings(self, df):
         h = df["heading"].values.copy()
@@ -1080,6 +1093,7 @@ class Replay:
         self._df = df.reset_index(drop=True)
         self._la_label = label
         self._hdg_a = self._compute_headings(self._df)
+        self._rate  = self._sample_rate(self._df)
         self._idx = 0; self._playing = False
         self._pbtn.config(text="▶  Play", fg=GRN)
         self._sv.set(0); self._delta_var.set("")
@@ -1228,8 +1242,20 @@ class Replay:
 
     def _tick(self):
         if not self._playing or self._df is None: return
-        step = max(1, int(self.SPEEDS[self._si]))
-        self._idx = min(self._idx + step, len(self._df)-1)
+        # Real-time playback: SPEEDS[x] seconds of recording per wall-clock
+        # second, via a fractional sample position. The old integer step,
+        # max(1, int(speed)), made 0.25x and 0.5x identical to 1x -- and 1x
+        # was one sample per frame, ~2.8x real time at 10 Hz but ~0.5x at
+        # 60 Hz. Uses measured elapsed time (capped, so a stall doesn't lurch
+        # ahead) rather than 1/FPS, since each redraw takes time too.
+        now = time.monotonic()
+        dt = 1.0 / self.FPS if self._last_tick_t is None else min(now - self._last_tick_t, 0.25)
+        self._last_tick_t = now
+        if int(self._play_pos) != self._idx:
+            self._play_pos = float(self._idx)   # scrubbed / reset / restarted since last frame
+        self._play_pos = min(self._play_pos + self.SPEEDS[self._si] * self._rate * dt,
+                             len(self._df) - 1)
+        self._idx = int(self._play_pos)
         self._update()
         if self._idx >= len(self._df)-1:
             self._playing = False
@@ -1243,6 +1269,12 @@ class Replay:
         if self._playing:
             if self._idx >= len(self._df)-1: self._idx = 0
             self._pbtn.config(text="⏸  Pause", fg=YLW)
+            # A frame queued before a quick pause/play would otherwise start a
+            # second tick chain alongside this one, doubling playback speed.
+            if self._after_id is not None:
+                self._canvas.get_tk_widget().after_cancel(self._after_id)
+                self._after_id = None
+            self._last_tick_t = None
             self._tick()
         else:
             self._pbtn.config(text="▶  Play", fg=GRN)

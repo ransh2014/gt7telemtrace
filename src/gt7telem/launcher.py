@@ -157,6 +157,11 @@ def _show_onboarding(from_menu: bool = False):
         _show_menu()
 
     def do_create():
+        # <Return> on the entry calls this directly, bypassing the disabled
+        # button -- without this guard, pressing Enter again while a sign-up
+        # was in flight created a second (third, ...) anonymous account.
+        if str(create_btn.cget("state")) == "disabled":
+            return
         name = name_var.get().strip()
         if not name:
             status.config(text="Enter a display name first.")

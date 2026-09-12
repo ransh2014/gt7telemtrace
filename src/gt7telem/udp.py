@@ -21,7 +21,7 @@ __all__ = [
     "get_snapshot", "get", "get_int", "get_float",
     "set_ip", "set_car", "set_track", "is_connected", "wait_for_connection",
     "get_diagnostics", "get_last_error", "get_incidents", "register_event",
-    "reset_lap", "get_log_lines", "discover_ps_ip",
+    "reset_lap", "get_log_lines", "discover_ps_ip", "get_ip",
 ]
 
 _ps4_ip         = PS_IP    # mutable — updated by set_ip()
@@ -93,6 +93,15 @@ def _diag_incr(key):
     with _diag_lock:
         _diag[key] = _diag.get(key, 0) + 1
 
+def _reset_diagnostics():
+    """Zero the per-console counters. bind_error is left alone -- it's about
+    our own receive port, not whichever console we're talking to."""
+    with _diag_lock:
+        for key in ("heartbeats_sent", "heartbeat_errors", "packets_received",
+                    "unexpected_source", "decrypt_failures", "parse_failures"):
+            _diag[key] = 0
+        _diag.update(last_heartbeat_error=None, last_recv_error=None, last_good_packet_at=None)
+
 def get_diagnostics() -> dict:
     """Snapshot of connection diagnostics for the GUI's log/status panel."""
     with _diag_lock:
@@ -124,6 +133,7 @@ _prev_x       = None
 _prev_z       = None
 _prev_heading = None
 _cum_dist     = 0.0
+_prev_lap_number = None   # lap counter of the previous packet -- track_position restarts when it changes
 
 # ── Event hooks (race start/end, pause/resume) ───────────────────────────
 _event_callbacks   = {}     # dict[str, list[callable]]
@@ -309,7 +319,16 @@ def _check_events(parsed):
     _check_debug_state(parsed, now, paused, car_on_track, loading, speed, lap_number, total_laps)
 
     # ── Race start ──────────────────────────────────────────────────
-    if not _race_active:
+    # Past the chequered flag (e.g. lap 4 of 3) the car is still on track and
+    # usually still at speed on the cool-down lap, so neither start condition
+    # may fire there. The rolling-start check used to re-arm straight after
+    # race_end and -- since lap_number > total_laps still held -- fire a
+    # race_start + race_end pair every ROLLING_START_HOLD seconds until the
+    # results screen, each pair starting and saving a near-empty race.
+    race_over = total_laps > 0 and lap_number > total_laps
+    if race_over:
+        _speed_hold_start = None
+    elif not _race_active:
         # Rolling start: sustained speed above threshold
         if speed >= ROLLING_START_KPH:
             if _speed_hold_start is None:
@@ -354,14 +373,23 @@ def _check_events(parsed):
 def set_track(name: str) -> None: global _track; _track = name
 def set_car(name: str) -> None:   global _car;   _car   = name
 def is_connected() -> bool:  return _connected
+def get_ip() -> str:         return _ps4_ip
 
 def set_ip(new_ip: str) -> None:
     global _ps4_ip, _connected, _source, _latest
-    _ps4_ip = new_ip.strip()
+    new_ip  = new_ip.strip()
+    changed = new_ip != _ps4_ip
+    _ps4_ip = new_ip
     with _lock:
         _connected = False
         _source    = None
         _latest    = {}
+    if changed:
+        # Counters from the previous console would otherwise decide
+        # get_last_error() for the new one -- e.g. packets_received > 0 left
+        # over from the old IP made it return None ("unknown error") when the
+        # new IP was simply wrong. Re-setting the same IP (a reconnect) keeps them.
+        _reset_diagnostics()
 
 # Device names Windows refuses to create as files/folders at any path depth.
 # A track legitimately called "Con" is unlikely, but hitting one turns every
@@ -441,7 +469,7 @@ def _decrypt(data):
 def _salsa20_pure(data, key, nonce):
     def _block(state):
         x = list(state)
-        for _ in range(20):
+        for _ in range(10):  # 10 double rounds (column + row) = Salsa20's 20 rounds
             x[ 4] ^= ((x[ 0]+x[12])&0xFFFFFFFF)<<7  | ((x[ 0]+x[12])&0xFFFFFFFF)>>25
             x[ 8] ^= ((x[ 4]+x[ 0])&0xFFFFFFFF)<<9  | ((x[ 4]+x[ 0])&0xFFFFFFFF)>>23
             x[12] ^= ((x[ 8]+x[ 4])&0xFFFFFFFF)<<13 | ((x[ 8]+x[ 4])&0xFFFFFFFF)>>19
@@ -484,12 +512,19 @@ def _salsa20_pure(data, key, nonce):
         0,         0,         u(con,8),  u(key,16),
         u(key,20), u(key,24), u(key,28), u(con,12),
     ]
-    stream = _block(state)
-    return bytes(a ^ b for a, b in zip(data[:0x40], stream[:0x40])) + data[0x40:]
+    # One 64-byte keystream block per 64 bytes of packet, block n using
+    # counter n in state words 8-9. This used to run 40 rounds and decrypt
+    # only block 0, passing bytes 0x40+ through untouched, so the fallback
+    # never matched pycryptodome (tests/test_udp.py now pins it).
+    out = bytearray()
+    for n, off in enumerate(range(0, len(data), 64)):
+        state[8], state[9] = n & 0xFFFFFFFF, (n >> 32) & 0xFFFFFFFF
+        out.extend(a ^ b for a, b in zip(data[off:off + 64], _block(state)))
+    return bytes(out)
 
 # ── Parser — all fields from Bornhall's offsets ───────────────────────────────
 def _parse(data):
-    global _prev_x, _prev_z, _prev_heading, _cum_dist
+    global _prev_x, _prev_z, _prev_heading, _cum_dist, _prev_lap_number
     try:
         f  = lambda o: struct.unpack_from('<f', data, o)[0]
         i  = lambda o: struct.unpack_from('<i', data, o)[0]
@@ -517,6 +552,16 @@ def _parse(data):
         _prev_heading = heading
 
         speed_kmh = f(0x4C) * 3.6
+
+        # track_position is distance along the *current* lap, so restart it
+        # whenever GT7's lap counter changes. It used to be reset only by the
+        # Dashboard's Record Lap code: without a lap recording running it kept
+        # growing across laps, and the live delta compared lap 2 onward
+        # against the reference lap's final sample.
+        current_lap = h(0x74)
+        if _prev_lap_number is not None and current_lap != _prev_lap_number:
+            _cum_dist = 0.0
+        _prev_lap_number = current_lap
 
         if _prev_x is not None and speed_kmh > 2.0:
             dx = wx - _prev_x
@@ -557,7 +602,6 @@ def _parse(data):
         last_lap_ms = i(0x7C)
 
         packet_id       = i(0x70)
-        current_lap     = h(0x74)
         total_laps      = h(0x76)
         current_pos     = h(0x84)
         total_positions = h(0x86)
@@ -937,22 +981,48 @@ def wait_for_connection(timeout: int = 60) -> str | None:
 # throwaway broadcast socket, opened and closed within the call. Purely a
 # convenience for filling in the console-IP field; nothing else here depends
 # on it, and it's never started automatically.
-DISCOVERY_PORT  = 9302
-DISCOVERY_QUERY = b"SRCH * HTTP/1.1\ndevice-discovery-protocol-version:00030010"
+#
+# The two consoles speak different versions of the discovery protocol on
+# different ports (Sony's Remote Play discovery, as documented by chiaki):
+# PS4 listens on 987 for version 00020020, PS5 on 9302 for 00030010. Only the
+# PS5 pair used to be sent, so Auto-Detect could never find a PS4.
+DISCOVERY_TARGETS = (
+    (987,  "00020020"),   # PS4
+    (9302, "00030010"),   # PS5
+)
+
+def _discovery_query(protocol_version: str) -> bytes:
+    return f"SRCH * HTTP/1.1\ndevice-discovery-protocol-version:{protocol_version}\n".encode("ascii")
 
 def discover_ps_ip(timeout: float = 2.0) -> str | None:
-    """Broadcast a PS4/PS5 device-discovery query on the local network and
-    return the IP of whichever console answers first, or None if nothing
+    """Broadcast a PS4 and a PS5 device-discovery query on the local network
+    and return the IP of whichever console answers first, or None if nothing
     replies within `timeout` seconds (no console on, wrong network/subnet,
-    or a router that blocks broadcast traffic)."""
+    or a router that blocks broadcast traffic). Consoles answer with an
+    HTTP-style status line ("HTTP/1.1 200 Ok", or 620 in rest mode); anything
+    else that happens to arrive on the socket is ignored."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.settimeout(timeout)
-        sock.sendto(DISCOVERY_QUERY, ("<broadcast>", DISCOVERY_PORT))
-        _, addr = sock.recvfrom(1024)
-        return addr[0]
-    except (OSError, socket.timeout):
+        sent = False
+        for port, version in DISCOVERY_TARGETS:
+            try:
+                sock.sendto(_discovery_query(version), ("<broadcast>", port))
+                sent = True
+            except OSError:
+                pass  # still try the other console type
+        if not sent:
+            return None
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            sock.settimeout(remaining)
+            data, addr = sock.recvfrom(1024)
+            if data.startswith(b"HTTP/"):
+                return addr[0]
+    except OSError:  # socket.timeout is an OSError subclass
         return None
     finally:
         sock.close()

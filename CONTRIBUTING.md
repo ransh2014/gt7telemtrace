@@ -78,8 +78,11 @@ download a release behind):
    never mentions the version being served.
 3. After the tag builds, run `python tools/build_source_zip.py -o
    <website-dir>` and redeploy the site, so the source download matches.
-4. Check the Homebrew and Scoop taps picked the release up — both poll
-   every 6h and will fail loudly now rather than committing a bad hash.
+4. Check the package managers picked the release up: the Chocolatey and
+   WinGet workflows in `.github/workflows/` run on the tag push (WinGet
+   skips itself until its first manifest is merged upstream), and the
+   Homebrew and Scoop taps — which live outside this repo — poll every 6h
+   and will fail loudly rather than committing a bad hash.
 
 CI runs `pytest` and `ruff check .` on every PR — make sure both pass
 locally first. Pushing a `vX.Y.Z` tag on `main` (after merging a version

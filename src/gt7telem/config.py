@@ -9,6 +9,7 @@ import base64
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_RATE", "KNOWN_IPS", "DEBUG_LOG",
@@ -20,28 +21,72 @@ _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUP
 _ENC_PREFIX = "enc:v1:"
 
 
+# Path fragments meaning the executable lives somewhere a package manager
+# owns rather than a folder the user picked: Chocolatey's lib folder
+# (admin-write-only on Windows) and WinGet's Packages folder are both
+# replaced wholesale on upgrade.
+_MANAGED_INSTALL_MARKERS = ("chocolatey", "winget")
+
+
+def _is_writable_dir(d: Path) -> bool:
+    try:
+        with tempfile.TemporaryFile(dir=d):
+            pass
+        return True
+    except OSError:
+        return False
+
+
+def _portable_dir() -> Path | None:
+    """The folder a frozen build keeps settings.json and laps/ in, or None
+    to use the per-user folders instead.
+
+    Frozen (.exe/.app/binary) builds are portable by design -- unzip
+    anywhere and the data lives next to the executable. That only works
+    where the user put the executable themselves, though. Installed by
+    Chocolatey, settings silently never saved and lap saves raised (the
+    folder is admin-only); installed by WinGet or run as a macOS .app, the
+    data sat inside a folder that's replaced on upgrade (and, for the .app,
+    hidden from the user). Those, and any folder we can't write to, now use
+    the same per-user folders pip installs do. An existing portable install
+    (settings.json already next to the exe) stays where it is."""
+    if not getattr(sys, "frozen", False):
+        return None
+    exe_dir = Path(sys.executable).resolve().parent
+    parts = [p.lower() for p in exe_dir.parts]
+    if any(p.endswith(".app") for p in parts):
+        return None
+    if any(marker in p for p in parts for marker in _MANAGED_INSTALL_MARKERS):
+        return None
+    if (exe_dir / "settings.json").exists() or _is_writable_dir(exe_dir):
+        return exe_dir
+    return None
+
+
 def _base_dir() -> Path:
-    """Where settings.json lives. Frozen (.exe/.app) builds keep it next to
-    the executable -- a deliberate portable-app design, untouched here.
+    """Where settings.json lives: next to the executable for a portable
+    frozen build (see _portable_dir), otherwise ~/.gt7telem.
     Non-frozen (pip/source) runs used to resolve this to the package's own
     install directory (Path(__file__).parent), which for a pip install
     means inside site-packages: not reliably writable, and wiped on every
     `pip install --upgrade` -- silently, since save() swallows write
     failures. A per-user config dir survives upgrades and reinstalls."""
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
+    portable = _portable_dir()
+    if portable is not None:
+        return portable
     d = Path.home() / ".gt7telem"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def _default_laps_dir() -> Path:
-    """Frozen builds keep laps next to the exe, as before. Non-frozen runs
-    get a visible ~/TRACE/laps instead of nesting inside the hidden
-    ~/.gt7telem config dir, which would be a surprising place to go looking
-    for recorded laps."""
-    if getattr(sys, "frozen", False):
-        return _base_dir() / "laps"
+    """Portable frozen builds keep laps next to the exe, as before.
+    Everything else gets a visible ~/TRACE/laps instead of nesting inside
+    the hidden ~/.gt7telem config dir, which would be a surprising place to
+    go looking for recorded laps."""
+    portable = _portable_dir()
+    if portable is not None:
+        return portable / "laps"
     return Path.home() / "TRACE" / "laps"
 
 

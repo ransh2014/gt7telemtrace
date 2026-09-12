@@ -21,7 +21,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-__all__ = ["submit_lap", "get_top_laps", "get_lap_samples", "get_consensus_line", "submit_car_id", "submit_track_name"]
+__all__ = ["submit_lap", "get_top_laps", "get_lap_samples", "get_consensus_line", "submit_car_id", "submit_track_name",
+           "lap_submission_error"]
 
 _SUPABASE_URL = "https://hignsvyojdqsjoidgkud.supabase.co"
 _SUPABASE_ANON_KEY = "sb_publishable_OdzGvcypa0GI7TVxxUkusQ_KJ_Apa8i"
@@ -69,6 +70,28 @@ def _compact_samples(samples):
             "gear":           s.get("gear", 0),
         })
     return out
+
+
+def lap_submission_error(lap: dict) -> str | None:
+    """Why a recorded lap (a saved lap file's dict) can't go on the
+    leaderboard, or None if it can. Incomplete laps are refused: they were
+    stopped before the line, or saved when the Dashboard closed, so their
+    lap_time_s is only the elapsed part of a lap -- submitting half a lap
+    would post a bogus "record". Lap files from before the `incomplete`
+    flag existed are treated as complete."""
+    if lap.get("incomplete"):
+        return ("This lap is incomplete -- it was stopped before the line (or saved when "
+                "the Dashboard closed), so its time only covers part of a lap. Only "
+                "complete laps can be submitted.")
+    if not lap.get("samples"):
+        return "This lap has no samples to submit."
+    try:
+        lap_time_s = float(lap.get("lap_time_s") or 0)
+    except (TypeError, ValueError):
+        lap_time_s = 0.0
+    if lap_time_s <= 0:
+        return "This lap has no valid lap time to submit."
+    return None
 
 
 def submit_lap(car_name: str, track_name: str, lap_time_ms: int,
