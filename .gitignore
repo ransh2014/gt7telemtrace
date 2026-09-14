@@ -7,3 +7,4 @@ dist/
 venv/
 src/gt7telem/settings.json
 src/gt7telem/.settings.key
+gpg-signing-key/*SECRET*
