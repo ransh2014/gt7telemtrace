@@ -55,6 +55,10 @@ jobs:
             --add-data "$PKG_DIR/course_ids.csv:gt7telem" \
             entrypoint.py
 
+      - name: Ad-hoc sign TRACE.app
+        run: |
+          codesign --force --deep --sign - dist/TRACE.app
+
       - name: Zip the app bundle
         run: |
           cd dist
