@@ -1,6 +1,7 @@
 # race_analyst.py — GT7 Race Analyst
 # pip install pandas matplotlib numpy
 import base64
+import csv
 import io
 import json
 import math
@@ -95,6 +96,29 @@ def load_race(path):
                        - (df["tyre_temp_fr"] + df["tyre_temp_rr"]) / 2
     df["pit_flag"]     = df["in_pit"].astype(float)
     return data, df
+
+def export_csv(df, out_path):
+    """Dump a race's per-sample telemetry to CSV. distance_m is derived by
+    integrating speed_kmh over each frame's dt (same dt pattern used to
+    build long_g in load_race), since GT7's telemetry has no raw distance
+    field of its own. Mirrors lap_analyst.export_csv's column set."""
+    dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
+    distance_m = (df["speed_kmh"] / 3.6 * dt).cumsum()
+    cols = ["distance_m","speed_kmh","throttle","brake","rpm","gear","steering"]
+    with open(out_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(cols)
+        for i in range(len(df)):
+            row = df.iloc[i]
+            w.writerow([
+                round(float(distance_m.iloc[i]), 2),
+                round(float(row.get("speed_kmh", 0)), 2),
+                round(float(row.get("throttle", 0)), 4),
+                round(float(row.get("brake", 0)), 4),
+                round(float(row.get("rpm", 0)), 1),
+                int(row.get("gear", 0)),
+                round(float(row.get("steering", 0)), 4),
+            ])
 
 def fmt_dur(t):
     m = int(t // 60); s = t % 60
@@ -1033,6 +1057,9 @@ class Replay:
         self._mode_btn = tk.Button(ctrl, text="🔀 Synced", command=self._toggle_mode,
                                     bg=DIM2, fg=CYN, relief="flat", font=FONTL,
                                     padx=8, pady=2, cursor="hand2")
+        tk.Button(ctrl, text="📄 Export CSV", command=self._export_csv,
+                  bg=DIM2, fg=FG, relief="flat", font=FONTL,
+                  padx=8, pady=2, cursor="hand2").pack(side="right", padx=8)
 
         info_wrap = tk.Frame(parent, bg=BG)
         info_wrap.pack(fill="x", padx=4, pady=2)
@@ -1088,6 +1115,23 @@ class Replay:
             self._dual_mode = "synced"
             self._mode_btn.config(text="🔀 Synced", fg=CYN)
         self._update()
+
+    def _export_csv(self):
+        if self._df is None:
+            messagebox.showinfo("Export CSV", "Load a race first.")
+            return
+        default_name = (self._la_label or "race").replace(" ", "_").replace(":", "") + ".csv"
+        out_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv")],
+            initialfile=default_name,
+        )
+        if not out_path: return
+        try:
+            export_csv(self._df, out_path)
+            messagebox.showinfo("Export CSV", f"Saved to:\n{out_path}")
+        except Exception as e:
+            messagebox.showerror("Export CSV", f"Failed to export:\n{e}")
 
     def load(self, df, label=""):
         self._df = df.reset_index(drop=True)

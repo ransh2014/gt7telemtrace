@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-15
+- Race Analyst: CSV export button on the Replay tab (distance_m, speed_kmh,
+  throttle, brake, rpm, gear, steering), mirroring the one Lap Analyst has
+  had since 0.3.x. The sidebar's full-dataframe A/B CSV export was already
+  there; this adds the quick single-race export next to Play/Speed/Synced.
+- Live Dashboard: personal-best tracking per track+car combo. Each combo's
+  fastest complete lap is kept in `personal_bests.json` alongside that
+  track's `reference_lap.json` (which stays per-track only, for the live
+  delta readout). Beating it marks the lap history row with a gold
+  "🏆" badge that stays put for the rest of the session.
+- Live Dashboard: closing the window now shows a quick session recap
+  (laps completed, best lap, average lap, fuel used) right before it
+  actually closes -- after the existing still-recording save prompt (if
+  any) is resolved, and skipped entirely if nothing was recorded this
+  session.
+
 ## [0.3.9] - 2026-09-12
 - Live Dashboard: Auto-Detect stopped reconnecting when the console it found
   was already the IP in the box -- a regression from 0.3.8's IP-box fix

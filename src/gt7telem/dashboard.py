@@ -588,7 +588,7 @@ class App(tk.Tk):
         self.hist_tree.heading("track", text="Track", anchor="w")
         self.hist_tree.heading("car",   text="Car",   anchor="w")
         self.hist_tree.column("lap",   width=26, minwidth=26, stretch=False)
-        self.hist_tree.column("time",  width=74, minwidth=74, stretch=False)
+        self.hist_tree.column("time",  width=94, minwidth=94, stretch=False)
         self.hist_tree.column("track", width=70, minwidth=50, stretch=True)
         self.hist_tree.column("car",   width=66, minwidth=50, stretch=True)
 
@@ -1182,11 +1182,73 @@ class App(tk.Tk):
                     return
 
         session.recording = session.waiting = session.race_recording = False
+        self._show_close_recap()
         try:
             metrics_server.stop()
         except Exception:
             pass  # never block the close on exporter teardown
         self.destroy()
+
+    def _show_close_recap(self):
+        """Quick recap shown once, right before the window actually closes --
+        not to be confused with _show_session_summary (the race/incident
+        summary opened from its own toolbar button). Reads session.laps_saved,
+        which _save_lap's _do_save() appends to for every lap saved this
+        session regardless of where the file landed, so no disk re-scan is
+        needed. Skipped entirely if nothing was recorded -- no point showing
+        an empty recap on every close."""
+        laps = session.laps_saved
+        if not laps:
+            return
+
+        complete = [d for d in laps if not d.get("incomplete") and (d.get("lap_time_s") or 0) > 0]
+        if complete:
+            times = [d["lap_time_s"] for d in complete]
+            best_str = ms_to_laptime(int(min(times) * 1000))
+            avg_str  = ms_to_laptime(int(sum(times) / len(times) * 1000))
+        else:
+            best_str = avg_str = "--"
+
+        fuel_used = 0.0
+        for d in laps:
+            lap_samples = d.get("samples") or []
+            if len(lap_samples) >= 2:
+                fuel_used += max(0.0, lap_samples[0].get("fuel_remaining", 0) -
+                                       lap_samples[-1].get("fuel_remaining", 0))
+
+        dlg = tk.Toplevel(self)
+        dlg.title("Session Recap")
+        dlg.configure(bg="#0a0a12")
+        dlg.resizable(False, False)
+        dlg.transient(self)
+        dlg.grab_set()
+
+        tk.Label(dlg, text="🏁 Session Recap", fg="#e94560", bg="#0a0a12",
+                 font=("Consolas", 12, "bold")).pack(pady=(14, 10), padx=24)
+
+        rows = [
+            ("Laps completed", str(len(complete))),
+            ("Best lap",       best_str),
+            ("Average lap",    avg_str),
+            ("Fuel used",      f"{fuel_used:.2f} L" if fuel_used > 0 else "--"),
+        ]
+        body = tk.Frame(dlg, bg="#0a0a12")
+        body.pack(padx=24, pady=(0, 10))
+        for label, value in rows:
+            r = tk.Frame(body, bg="#0a0a12")
+            r.pack(fill="x", pady=2)
+            tk.Label(r, text=label, fg="#888", bg="#0a0a12",
+                     font=("Consolas", 10), width=15, anchor="w").pack(side="left")
+            tk.Label(r, text=value, fg="#e0e0e0", bg="#0a0a12",
+                     font=("Consolas", 10, "bold"), anchor="w").pack(side="left")
+
+        tk.Button(dlg, text="Close", command=dlg.destroy, bg="#e94560", fg="#000",
+                  font=("Consolas", 10, "bold"), relief="flat", padx=16, pady=4,
+                  cursor="hand2").pack(pady=(6, 16))
+
+        dlg.update_idletasks()
+        dlg.geometry(f"+{self.winfo_rootx() + 60}+{self.winfo_rooty() + 60}")
+        dlg.wait_window()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Recording tick -- runs on its own timer, independent of the 10Hz GUI
@@ -1744,6 +1806,10 @@ class App(tk.Tk):
         }
 
         lap_num = int(samples[-1].get("lap_number", 0)) if samples else 0
+        # Set below (complete laps only) before _do_save() runs, so the
+        # history row can show the badge the same moment the lap is saved --
+        # see the personal-best check just above the final _do_save() call.
+        is_pb = False
 
         def _do_save():
             saved = self._save_json(lap_path, data, "lap")
@@ -1755,7 +1821,7 @@ class App(tk.Tk):
                              "to write it somewhere else.")
                 return None
             self.log_msg(f"Saved: {self._display_path(saved)}")
-            self._add_lap_to_history(lap_num, new_time, track, car, incomplete)
+            self._add_lap_to_history(lap_num, new_time, track, car, incomplete, is_pb)
             return saved
 
         if incomplete and not prompt:
@@ -1784,11 +1850,21 @@ class App(tk.Tk):
         if fuel_used > 0:
             self._fuel_per_lap = fuel_used
 
+        # Checked (read-only) before the save so the history row's badge and
+        # the actual save happen together; the personal-best file itself is
+        # only written below once `saved == lap_path` confirms the lap made
+        # it to its normal location (same gating as the reference lap).
+        is_pb = self._is_new_personal_best(track, car_safe, new_time)
+
         saved = _do_save()
         if saved != lap_path:
             # Not saved, or only to the fallback folder: the laps folder isn't
             # writable, so there's no point trying the reference lap there.
             return saved
+
+        if is_pb:
+            self._write_personal_best(track, car_safe, ui_car or car, new_time, ts)
+            self.log_msg(f"New personal best for {ui_car or car} @ {track}!")
 
         ref_time = 0.0
         if ref.exists():
@@ -1809,23 +1885,64 @@ class App(tk.Tk):
         return saved
 
     # ─────────────────────────────────────────────────────────────────────────
+    # Personal bests (per track+car combo, separate from reference_lap.json
+    # which is per-track only and drives the live delta readout)
+    # ─────────────────────────────────────────────────────────────────────────
+    def _personal_bests_path(self, track):
+        return Path(runtime_config.LAPS_FOLDER) / track / "personal_bests.json"
+
+    def _load_personal_bests(self, track):
+        path = self._personal_bests_path(track)
+        if not path.exists():
+            return {}
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _is_new_personal_best(self, track, car_safe, new_time):
+        """True if new_time beats (or is the first recorded for) the stored
+        best for this exact track+car combo. Read-only -- callers write the
+        new best separately, only once the lap itself is confirmed saved."""
+        prev = self._load_personal_bests(track).get(car_safe, {}).get("lap_time_s")
+        return prev is None or new_time < prev
+
+    def _write_personal_best(self, track, car_safe, car_display, new_time, ts):
+        bests = self._load_personal_bests(track)
+        bests[car_safe] = {
+            "lap_time_s":  round(new_time, 3),
+            "car_display": car_display,
+            "recorded_at": ts,
+        }
+        self._save_json(self._personal_bests_path(track), bests, "personal best", fallback=False)
+
+    # ─────────────────────────────────────────────────────────────────────────
     # Lap history row
     # ─────────────────────────────────────────────────────────────────────────
-    def _add_lap_to_history(self, lap_num, lap_time_s, track, car, incomplete=False):
+    def _add_lap_to_history(self, lap_num, lap_time_s, track, car, incomplete=False, is_pb=False):
         self._saved_laps += 1
         time_str = ms_to_laptime(int(lap_time_s * 1000))
         if incomplete:
             time_str = f"({time_str})"
+        if is_pb:
+            time_str = f"\U0001F3C6{time_str}"
         track_d = track[:9]
         car_d   = car[:9]
         display_num = lap_num if lap_num > 0 else self._saved_laps
         row_id = self.hist_tree.insert(
             "", 0, values=(display_num, time_str, track_d, car_d))
         self.hist_tree.tag_configure("newest", foreground="#4fc3f7")
-        self.hist_tree.item(row_id, tags=("newest",))
+        # Gold "pb" tag takes over from "newest" for a PB row -- and, unlike
+        # "newest" (cleared below as soon as the next lap comes in), sticks
+        # around so the badge stays visible for the rest of the session.
+        self.hist_tree.tag_configure("pb", foreground="#ffd700")
+        self.hist_tree.item(row_id, tags=("pb",) if is_pb else ("newest",))
         children = self.hist_tree.get_children()
         if len(children) > 1:
-            self.hist_tree.item(children[1], tags=())
+            prev_tags = self.hist_tree.item(children[1], "tags")
+            if "pb" not in prev_tags:
+                self.hist_tree.item(children[1], tags=())
 
     # ─────────────────────────────────────────────────────────────────────────
     # Export session
