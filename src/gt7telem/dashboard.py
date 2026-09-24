@@ -4,6 +4,7 @@
 #   - Tyre hot / cold / fuel-low alert banners (flashing)
 #   - Lap history Treeview (scrollable, right panel)
 
+import bisect
 import json
 import math
 import os
@@ -95,6 +96,7 @@ class Session:
     race_samples   = []
     race_start_t   = 0.0
     paused         = False   # True while GT7 reports the game paused -- recording freezes
+    paused_at      = None    # time.time() when the current pause began
 
 session = Session()
 
@@ -126,7 +128,7 @@ class App(tk.Tk):
         self._last_record_error = None
 
         # ── Live delta-vs-reference-lap state ────────────────────────────────
-        self._delta_ref_cache  = {"track": None, "samples": None}
+        self._delta_ref_cache  = {"track": None, "samples": None, "positions": None}
         self._delta_prev_lap   = 0
         self._delta_lap_start_t = None
 
@@ -671,8 +673,12 @@ class App(tk.Tk):
                     samples = sorted(
                         ref_data.get("samples", []),
                         key=lambda s: s.get("track_position", 0))
-                    if samples:
+                    # A reference lap from an older GT7 physics era would
+                    # show a meaningless delta -- treat it as absent.
+                    if samples and leaderboard.is_current_era(ref_data):
                         self._delta_ref_cache["samples"] = samples
+                        self._delta_ref_cache["positions"] = [
+                            s.get("track_position", 0) for s in samples]
             except Exception:
                 self._delta_ref_cache["samples"] = None
         return self._delta_ref_cache["samples"]
@@ -1033,7 +1039,7 @@ class App(tk.Tk):
 
         surface = d.get("surface_type")
         surf_names = {"T": "Tarmac", "C": "Curb", "D": "Dirt", "G": "Grass",
-                      "S": "Sand", "s": "Gravel"}
+                      "S": "Sand", "s": "Snow"}
         for i, key in enumerate(["fl", "fr", "rl", "rr"]):
             code = surface[i] if surface and i < len(surface) else None
             self._surf_lbls[key].config(
@@ -1115,8 +1121,12 @@ class App(tk.Tk):
         if track_name and cur_elapsed > 0.5 and cur_track_pos > 0:
             ref_samples = self._get_reference_samples(telem.sanitize(track_name))
             if ref_samples:
-                nearest = min(ref_samples,
-                              key=lambda s: abs(s.get("track_position", 0) - cur_track_pos))
+                # Binary search on the pre-sorted positions instead of a
+                # linear min() over every reference sample, 10x a second.
+                pos = self._delta_ref_cache["positions"]
+                j = bisect.bisect_left(pos, cur_track_pos)
+                cands = [k for k in (j - 1, j) if 0 <= k < len(pos)]
+                nearest = ref_samples[min(cands, key=lambda k: abs(pos[k] - cur_track_pos))]
                 ref_t = nearest.get("t")
                 if ref_t is not None:
                     delta = cur_elapsed - ref_t
@@ -1345,6 +1355,8 @@ class App(tk.Tk):
         self.after(0, self._handle_pause)
 
     def _handle_pause(self):
+        if not session.paused:
+            session.paused_at = time.time()
         session.paused = True
         self.log_msg("Auto: game paused -- recording frozen")
 
@@ -1352,6 +1364,16 @@ class App(tk.Tk):
         self.after(0, self._handle_resume)
 
     def _handle_resume(self):
+        # Shift the recording clocks forward by the pause length, so sample
+        # `t`, the elapsed-time lap fallback and race_duration_s all exclude
+        # time spent in the pause menu instead of showing a gap / inflating it.
+        if session.paused and session.paused_at is not None:
+            gap = max(0.0, time.time() - session.paused_at)
+            session.start_t      += gap
+            session.race_start_t += gap
+            if self._delta_lap_start_t is not None:
+                self._delta_lap_start_t += gap
+        session.paused_at = None
         session.paused = False
         self.log_msg("Auto: game resumed -- recording continues")
 
@@ -1453,6 +1475,7 @@ class App(tk.Tk):
             "track_display":   ui_track or track,
             "car_display":     ui_car or car,
             "race_duration_s": round(race_duration, 3),
+            "physics_era":     leaderboard.PHYSICS_ERA,
             "total_samples":   len(samples),
             "incidents":       incidents,
             # See the matching note in _save_lap -- per-car constant, stored
@@ -1627,6 +1650,7 @@ class App(tk.Tk):
             "ang_y":            _f("ang_y"),     "ang_z":      _f("ang_z"),
             "throttle":         _f("throttle"),  "brake":      _f("brake"),
             "steering":         _f("steering"),  "clutch":     _f("clutch"),
+            "steering_source":  d.get("steering_source") or "heading",
             "clutch_engaged":   _f("clutch_engaged"),
             "gear":             _i("gear"),      "suggested_gear": _i("suggested_gear"),
             "rpm":              _f("rpm"),       "max_rpm":    _i("max_rpm"),
@@ -1662,6 +1686,8 @@ class App(tk.Tk):
             "surge":                     _f("surge"),
             "torque_vectors":            d.get("torque_vectors") or [],
             "energy_recovery":           _f("energy_recovery"),
+            "throttle_filtered":         _f("throttle_filtered"),
+            "brake_filtered":            _f("brake_filtered"),
             "surface_type":              "".join(d.get("surface_type") or []),
             "current_lap_ms":            _i("current_lap_ms"),
             "wheel_steering_angle_l":    _f_tuple(d.get("wheel_steering_angle"), 0),
@@ -1798,6 +1824,7 @@ class App(tk.Tk):
             "lap_distance_m": round(lap_dist, 1),
             "total_samples":  len(samples),
             "incomplete":     incomplete,
+            "physics_era":    leaderboard.PHYSICS_ERA,
             # Per-car constant, so it lives here rather than being repeated on
             # every sample -- it was ~9% of each saved file's bytes and nothing
             # ever read it back off a sample.
@@ -1870,7 +1897,11 @@ class App(tk.Tk):
         if ref.exists():
             try:
                 with open(ref, encoding="utf-8") as f:
-                    ref_time = float(json.load(f).get("lap_time_s") or 0)
+                    ref_data = json.load(f)
+                # A reference from before the current physics era is
+                # replaced by the first lap driven under the new physics.
+                if leaderboard.is_current_era(ref_data):
+                    ref_time = float(ref_data.get("lap_time_s") or 0)
             except Exception:
                 ref_time = 0.0
 
@@ -1905,7 +1936,10 @@ class App(tk.Tk):
         """True if new_time beats (or is the first recorded for) the stored
         best for this exact track+car combo. Read-only -- callers write the
         new best separately, only once the lap itself is confirmed saved."""
-        prev = self._load_personal_bests(track).get(car_safe, {}).get("lap_time_s")
+        entry = self._load_personal_bests(track).get(car_safe, {})
+        prev = entry.get("lap_time_s")
+        if prev is not None and not leaderboard.is_current_era(entry):
+            prev = None   # set under older GT7 physics -- not a fair target
         return prev is None or new_time < prev
 
     def _write_personal_best(self, track, car_safe, car_display, new_time, ts):
@@ -1914,6 +1948,7 @@ class App(tk.Tk):
             "lap_time_s":  round(new_time, 3),
             "car_display": car_display,
             "recorded_at": ts,
+            "physics_era": leaderboard.PHYSICS_ERA,
         }
         self._save_json(self._personal_bests_path(track), bests, "personal best", fallback=False)
 

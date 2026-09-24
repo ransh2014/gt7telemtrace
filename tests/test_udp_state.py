@@ -9,6 +9,8 @@ import struct
 from collections import deque
 from types import SimpleNamespace
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from gt7telem import udp
@@ -168,3 +170,20 @@ def test_discovery_returns_the_first_console_that_answers(monkeypatch):
         (b"HTTP/1.1 620 Server Standby\nhost-type:PS4\n", ("192.168.1.50", 987)),
     ])
     assert udp.discover_ps_ip(timeout=1.0) == "192.168.1.50"
+
+
+# ── Race Analyst pit inference ─────────────────────────────────────────────
+def test_refuel_marks_pit_lane_section():
+    pytest.importorskip("tkinter")
+    from gt7telem.race_analyst import _infer_pit_flag
+    speed = [200, 200, 70, 60, 0, 0, 60, 70, 200, 200]
+    fuel  = [50, 49.9, 49.8, 49.8, 49.8, 90, 90, 90, 89.9, 89.8]
+    flag = _infer_pit_flag(pd.DataFrame({"speed_kmh": speed, "fuel_remaining": fuel}))
+    assert list(flag) == [0, 0, 1, 1, 1, 1, 1, 1, 0, 0]
+
+
+def test_no_refuel_no_pit():
+    pytest.importorskip("tkinter")
+    from gt7telem.race_analyst import _infer_pit_flag
+    df = pd.DataFrame({"speed_kmh": np.full(20, 50.0), "fuel_remaining": np.linspace(50, 40, 20)})
+    assert _infer_pit_flag(df).sum() == 0

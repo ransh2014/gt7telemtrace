@@ -135,6 +135,20 @@ _prev_heading = None
 _cum_dist     = 0.0
 _prev_lap_number = None   # lap counter of the previous packet -- track_position restarts when it changes
 
+# ── Steering ─────────────────────────────────────────────────────────────
+# Packet A has no steering input at all, so `steering` used to be estimated
+# from how fast the heading changes. Packets B and C carry the real thing:
+# C gives both front wheels' steering angle, B the steering-wheel rotation.
+# Those are used whenever present and normalised to -1..1 against the
+# largest lock seen for the current car (with a floor, so a gentle first
+# lap doesn't read as full lock). GT7's sign convention for these fields
+# isn't documented, so the sign is matched to the heading-rate estimate
+# (which older recordings used) by a running correlation -- that keeps new
+# and old laps' steering traces pointing the same way.
+STEER_LOCK_FLOOR = {"wheel": 0.35, "rotation": 1.5}   # radians: ~20 deg road-wheel, ~86 deg steering-wheel
+_steer_lock   = {}    # (car_id, source) -> largest |angle| seen
+_steer_corr   = 0.0   # running sum of real_angle * heading_estimate
+
 # ── Event hooks (race start/end, pause/resume) ───────────────────────────
 _event_callbacks   = {}     # dict[str, list[callable]]
 _prev_paused       = False
@@ -550,6 +564,7 @@ def _parse(data):
             while dh < -math.pi: dh += 2 * math.pi
             steering = max(-1.0, min(1.0, dh / 0.2))
         _prev_heading = heading
+        steering_source = "heading"
 
         speed_kmh = f(0x4C) * 3.6
 
@@ -647,20 +662,33 @@ def _parse(data):
             heave                      = f(0x134)
             surge                      = f(0x138)
 
-        if pkt_len >= 344:   # Packet ~ (Tilda)
+        throttle_filtered = brake_filtered = None
+        if pkt_len >= 344:   # Packet ~ (Tilda) -- packet C carries these too
+            throttle_filtered = b(0x13C) / 255.0   # after TCS / assists
+            brake_filtered    = b(0x13D) / 255.0   # after ABS / assists
             torque_vectors  = [f(0x140 + i * 4) for i in range(4)]
             energy_recovery = f(0x150)
 
         if pkt_len >= 368:   # Packet C
             surface_type = tuple(
                 chr(b(0x158 + i)) if b(0x158 + i) else "" for i in range(4)
-            )  # T=tarmac, C=curb/kerb, D=dirt, G=grass, S/s=sand/gravel, per wheel FL/FR/RL/RR
+            )  # T=tarmac, C=curb/kerb, D=dirt, G=grass, S=sand, s=snow -- per wheel FL/FR/RL/RR
             current_lap_ms       = i(0x15C)   # live in-progress lap time, ms
             wheel_steering_angle = (f(0x160), f(0x164))  # front-left, front-right, radians
             wheel_base           = f(0x168)  # meters
             car_category = "".join(
                 chr(b(0x16C + i)) for i in range(4) if b(0x16C + i)
             )  # e.g. "GR3", "GRX"
+
+        real_steer, src = None, None
+        if wheel_steering_angle is not None:
+            real_steer, src = (wheel_steering_angle[0] + wheel_steering_angle[1]) / 2.0, "wheel"
+        elif wheel_rotation is not None:
+            real_steer, src = wheel_rotation, "rotation"
+        if real_steer is not None and math.isfinite(real_steer):
+            norm = _normalise_steering(real_steer, src, steering, car_id, speed_kmh)
+            if norm is not None:
+                steering, steering_source = norm, src
 
         flags_8e = b(0x8E)
         flags_8f = b(0x8F)
@@ -709,6 +737,7 @@ def _parse(data):
             "throttle":         b(0x91) / 255.0,
             "brake":            b(0x92) / 255.0,
             "steering":         steering,
+            "steering_source":  steering_source,
             "gear":             current_gear,
             "suggested_gear":   suggested_gear,
             "rpm":              rpm,
@@ -778,6 +807,8 @@ def _parse(data):
             "surge":                     surge,
             "torque_vectors":            torque_vectors,
             "energy_recovery":           energy_recovery,
+            "throttle_filtered":         throttle_filtered,
+            "brake_filtered":            brake_filtered,
             "surface_type":              surface_type,
             "current_lap_ms":            current_lap_ms,
             "wheel_steering_angle":      wheel_steering_angle,
@@ -786,6 +817,23 @@ def _parse(data):
         }
     except:
         return None
+
+def _normalise_steering(angle, source, heading_estimate, car_id, speed_kmh):
+    """Real steering angle (radians) -> -1..1, sign-matched to the old
+    heading-rate estimate, or None until that sign has been learned from a
+    first clear turn. See the Steering note near the top of this file."""
+    global _steer_corr
+    key = (car_id, source)
+    lock = max(_steer_lock.get(key, 0.0), abs(angle), STEER_LOCK_FLOOR[source])
+    _steer_lock[key] = lock
+    # Only learn the sign from clear, moving turns -- parked or straight-line
+    # noise would make it flap.
+    if speed_kmh > 30.0 and abs(heading_estimate) > 0.02 and abs(angle) > 0.02:
+        _steer_corr += angle * heading_estimate
+    if _steer_corr == 0.0:
+        return None   # sign not learned yet (no clear turn so far) -- caller keeps the estimate
+    sign = -1.0 if _steer_corr < 0 else 1.0
+    return max(-1.0, min(1.0, sign * angle / lock))
 
 def _ingest(raw):
     global _connected, _latest

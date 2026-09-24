@@ -173,6 +173,8 @@ def lap_label(data, short=False):
     car   = data.get("car","?")
     track = data.get("track","?").replace("_"," ").title()
     time_str = f"{m}:{s:06.3f}"
+    if not leaderboard.is_current_era(data):
+        time_str += f" [pre-{leaderboard.PHYSICS_ERA}]"
     if short: return f"{car}  {time_str}"
     return f"{car} @ {track}  {time_str}"
 
@@ -710,7 +712,7 @@ def draw_telediff(fig, df, dfb=None):
     dp(axs[0,1], "throttle",  "Δ Throttle (B−A)", yl="Δ")
     dp(axs[0,2], "brake",     "Δ Brake (B−A)",    yl="Δ")
     dp(axs[1,0], "rpm",       "Δ RPM (B−A)",      yl="ΔRPM")
-    dp(axs[1,1], "steering",  "Δ Steering (B−A)", yl="Δrad")
+    dp(axs[1,1], "steering",  "Δ Steering (B−A)", yl="Δ (−1..1)")
     dp(axs[1,2], "lat_g",     "Δ Lat G (B−A)",    yl="Δg")
 
     dt = diff("t")

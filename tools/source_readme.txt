@@ -61,9 +61,11 @@ gt7telem/         The TRACE package itself (same source that ships on
   cars.py           Car ID -> name lookup (car_ids.csv)
   tracks.py         Track ID -> name lookup (course_ids.csv), plus track
                     boundary extraction from a lap's GPS trace
-  add_car.py        CLI tool: add a missing car to car_ids.csv.
+  add_car.py        CLI tool: add a missing car. Saved to car_ids_local.csv
+                    next to settings.json, so it survives upgrades.
                     Run it as:  python -m gt7telem.add_car
-  add_track.py      CLI tool: add a missing track to course_ids.csv.
+  add_track.py      CLI tool: add a missing track. Saved to
+                    course_ids_local.csv next to settings.json.
                     Run it as:  python -m gt7telem.add_track
 
 WHERE YOUR FILES GO

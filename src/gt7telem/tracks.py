@@ -25,6 +25,11 @@ from . import config as _runtime_config
 __all__ = ["get_track_name", "all_track_names", "extract_boundary", "save_boundary", "load_boundary"]
 
 _CSV_PATH = Path(__file__).parent / "course_ids.csv"
+LOCAL_CSV_NAME = "course_ids_local.csv"   # user additions from add_track.py, survive upgrades
+
+
+def local_csv_path() -> Path:
+    return _runtime_config._base_dir() / LOCAL_CSV_NAME
 _track_names: dict[int, str] = {}
 _loaded = False
 
@@ -34,17 +39,24 @@ def _load() -> None:
     if _loaded:
         return
     _loaded = True
+    paths = [_CSV_PATH]
     try:
-        with open(_CSV_PATH, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    tid = int(row["ID"])
-                except (KeyError, ValueError, TypeError):
-                    continue
-                _track_names[tid] = (row.get("Name") or "").strip()
-    except FileNotFoundError:
+        paths.append(local_csv_path())
+    except Exception:
         pass
+    for path in paths:
+        try:
+            with open(path, newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    try:
+                        tid = int(row["ID"])
+                    except (KeyError, ValueError, TypeError):
+                        continue
+                    name = (row.get("Name") or "").strip()
+                    if name:
+                        _track_names[tid] = name
+        except (OSError, csv.Error, UnicodeDecodeError):
+            pass
 
 
 def get_track_name(track_id: int | str) -> str:

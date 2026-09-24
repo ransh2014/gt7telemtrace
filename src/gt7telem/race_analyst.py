@@ -25,7 +25,7 @@ from matplotlib.patches import Polygon as MplPolygon
 
 warnings.filterwarnings("ignore")
 
-from . import __version__  # noqa: E402  (kept with the other package imports)
+from . import __version__, leaderboard  # noqa: E402  (kept with the other package imports)
 
 # ── Theme (matches lap_analyst.py) ─────────────────────────────────────────────
 BG   = "#07080f"
@@ -94,8 +94,35 @@ def load_race(path):
     df["rear_t_avg"]   = (df["tyre_temp_rl"] + df["tyre_temp_rr"]) / 2
     df["lr_t_bal"]     = (df["tyre_temp_fl"] + df["tyre_temp_rl"]) / 2 \
                        - (df["tyre_temp_fr"] + df["tyre_temp_rr"]) / 2
-    df["pit_flag"]     = df["in_pit"].astype(float)
+    df["pit_flag"]     = np.maximum(df["in_pit"].astype(float), _infer_pit_flag(df))
     return data, df
+
+PIT_LANE_MAX_KPH = 100.0   # generous: GT7 pit limiters are 60-80 km/h
+REFUEL_MIN_JUMP  = 0.5     # fuel units (L / % / kWh) gained between two samples
+
+def _infer_pit_flag(df):
+    """GT7 has no known "in pit" bit (see udp.py), so `in_pit` is always
+    False and the pit-stop count/charts were permanently empty. A refuel
+    is unambiguous in the data though: fuel only ever goes up in the pits.
+    Each refuel sample is expanded to the surrounding slow section -- the
+    pit-lane drive in and out. Tyre-only stops (no fuel added) still
+    aren't detectable."""
+    fuel  = df["fuel_remaining"].to_numpy(dtype=float)
+    speed = df["speed_kmh"].to_numpy(dtype=float)
+    flag  = np.zeros(len(df))
+    if len(df) < 2:
+        return flag
+    for i in np.where(np.diff(fuel) > REFUEL_MIN_JUMP)[0] + 1:
+        if flag[i]:
+            continue
+        lo = i
+        while lo > 0 and speed[lo - 1] <= PIT_LANE_MAX_KPH:
+            lo -= 1
+        hi = i
+        while hi < len(df) - 1 and speed[hi + 1] <= PIT_LANE_MAX_KPH:
+            hi += 1
+        flag[lo:hi + 1] = 1.0
+    return flag
 
 def export_csv(df, out_path):
     """Dump a race's per-sample telemetry to CSV. distance_m is derived by
@@ -128,6 +155,8 @@ def race_label(data, short=False):
     car   = data.get("car", "?")
     track = data.get("track", "?").replace("_", " ").title()
     dur   = data.get("race_duration_s", 0)
+    if not leaderboard.is_current_era(data):
+        car = f"{car} [pre-{leaderboard.PHYSICS_ERA}]"
     if short: return f"{car}  {fmt_dur(dur)}"
     return f"{car} @ {track}  {fmt_dur(dur)}"
 
@@ -149,9 +178,15 @@ def get_lap_segments(df):
 def lap_split_stats(df):
     """Returns list of dicts: lap, time_s, avg_speed, top_speed, brake%, throttle%, max_lat_g"""
     segs = get_lap_segments(df)
+    # Lap 0 is the grid / pre-start roll, not a lap.
+    if len(segs) > 1:
+        segs = [s for s in segs if int(s["lap_number"].iloc[0]) != 0] or segs
     out = []
     for i, seg in enumerate(segs, 1):
-        lap_time = float(seg["t"].iloc[-1] - seg["t"].iloc[0])
+        # Measure to the next lap's first sample, not this lap's last one --
+        # otherwise every lap loses one sample interval (up to 0.1s at 10 Hz).
+        end_t = segs[i]["t"].iloc[0] if i < len(segs) else seg["t"].iloc[-1]
+        lap_time = float(end_t - seg["t"].iloc[0])
         out.append({
             "lap": int(seg["lap_number"].iloc[0]) or i,
             "time_s": lap_time,
@@ -735,7 +770,7 @@ def draw_telediff(fig, df, dfb=None):
     dp(axs[0,1], "throttle",  "Δ Throttle (B−A)", yl="Δ")
     dp(axs[0,2], "brake",     "Δ Brake (B−A)",    yl="Δ")
     dp(axs[1,0], "rpm",       "Δ RPM (B−A)",      yl="ΔRPM")
-    dp(axs[1,1], "steering",  "Δ Steering (B−A)", yl="Δrad")
+    dp(axs[1,1], "steering",  "Δ Steering (B−A)", yl="Δ (−1..1)")
     dp(axs[1,2], "lat_g",     "Δ Lat G (B−A)",    yl="Δg")
     dp(axs[2,1], "long_g", "Δ Long G (B−A)", yl="Δg")
 

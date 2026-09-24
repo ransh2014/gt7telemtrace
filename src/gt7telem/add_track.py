@@ -13,7 +13,9 @@ Usage (any install):  gt7telem-add-track
 import csv
 from pathlib import Path
 
-CSV_PATH = Path(__file__).parent / "course_ids.csv"
+from . import tracks
+
+SHIPPED_CSV = Path(__file__).parent / "course_ids.csv"
 
 FIELDNAMES = [
     "ID", "Name", "Base", "Country", "Category", "Length", "LongestStraight",
@@ -23,11 +25,17 @@ FIELDNAMES = [
 ]
 
 
-def load_rows():
-    if not CSV_PATH.exists():
+def _read(path):
+    if not path.exists():
         return []
-    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
+
+def load_rows():
+    """Shipped + local rows (local additions live in the per-user settings
+    folder so they survive upgrades -- see tracks.local_csv_path())."""
+    return _read(SHIPPED_CSV) + _read(tracks.local_csv_path())
 
 
 def save_rows(rows):
@@ -37,7 +45,9 @@ def save_rows(rows):
         except (TypeError, ValueError):
             return 0
     rows_sorted = sorted(rows, key=sort_key)
-    with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
+    path = tracks.local_csv_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
         writer.writeheader()
         writer.writerows(rows_sorted)
@@ -58,8 +68,8 @@ def next_local_id(rows):
 
 
 def main():
-    print("=== Add a track to course_ids.csv ===")
-    print(f"File: {CSV_PATH}\n")
+    print("=== Add a track to TRACE's track list ===")
+    print(f"File: {tracks.local_csv_path()}\n")
     print("GT7's telemetry doesn't report a track ID, so there's nothing to")
     print("look up by number here -- this just adds a name to the TRACK")
     print("dropdown in the Live Dashboard.\n")
@@ -73,22 +83,24 @@ def main():
         return
 
     if name.lower() in existing_names:
-        print(f"\n\"{name}\" is already in course_ids.csv -- nothing to add.")
+        print(f"\n\"{name}\" is already in the track list -- nothing to add.")
         return
 
     new_id = next_local_id(rows)
     row = {k: "" for k in FIELDNAMES}
     row["ID"] = str(new_id)
     row["Name"] = name
-    rows.append(row)
-    save_rows(rows)
+    local_rows = _read(tracks.local_csv_path()) + [row]
+    try:
+        save_rows(local_rows)
+    except OSError as e:
+        print(f"\nCouldn't write {tracks.local_csv_path()}: {e}")
+        return
 
     print(f"\nSaved. \"{name}\" added (local ID {new_id}) -- it'll show up")
     print("in the TRACK dropdown next time you open the Dashboard.")
     print()
-    print("This updated your local course_ids.csv only. Note that")
-    print("reinstalling or upgrading TRACE replaces this file, so the edit")
-    print("won't survive an upgrade.")
+    print("It's saved in your own settings folder, so it survives TRACE upgrades.")
     print()
     print("To get the track into the official database for everyone, open an")
     print("issue with the in-game name:")

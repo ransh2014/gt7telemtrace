@@ -36,9 +36,15 @@ session or a previously recorded lap.
 - `src/gt7telem/cars.py` / `car_ids.csv` and `src/gt7telem/tracks.py` /
   `course_ids.csv` — ID → name lookups, sourced from
   [ddm999/gt7info](https://ddm999.github.io/gt7info/).
-- `add_car.py` / `add_track.py` — CLI helpers for adding a missing ID to the
-  local database without hand-editing the CSVs. Installed as the
+- `add_car.py` / `add_track.py` — CLI helpers for adding a missing ID
+  without hand-editing the CSVs. They write `car_ids_local.csv` /
+  `course_ids_local.csv` in the per-user settings folder (layered over the
+  shipped CSVs), never the installed package. Installed as the
   `gt7telem-add-car` / `gt7telem-add-track` console scripts.
+- `leaderboard.py` also owns `PHYSICS_ERA` / `PHYSICS_EPOCH` (currently GT7
+  1.71). When a GT7 update changes physics again, bump them there, in
+  the website's `leaderboard.html`, and in the `validate_lap_submission` /
+  `get_consensus_line` SQL functions.
 - `tools/build_source_zip.py` — builds `gt7telem-source.zip`, the "Python
   Source" download on the website. Run it after every release (`python
   tools/build_source_zip.py -o <website-dir>`); the three binary downloads
@@ -58,7 +64,7 @@ Please include:
 
 If a car or track shows up with a blank name, it's likely missing from
 `car_ids.csv` / `course_ids.csv`. Run `add_car.py` / `add_track.py` locally
-to add it, or open an issue with the ID and the in-game name so it can be
+to add it (saved to your settings folder, so it survives upgrades), or open an issue with the ID and the in-game name so it can be
 added to the next scheduled refresh.
 
 ## Pull requests

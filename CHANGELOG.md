@@ -5,6 +5,47 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-24
+
+GT7 update 1.71 (20 Aug 2026) overhauled the physics (tyre model, steering
+geometry, dampers, torque delivery, aero, TCS/ABS) and Polyphony reset every
+official leaderboard. Lap times either side of it aren't comparable, so
+TRACE now treats them as separate "physics eras" (`leaderboard.PHYSICS_ERA`).
+
+- Leaderboard: Top-10 (app and website) and ghost downloads only show laps
+  submitted since 1.71; laps recorded before it can't be submitted. The
+  Supabase consensus line and the anti-cheat "current record" check use the
+  same cut-off (applied server-side).
+- Leaderboard anti-cheat: the validation trigger only ran on INSERT, but RLS
+  let a player UPDATE their own lap -- so a submitted time could be edited
+  down afterwards with no checks. It now runs on UPDATE too and only
+  `psn_name` may change; `created_at` is set by the server. Also: the
+  consensus RPC caps `p_n` at 50 and pins its search_path, and the
+  `handle_new_user` trigger function is no longer callable over the API.
+- Live Dashboard: a pre-1.71 reference lap no longer drives the DELTA readout
+  and is replaced by the first lap driven on the new physics; pre-1.71
+  personal bests no longer block a new PB. Lap, race and PB files now carry
+  a `physics_era` tag. Lap/Race Analyst labels older recordings `[pre-1.71]`.
+- Steering: packets B and C carry the real steering angle, and it's now used
+  instead of the heading-rate estimate (Packet A still falls back to the
+  estimate). Normalised to -1..1 per car and sign-matched to the old trace;
+  each sample records `steering_source`.
+- Packet ~/C: filtered (post-TCS/ABS) throttle and brake are now read
+  (`throttle_filtered`, `brake_filtered`) and recorded.
+- Surface type `s` is snow, not gravel (Dashboard label + comments).
+- Live Dashboard: pausing the game no longer counts toward sample `t`, the
+  elapsed-time lap fallback, the live delta or `race_duration_s`.
+- Live Dashboard: live delta lookup is a binary search instead of a scan of
+  every reference sample on each 10 Hz redraw.
+- Race Analyst: pit stops are detected from refuelling (GT7 has no pit
+  flag, so the count and pit charts were always empty). Lap splits exclude
+  the lap-0 grid roll and no longer drop one sample interval per lap.
+- `gt7telem-add-car` / `gt7telem-add-track` save to `car_ids_local.csv` /
+  `course_ids_local.csv` in the settings folder instead of the installed
+  package (not writable under Chocolatey, wiped on upgrade). Useful for the
+  Spec IV cars and Sportsland SUGO before a DB refresh ships.
+- Website leaderboard: escapes `&`/`"`/`>` in names, not just `<`.
+
 ## [0.4.0] - 2026-09-15
 - Race Analyst: CSV export button on the Replay tab (distance_m, speed_kmh,
   throttle, brake, rpm, gear, steering), mirroring the one Lap Analyst has

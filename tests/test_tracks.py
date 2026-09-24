@@ -29,3 +29,17 @@ def test_all_track_names_is_sorted_and_nonempty():
     assert names
     assert names == sorted(names)
     assert all(n for n in names)  # no blank entries
+
+
+# ── local track additions survive upgrades ─────────────────────────────────
+def test_add_track_writes_local_file_only(tmp_path, monkeypatch):
+    from gt7telem import add_track, config, tracks
+    monkeypatch.setattr(config, "_base_dir", lambda: tmp_path)
+    monkeypatch.setattr(tracks._runtime_config, "_base_dir", lambda: tmp_path)
+    shipped_before = add_track.SHIPPED_CSV.read_bytes()
+    monkeypatch.setattr("builtins.input", lambda *_: "Sportsland SUGO")
+    add_track.main()
+    assert add_track.SHIPPED_CSV.read_bytes() == shipped_before
+    monkeypatch.setattr(tracks, "_loaded", False)
+    monkeypatch.setattr(tracks, "_track_names", {})
+    assert "Sportsland SUGO" in tracks.all_track_names()

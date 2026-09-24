@@ -20,12 +20,61 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 
 __all__ = ["submit_lap", "get_top_laps", "get_lap_samples", "get_consensus_line", "submit_car_id", "submit_track_name",
-           "lap_submission_error"]
+           "lap_submission_error", "PHYSICS_ERA", "PHYSICS_EPOCH", "physics_era_of", "is_current_era"]
 
 _SUPABASE_URL = "https://hignsvyojdqsjoidgkud.supabase.co"
 _SUPABASE_ANON_KEY = "sb_publishable_OdzGvcypa0GI7TVxxUkusQ_KJ_Apa8i"
+
+
+# ── GT7 physics era ─────────────────────────────────────────────────────────
+# GT7's telemetry packet carries no game version, so anything that depends on
+# which physics model a lap was driven under has to go by date instead.
+#
+# Update 1.71 (20 Aug 2026) overhauled the physics: the tyre model (slip,
+# rolling resistance, heating and wear), steering geometry, damper curves,
+# engine torque delivery, aero ranges and TCS/ABS behaviour all changed, and
+# Polyphony reset every official leaderboard because of it. Lap times from
+# before that date aren't comparable with ones after it, so TRACE treats them
+# as a separate "physics era": they can't replace a newer reference lap or
+# personal best, can't be submitted to the leaderboard, and don't show on it.
+# The Supabase side (anti-cheat record check, consensus line) and the
+# website's leaderboard page use the same date.
+#
+# When a future update changes physics again, bump PHYSICS_EPOCH and
+# PHYSICS_ERA here (and in leaderboard.html + the two SQL functions).
+
+PHYSICS_ERA = "1.71"
+# Rolled out ~06:00 UTC; midnight UTC is close enough and errs toward
+# treating a few pre-patch laps that day as current rather than the reverse.
+PHYSICS_EPOCH = datetime(2026, 8, 20, tzinfo=timezone.utc)
+PHYSICS_EPOCH_ISO = PHYSICS_EPOCH.strftime("%Y-%m-%dT%H:%M:%SZ")
+_EPOCH_STAMP = PHYSICS_EPOCH.strftime("%Y%m%d_%H%M%S")  # same shape as lap files' recorded_at
+
+
+def physics_era_of(recorded_at) -> str | None:
+    """Era label for a saved lap/race's `recorded_at` stamp ("YYYYmmdd_HHMMSS",
+    local time as the Dashboard writes it). Returns PHYSICS_ERA for laps on or
+    after the epoch, "pre-" + PHYSICS_ERA before it, or None if the stamp is
+    missing/unparseable (unknown -- callers treat that as current, so old
+    files without a stamp aren't locked out)."""
+    s = str(recorded_at or "").strip()
+    if len(s) < 8 or not s[:8].isdigit():
+        return None
+    return PHYSICS_ERA if s >= _EPOCH_STAMP[: len(s)] else f"pre-{PHYSICS_ERA}"
+
+
+def is_current_era(data: dict) -> bool:
+    """True unless a lap/race dict is known to be from before PHYSICS_EPOCH.
+    A stored "physics_era" tag wins over the date, so a file saved by a
+    TRACE version that knew the era is taken at its word."""
+    tag = data.get("physics_era")
+    if tag:
+        return tag == PHYSICS_ERA
+    era = physics_era_of(data.get("recorded_at"))
+    return era is None or era == PHYSICS_ERA
 
 
 def _headers(prefer=None, access_token=None):
@@ -85,6 +134,10 @@ def lap_submission_error(lap: dict) -> str | None:
                 "complete laps can be submitted.")
     if not lap.get("samples"):
         return "This lap has no samples to submit."
+    if not is_current_era(lap):
+        return (f"This lap was recorded before GT7 update {PHYSICS_ERA}, which changed the "
+                "tyre, suspension and engine physics -- its time isn't comparable with laps driven "
+                "since, so it can't go on the leaderboard. Drive a fresh lap to submit.")
     try:
         lap_time_s = float(lap.get("lap_time_s") or 0)
     except (TypeError, ValueError):
@@ -148,10 +201,15 @@ def get_top_laps(car_name: str, track_name: str, n: int = 10, timeout: float = 8
     included so a row can be passed straight to get_lap_samples() for a
     ghost-lap download. Returns [] on any failure (offline, nothing
     submitted yet, etc) -- callers should treat an empty list as "nothing
-    to show", not an error."""
+    to show", not an error.
+
+    Only laps submitted since the current GT7 physics era began
+    (PHYSICS_EPOCH) are returned: times set under the old physics
+    aren't comparable, the same reason Polyphony reset its own boards."""
     params = urllib.parse.urlencode({
         "car_name": _eq(car_name),
         "track_name": _eq(track_name),
+        "created_at": f"gte.{PHYSICS_EPOCH_ISO}",
         "select": "id,car_name,track_name,lap_time_ms,psn_name,created_at",
         "order": "lap_time_ms.asc",
         "limit": str(n),

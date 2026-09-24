@@ -7,12 +7,14 @@ same key/IV derivation `_decrypt` uses, so these tests catch regressions in
 either the crypto step or the byte-offset parsing -- the two things this
 whole project depends on getting right.
 """
+import math
 import struct
 
 import pytest
 
 Salsa20 = pytest.importorskip("Crypto.Cipher.Salsa20", reason="pycryptodome not installed")
 
+from gt7telem import udp as _udp  # noqa: E402
 from gt7telem.udp import _decrypt, _parse, _salsa20_pure  # noqa: E402
 
 MAGIC = 0x47375330
@@ -102,3 +104,81 @@ def test_pure_python_salsa20_fallback_matches_pycryptodome():
     iv = bytes(range(8))
     data = bytes((i * 7 + 3) & 0xFF for i in range(368))
     assert _salsa20_pure(data, KEY, iv) == Salsa20.new(key=KEY, nonce=iv).decrypt(data)
+
+
+# ── udp: filtered inputs + real steering ────────────────────────────────────
+def _plain_packet(length, setters):
+    pt = bytearray(length)
+    struct.pack_into("<I", pt, 0, 0x47375330)
+    setters(pt)
+    return bytes(pt)
+
+
+@pytest.fixture(autouse=True)
+def _reset_steering_state():
+    _udp._steer_lock.clear()
+    _udp._steer_corr = 0.0
+    _udp._prev_heading = None
+    yield
+    _udp._steer_lock.clear()
+    _udp._steer_corr = 0.0
+    _udp._prev_heading = None
+
+
+def test_filtered_inputs_parsed_on_tilde_and_c():
+    def s(pt):
+        pt[0x13C] = 255
+        pt[0x13D] = 51
+    for length in (344, 368):
+        p = _udp._parse(_plain_packet(length, s))
+        assert p["throttle_filtered"] == pytest.approx(1.0)
+        assert p["brake_filtered"] == pytest.approx(0.2)
+
+
+def test_filtered_inputs_absent_on_a_and_b():
+    for length in (296, 316):
+        p = _udp._parse(_plain_packet(length, lambda pt: None))
+        assert p["throttle_filtered"] is None and p["brake_filtered"] is None
+
+
+def test_packet_a_keeps_heading_estimate():
+    p = _udp._parse(_plain_packet(296, lambda pt: None))
+    assert p["steering_source"] == "heading"
+
+
+def test_real_steering_waits_for_sign():
+    """Before any clear turn has taught the sign, the estimate is kept."""
+    def s(pt):
+        struct.pack_into("<f", pt, 0x160, 0.2)
+        struct.pack_into("<f", pt, 0x164, 0.2)
+    p = _udp._parse(_plain_packet(368, s))
+    assert p["steering_source"] == "heading"
+
+
+def test_packet_c_uses_front_wheel_angle():
+    _udp._steer_corr = 1.0   # sign already learned
+    def s(pt):
+        struct.pack_into("<f", pt, 0x160, 0.2)
+        struct.pack_into("<f", pt, 0x164, 0.2)
+    p = _udp._parse(_plain_packet(368, s))
+    assert p["steering_source"] == "wheel"
+    # below the 0.35 rad lock floor, so reads as a partial turn
+    assert p["steering"] == pytest.approx(0.2 / 0.35, abs=1e-6)
+
+
+def test_packet_b_uses_wheel_rotation():
+    _udp._steer_corr = 1.0
+    def s(pt):
+        struct.pack_into("<f", pt, 0x128, 3.0)
+    p = _udp._parse(_plain_packet(316, s))
+    assert p["steering_source"] == "rotation"
+    assert p["steering"] == pytest.approx(1.0)  # 3.0 rad becomes the lock itself
+
+
+def test_steering_sign_follows_heading_estimate():
+    """If GT7's angle sign is opposite to the heading-rate estimate, the
+    normalised value is flipped to match it."""
+    for _ in range(5):
+        v = _udp._normalise_steering(0.3, "wheel", heading_estimate=-0.5, car_id=1, speed_kmh=100.0)
+    assert v < 0
+    assert math.isfinite(v)

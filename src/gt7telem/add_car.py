@@ -6,25 +6,46 @@ ddm999's gt7info database. If you're driving a car GT7 added after that
 snapshot was taken, it won't have a name yet and will just show as a
 raw numeric ID. Run this to add it manually.
 
+Additions go to car_ids_local.csv in TRACE's per-user settings folder
+(~/.gt7telem, or next to a portable exe), not into the installed package:
+that folder isn't writable under Chocolatey/system installs, and pip/WinGet
+upgrades replace it. The Dashboard layers the local file on top.
+
 Usage (any install):  gt7telem-add-car
    or:              python -m gt7telem.add_car
 """
 import csv
 from pathlib import Path
 
-CSV_PATH = Path(__file__).parent / "car_ids.csv"
+from . import cars
+
+SHIPPED_CSV = Path(__file__).parent / "car_ids.csv"
 
 
-def load_rows():
-    if not CSV_PATH.exists():
+def _read(path):
+    if not path.exists():
         return []
-    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
+def load_rows():
+    """Shipped rows overlaid with local ones -- what the Dashboard sees."""
+    merged = {}
+    for r in _read(SHIPPED_CSV) + _read(cars.local_csv_path()):
+        try:
+            merged[int(r["ID"])] = r
+        except (KeyError, ValueError, TypeError):
+            continue
+    return list(merged.values())
+
+
 def save_rows(rows):
+    """Write only the local additions file."""
+    path = cars.local_csv_path()
     rows_sorted = sorted(rows, key=lambda r: int(r["ID"]))
-    with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["ID", "ShortName", "Maker"])
         writer.writeheader()
         writer.writerows(rows_sorted)
@@ -40,11 +61,12 @@ def prompt_int(label):
 
 
 def main():
-    print("=== Add a car to car_ids.csv ===")
-    print(f"File: {CSV_PATH}\n")
+    local_path = cars.local_csv_path()
+    print("=== Add a car to TRACE's car list ===")
+    print(f"File: {local_path}\n")
 
-    rows = load_rows()
-    existing_by_id = {int(r["ID"]): r for r in rows}
+    existing_by_id = {int(r["ID"]): r for r in load_rows()}
+    local_rows = _read(local_path)
 
     car_id = prompt_int("Car ID (the numeric id GT7 reports in telemetry)")
 
@@ -64,18 +86,18 @@ def main():
         print("Car name can't be empty -- cancelled.")
         return
 
-    if car_id in existing_by_id:
-        rows.remove(existing_by_id[car_id])
-
-    rows.append({"ID": str(car_id), "ShortName": name, "Maker": str(maker_id)})
-    save_rows(rows)
+    local_rows = [r for r in local_rows if str(r.get("ID")) != str(car_id)]
+    local_rows.append({"ID": str(car_id), "ShortName": name, "Maker": str(maker_id)})
+    try:
+        save_rows(local_rows)
+    except OSError as e:
+        print(f"\nCouldn't write {local_path}: {e}")
+        return
 
     print(f"\nSaved. \"{name}\" is now car ID {car_id} (Maker {maker_id}).")
     print()
-    print("This updated your local car_ids.csv only -- the name will show up")
-    print("next time you open the Dashboard. Note that reinstalling or")
-    print("upgrading TRACE replaces this file, so the edit won't survive an")
-    print("upgrade.")
+    print("It's saved in your own settings folder, so it survives TRACE")
+    print("upgrades -- the name will show up next time you open the Dashboard.")
     print()
     print("To get the car into the official database for everyone, open an")
     print("issue with the ID and the in-game name:")

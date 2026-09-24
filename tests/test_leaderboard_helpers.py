@@ -7,6 +7,7 @@ import json
 
 import pytest
 
+from gt7telem import leaderboard
 from gt7telem.leaderboard import _compact_samples, _eq, lap_submission_error
 
 
@@ -97,3 +98,39 @@ def test_incomplete_lap_is_refused():
 ])
 def test_lap_without_samples_or_a_time_is_refused(bad):
     assert lap_submission_error({**COMPLETE_LAP, **bad})
+
+
+# ── GT7 1.71 physics era ────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("stamp,era", [
+    ("20260819_235959", "pre-1.71"),
+    ("20260820_000000", "1.71"),
+    ("20260923_101500", "1.71"),
+    ("20250101_120000", "pre-1.71"),
+    ("", None),
+    (None, None),
+    ("garbage", None),
+])
+def test_physics_era_of(stamp, era):
+    assert leaderboard.physics_era_of(stamp) == era
+
+
+def test_stored_tag_wins_over_date():
+    assert leaderboard.is_current_era({"physics_era": leaderboard.PHYSICS_ERA, "recorded_at": "20200101_000000"})
+    assert not leaderboard.is_current_era({"physics_era": "1.60", "recorded_at": "20990101_000000"})
+
+
+def test_unknown_date_counts_as_current():
+    assert leaderboard.is_current_era({})
+
+
+def _lap(recorded_at):
+    return {"recorded_at": recorded_at, "lap_time_s": 90.0, "samples": [{"t": 0}]}
+
+
+def test_pre_171_lap_cannot_be_submitted():
+    msg = lap_submission_error(_lap("20260801_120000"))
+    assert msg and "1.71" in msg
+
+
+def test_post_171_lap_can_be_submitted():
+    assert lap_submission_error(_lap("20260901_120000")) is None
