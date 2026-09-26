@@ -1,8 +1,7 @@
-# gt7telem2.py — GT7 Live Telemetry Viewer (v2)
-# New in v2:
-#   - Live mini track map canvas (right panel, 240x180)
-#   - Tyre hot / cold / fuel-low alert banners (flashing)
-#   - Lap history Treeview (scrollable, right panel)
+# dashboard.py — TRACE Live Dashboard
+#   - Live readouts for everything GT7's telemetry packet carries
+#   - Mini track map, tyre/fuel alert banners, lap history, live delta
+#   - Record Lap / Record Race (auto-starts on a detected race)
 
 import bisect
 import json
@@ -128,7 +127,7 @@ class App(tk.Tk):
         self._last_record_error = None
 
         # ── Live delta-vs-reference-lap state ────────────────────────────────
-        self._delta_ref_cache  = {"track": None, "samples": None, "positions": None}
+        self._delta_ref_cache  = {"key": None, "samples": None, "positions": None}
         self._delta_prev_lap   = 0
         self._delta_lap_start_t = None
 
@@ -173,7 +172,7 @@ class App(tk.Tk):
         hdr = tk.Frame(self, bg="#0f3460", pady=6)
         hdr.pack(fill="x")
 
-        tk.Label(hdr, text="GT7 TELEMETRY v2", fg=ACC, bg="#0f3460",
+        tk.Label(hdr, text="TRACE  LIVE DASHBOARD", fg=ACC, bg="#0f3460",
                  font=("Consolas", 14, "bold")).pack(side="left", padx=16)
         self.conn_dot = tk.Label(hdr, text="● OFFLINE", fg=DIM, bg="#0f3460",
                                  font=("Consolas", 10))
@@ -209,7 +208,7 @@ class App(tk.Tk):
         hdr2 = tk.Frame(self, bg="#0f3460", pady=4)
         hdr2.pack(fill="x")
 
-        tk.Label(hdr2, text="PS4 IP", fg=DIM, bg="#0f3460",
+        tk.Label(hdr2, text="CONSOLE IP", fg=DIM, bg="#0f3460",
                  font=("Consolas", 8)).pack(side="left", padx=(16, 2))
         self.ip_var = tk.StringVar(value=PS4_IP)
         _ip_values = list(KNOWN_IPS)
@@ -311,10 +310,18 @@ class App(tk.Tk):
             _lcanvas.itemconfig(_lwin, width=e.width)
         left.bind("<Configure>", _on_left_configure)
         _lcanvas.bind("<Configure>", _on_canvas_resize)
-        _lcanvas.bind_all("<MouseWheel>",
-                          lambda e: _lcanvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
-        _lcanvas.bind_all("<Button-4>", lambda e: _lcanvas.yview_scroll(-1, "units"))
-        _lcanvas.bind_all("<Button-5>", lambda e: _lcanvas.yview_scroll(1, "units"))
+        # Wheel scrolling only while the pointer is over the left panel --
+        # bind_all on its own also scrolled it from the log and lap history.
+        def _wheel_on(_e=None):
+            _lcanvas.bind_all("<MouseWheel>",
+                              lambda e: _lcanvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+            _lcanvas.bind_all("<Button-4>", lambda e: _lcanvas.yview_scroll(-1, "units"))
+            _lcanvas.bind_all("<Button-5>", lambda e: _lcanvas.yview_scroll(1, "units"))
+        def _wheel_off(_e=None):
+            for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                _lcanvas.unbind_all(seq)
+        left_outer.bind("<Enter>", _wheel_on)
+        left_outer.bind("<Leave>", _wheel_off)
 
         right = tk.Frame(body, bg=BG, width=260)
         right.pack(side="right", fill="y", padx=(6, 0))
@@ -334,9 +341,6 @@ class App(tk.Tk):
         self.sug_gear_lbl = tk.Label(sg_mid, text="--", fg="#f39c12", bg=PNL,
                                      font=("Consolas", 20, "bold"))
         self.sug_gear_lbl.pack()
-        self.inpit_lbl = tk.Label(sg_mid, text="", fg="#e94560", bg=PNL,
-                                  font=("Consolas", 9, "bold"))
-        self.inpit_lbl.pack()
         self.gear_lbl = tk.Label(sg, text="N", fg="#f39c12", bg=PNL,
                                  font=("Consolas", 64, "bold"))
         self.gear_lbl.pack(side="right", padx=20)
@@ -349,7 +353,7 @@ class App(tk.Tk):
         for attr, label, col in [
             ("lap_lbl", "LAP", FG), ("cur_lbl", "CURRENT", HI),
             ("best_lbl", "BEST", "#2ecc71"), ("last_lbl", "LAST", FG),
-            ("pos_lbl", "POS", FG), ("topspd_lbl", "TOP SPD", HI),
+            ("pos_lbl", "GRID", FG), ("topspd_lbl", "TOP SPD", HI),
             ("delta_lbl", "DELTA", FG),
         ]:
             col_f = tk.Frame(lap_f, bg=PNL)
@@ -426,8 +430,8 @@ class App(tk.Tk):
         eng_f = tk.LabelFrame(left, text=" ENGINE AND FLUIDS ", fg=ACC, bg=BG, font=("Consolas", 9))
         eng_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("FUEL", "fuel_lbl"), ("FUEL LAPS", "fuellaps_lbl"),
-                             ("BOOST", "boost_lbl"), ("OIL C", "oil_lbl"),
-                             ("WATER C", "water_lbl"), ("OIL kPa", "oilp_lbl"),
+                             ("BOOST bar", "boost_lbl"), ("OIL C*", "oil_lbl"),
+                             ("WATER C*", "water_lbl"), ("OIL bar", "oilp_lbl"),
                              ("RIDE mm", "ride_lbl")]:
             col_f = tk.Frame(eng_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=6, pady=4)
@@ -435,6 +439,8 @@ class App(tk.Tk):
             lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 12, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
+        tk.Label(eng_f, text="* GT7 sends fixed values for these (85 / 110 C) -- not simulated",
+                 fg=DIM, bg=BG, font=("Consolas", 7)).pack(side="bottom", anchor="w", padx=6)
 
         # ── Dynamics ─────────────────────────────────────────────────────────
         dyn_f = tk.LabelFrame(left, text=" DYNAMICS ", fg=ACC, bg=BG, font=("Consolas", 9))
@@ -627,11 +633,14 @@ class App(tk.Tk):
         min_z = min(zs); max_z = max(zs)
         rng_x = max_x - min_x or 1
         rng_z = max_z - min_z or 1
+        # One scale for both axes (and centred), so the track keeps its real
+        # shape -- scaling x and z separately stretched it to fill the box.
+        scale = min((W - 2 * PAD) / rng_x, (H - 2 * PAD) / rng_z)
+        off_x = (W - rng_x * scale) / 2
+        off_y = (H - rng_z * scale) / 2
 
         def to_cv(x, z):
-            cx = PAD + (x - min_x) / rng_x * (W - 2 * PAD)
-            cy = PAD + (z - min_z) / rng_z * (H - 2 * PAD)
-            return cx, cy
+            return off_x + (x - min_x) * scale, off_y + (z - min_z) * scale
 
         # Full trace downsampled to max 400 pts
         step = max(1, len(pts) // 400)
@@ -658,14 +667,22 @@ class App(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
     # IP change
     # ─────────────────────────────────────────────────────────────────────────
-    def _get_reference_samples(self, track_sanitized):
-        """Cached read of laps/<track>/reference_lap.json's sample list,
-        sorted by track_position for nearest-by-distance lookups. Returns
-        None (no crash) if there's no reference lap for this track yet."""
-        if self._delta_ref_cache["track"] != track_sanitized:
-            self._delta_ref_cache["track"]   = track_sanitized
+    @staticmethod
+    def _reference_path(track_sanitized, car_safe):
+        """Reference lap for the live DELTA: one per track *and car*. It used
+        to be one reference_lap.json per track, so after switching cars the
+        delta compared you against a different car's lap."""
+        return Path(runtime_config.LAPS_FOLDER) / track_sanitized / f"reference_{car_safe}.json"
+
+    def _get_reference_samples(self, track_sanitized, car_safe):
+        """Cached read of this track+car's reference lap samples, sorted by
+        track_position for nearest-by-distance lookups. Returns None (no
+        crash) if there's no reference lap for this combo yet."""
+        key = (track_sanitized, car_safe)
+        if self._delta_ref_cache["key"] != key:
+            self._delta_ref_cache["key"]     = key
             self._delta_ref_cache["samples"] = None
-            ref_path = Path(runtime_config.LAPS_FOLDER) / track_sanitized / "reference_lap.json"
+            ref_path = self._reference_path(track_sanitized, car_safe)
             try:
                 if ref_path.exists():
                     with open(ref_path, encoding="utf-8") as f:
@@ -885,7 +902,6 @@ class App(tk.Tk):
         self.speed_lbl.config(text=f"{spd:.0f}")
         self.gear_lbl.config(text=str(gear) if gear > 0 else "N")
         self.sug_gear_lbl.config(text=str(sug) if sug > 0 else "--")
-        self.inpit_lbl.config(text="PIT" if d.get("in_pit") else "")
 
         # Driver aids -- YES in accent color when active, NO dimmed otherwise
         for key, lbl in self._aid_lbls.items():
@@ -914,7 +930,9 @@ class App(tk.Tk):
         self.lap_lbl.config(text=f"{cur_lap}/{tot_lap}")
         self.best_lbl.config(text=ms_to_laptime(best_ms))
         self.last_lbl.config(text=ms_to_laptime(last_ms))
-        self.pos_lbl.config(text=f"{cur_pos}/{tot_pos}" if cur_pos else "--")
+        # GT7 only sends the starting-grid slot (and -1 once the race starts),
+        # not a live race position -- so this is labelled GRID and blanks out.
+        self.pos_lbl.config(text=f"P{cur_pos}/{tot_pos}" if cur_pos > 0 and tot_pos > 0 else "--")
         self.topspd_lbl.config(text=f"{top_spd} km/h" if top_spd else "--")
 
         # Tyres -- collect live temps for alert check
@@ -938,15 +956,18 @@ class App(tk.Tk):
         # Suspension
         for attr, key in [("susp_fl_lbl", "susp_fl"), ("susp_fr_lbl", "susp_fr"),
                            ("susp_rl_lbl", "susp_rl"), ("susp_rr_lbl", "susp_rr")]:
-            getattr(self, attr).config(text=f"{float(d.get(key) or 0):.1f}")
+            getattr(self, attr).config(text=f"{float(d.get(key) or 0) * 1000:.0f}")  # metres -> mm
 
         # Engine and Fluids
         fuel_r = float(d.get("fuel_remaining") or 0)
         fuel_c = float(d.get("fuel_capacity") or 0)
         is_ev  = bool(d.get("is_ev"))
-        fuel_str = f"{fuel_r:.1f}kWh" if is_ev else f"{fuel_r:.1f}L"
-        if fuel_c > 0:
-            fuel_str += f"/{fuel_c:.0f}"
+        # GT7 reports fuel against a capacity of 100 for nearly every car
+        # (i.e. a percentage), 5 for karts and 0 for EVs -- not litres.
+        if fuel_c == 100 or is_ev:
+            fuel_str = f"{fuel_r:.1f}%" + (" batt" if is_ev else "")
+        else:
+            fuel_str = f"{fuel_r:.1f}/{fuel_c:.0f}"
         self.fuel_lbl.config(text=fuel_str)
 
         _fuel_laps_num = (fuel_r / self._fuel_per_lap) \
@@ -1100,8 +1121,8 @@ class App(tk.Tk):
         # ── Live delta vs. reference lap ────────────────────────────────────
         # Matches on `track_position`: metres driven since GT7's lap counter
         # last changed (udp.py integrates it from world position and restarts
-        # it every lap). It's the same field stored per sample in
-        # reference_lap.json, so the two are directly comparable.
+        # it every lap). It's the same field stored per sample in the
+        # track+car reference lap file, so the two are directly comparable.
         if cur_lap != self._delta_prev_lap:
             self._delta_lap_start_t = time.time()
             self._delta_prev_lap    = cur_lap
@@ -1116,10 +1137,13 @@ class App(tk.Tk):
         else:
             cur_elapsed = 0.0
 
+        self.cur_lbl.config(text=ms_to_laptime(int(cur_elapsed * 1000)) if cur_elapsed > 0 else "--")
+
         delta_text, delta_color = "--", FG
         track_name = self.track_var.get().strip()
         if track_name and cur_elapsed > 0.5 and cur_track_pos > 0:
-            ref_samples = self._get_reference_samples(telem.sanitize(track_name))
+            ref_samples = self._get_reference_samples(
+                telem.sanitize(track_name), telem.sanitize(self.car_var.get().strip() or "unknown"))
             if ref_samples:
                 # Binary search on the pre-sorted positions instead of a
                 # linear min() over every reference sample, 10x a second.
@@ -1240,7 +1264,7 @@ class App(tk.Tk):
             ("Laps completed", str(len(complete))),
             ("Best lap",       best_str),
             ("Average lap",    avg_str),
-            ("Fuel used",      f"{fuel_used:.2f} L" if fuel_used > 0 else "--"),
+            ("Fuel used",      f"{fuel_used:.1f}%" if fuel_used > 0 else "--"),
         ]
         body = tk.Frame(dlg, bg="#0a0a12")
         body.pack(padx=24, pady=(0, 10))
@@ -1504,8 +1528,10 @@ class App(tk.Tk):
         laps       = sorted(set(int(s.get("lap_number", 0)) for s in samples))
         fuel_start = samples[0].get("fuel_remaining", 0)
         fuel_end   = samples[-1].get("fuel_remaining", 0)
-        pos_start  = samples[0].get("current_position", 0)
-        pos_end    = samples[-1].get("current_position", 0)
+        # GT7's position field is the starting-grid slot, -1 once racing --
+        # take the first valid one; there is no finishing position to read.
+        grid_pos   = next((s.get("current_position") for s in samples
+                           if (s.get("current_position") or 0) > 0), None)
 
         incident_counts = {}
         for inc in incidents:
@@ -1517,12 +1543,11 @@ class App(tk.Tk):
             "car":                race_data["car"],
             "duration_s":         race_data["race_duration_s"],
             "laps":               len(laps),
-            # fuel_remaining is litres (kWh for an EV), not a percentage --
-            # this used to be stored as fuel_used_pct and shown as "Fuel %".
+            # GT7 reports fuel against a capacity of 100 for nearly every car
+            # (a percentage), 5 for karts, 0 for EVs.
             "fuel_used":          round(fuel_start - fuel_end, 2),
-            "fuel_unit":          "kWh" if samples[-1].get("is_ev") else "L",
-            "position_start":     pos_start,
-            "position_end":       pos_end,
+            "fuel_unit":          "%" if samples[-1].get("fuel_capacity") in (100, 0) else "",
+            "grid_position":      grid_pos,
             "incident_count":     len(incidents),
             "incident_breakdown": incident_counts,
         }
@@ -1549,7 +1574,7 @@ class App(tk.Tk):
 
         cols = ("race", "track", "car", "laps", "duration", "fuel", "pos", "incidents")
         headers = {"race": "#", "track": "Track", "car": "Car", "laps": "Laps",
-                   "duration": "Duration", "fuel": "Fuel Used", "pos": "Pos",
+                   "duration": "Duration", "fuel": "Fuel Used", "pos": "Grid",
                    "incidents": "Incidents"}
 
         st = ttk.Style()
@@ -1571,7 +1596,7 @@ class App(tk.Tk):
             tree.insert("", "end", values=(
                 idx, s["track"], s["car"], s["laps"],
                 f"{s['duration_s']:.1f}s", f"{s['fuel_used']:.1f} {s['fuel_unit']}",
-                f"{s['position_start']}->{s['position_end']}", s["incident_count"],
+                f"P{s['grid_position']}" if s.get("grid_position") else "--", s["incident_count"],
             ))
 
     def _show_incident_timeline(self):
@@ -1800,9 +1825,10 @@ class App(tk.Tk):
 
         ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
         folder   = Path(runtime_config.LAPS_FOLDER) / track
-        ref      = folder / "reference_lap.json"
+        ref      = None   # set below, once car_safe is known
         car_safe = telem.sanitize(car)
         lap_path = folder / f"{car_safe}_{ts}.json"
+        ref      = self._reference_path(track, car_safe)
 
         new_time    = (lap_time_ms / 1000.0) if (lap_time_ms and lap_time_ms > 0) \
                       else time.time() - session.start_t
@@ -1909,15 +1935,15 @@ class App(tk.Tk):
                 self._save_json(ref, data, "reference lap", fallback=False):
             diff_str = (f"  (new best by {ref_time - new_time:.3f}s)"
                         if ref_time > 0 else "  (first lap)")
-            self.log_msg(f"Reference updated -> reference_lap.json{diff_str}")
+            self.log_msg(f"Reference updated -> {ref.name}{diff_str}")
             # Invalidate the live-delta reference cache so the new best is
             # picked up on the next poll instead of the stale one.
-            self._delta_ref_cache["track"] = None
+            self._delta_ref_cache["key"] = None
         return saved
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Personal bests (per track+car combo, separate from reference_lap.json
-    # which is per-track only and drives the live delta readout)
+    # Personal bests (per track+car combo; only the lap time -- the full
+    # reference lap for the live delta lives in reference_<car>.json)
     # ─────────────────────────────────────────────────────────────────────────
     def _personal_bests_path(self, track):
         return Path(runtime_config.LAPS_FOLDER) / track / "personal_bests.json"

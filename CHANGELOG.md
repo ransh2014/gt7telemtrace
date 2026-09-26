@@ -5,6 +5,67 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-25
+Full audit pass -- every module re-read and all three apps driven headless on
+synthetic GT7 telemetry; each fix below was reproduced before fixing.
+
+Telemetry
+- Live Dashboard now goes OFFLINE ~2 s after GT7 stops sending (game closed,
+  console asleep) and back to LIVE on its own. `is_connected()` used to stay
+  True forever after the first packet, so the recorders kept appending the
+  last frozen frame ~10 times a second.
+- Race auto-recording only starts in real race sessions. In time trial /
+  practice (total laps 0) two seconds above 80 km/h started a "race" that
+  never ended -- recording the whole session and blocking detection of the
+  next real race. Quitting or restarting mid-race (a loading screen while a
+  race is active) now ends the race too.
+- Real steering (packets B/C) now switches on at the first ordinary corner;
+  the check that learns its direction was too strict for fast, gentle bends.
+- Position: GT7 only sends the starting-grid slot (-1 once the race starts),
+  never a live race position. Dashboard shows it as GRID and blanks it once
+  racing; Race Analyst shows "Grid Pos" instead of a flat "Position Over
+  Race" chart; the session summary shows the grid slot instead of a
+  meaningless start->end pair. `grid_position` / `grid_cars` added to the
+  parsed packet.
+
+Live Dashboard
+- CURRENT lap timer works (it never updated).
+- Live DELTA compares against your best lap in the same car on that track
+  (`reference_<car>.json`), not whatever car last set the track's
+  reference_lap.json.
+- Suspension shown in mm (GT7 sends metres -- it read 0.1 under an "mm"
+  label); oil pressure labelled bar, not kPa; fuel shown as the percentage
+  GT7 actually sends; oil/water temperatures marked as the fixed values GT7
+  sends.
+- PIT label removed -- GT7 has no pit flag, so it could never light up
+  (Race Analyst works pit stops out from refuelling).
+- Mouse wheel scrolls only the panel under the pointer; the mini track map
+  keeps the circuit's real proportions; header/labels say TRACE / CONSOLE IP.
+
+Lap / Race Analyst
+- Race Analyst no longer counts a partial final lap as the best lap or in
+  the average ("Laps: 3 (+1 partial)").
+- Lap Analyst HTML export declares UTF-8 (the title's dash garbled).
+- Extended tab surface legend spelled out (5 = Snow, not "s").
+- Lap Notes are saved into the lap file ("Save Notes") and reloaded with it.
+- A leaderboard session the server no longer accepts now asks you to create
+  a new account instead of failing with "server error" forever; a network
+  blip still keeps your session. PSN names are trimmed to 32 characters.
+
+Accounts / leaderboard (server side)
+- Log Out now warns that an anonymous account can't be signed back into;
+  "Sign In / Create Account" renamed to "Create Free Account" (there is no
+  sign-in). The "known Supabase issue" message was wrong -- it now just
+  says the display name didn't save.
+
+Release / packaging
+- Tag builds and the PyPI publish now run the test suite first and stop if
+  it fails.
+- Chocolatey marks TRACE.exe as a GUI app (no console window); package
+  description updated.
+- Website leaderboard reads the live car/track lists, so new GT7 cars show
+  up without editing the page.
+
 ## [0.4.1] - 2026-09-24
 
 GT7 update 1.71 (20 Aug 2026) overhauled the physics (tyre model, steering

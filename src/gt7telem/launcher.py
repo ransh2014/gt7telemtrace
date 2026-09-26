@@ -91,7 +91,7 @@ def _swap_content() -> tk.Frame:
 
 def _show_onboarding(from_menu: bool = False):
     """The one-time first-launch screen. `from_menu=True` means it was
-    reopened later via the "Sign In / Create Account" link on the tool menu
+    reopened later via the "Create Free Account" link on the tool menu
     (ONBOARDING_DONE is already True in that case) -- Skip/Back should just
     return to the menu rather than touching that flag again."""
     f = _swap_content()
@@ -201,14 +201,13 @@ def _show_onboarding(from_menu: bool = False):
             _show_menu()
             return
         # Account/session creation itself worked -- only the display-name
-        # sync failed (a known upstream Supabase auth issue). Say so
-        # honestly instead of silently swallowing it and looking done;
-        # the account still works fine, submissions just use whatever
-        # name you type at submit time either way.
+        # write failed (network). Say so instead of silently looking done;
+        # the account still works, submissions use the name typed at
+        # submit time either way.
         status.config(
-            text="Account created — display name didn't sync to the "
-                 "server (known Supabase issue on their end). Doesn't "
-                 "affect using TRACE.", fg=PINK)
+            text="Account created — the display name didn't save (network "
+                 "hiccup). Doesn't matter: leaderboard rows use the name you "
+                 "type when submitting.", fg=PINK)
         root.after(2200, _show_menu)
 
     create_btn.config(command=do_create)
@@ -250,7 +249,7 @@ def _show_menu():
               font=("Segoe UI", 8), fg=DIM2, bg=BG).pack(side="left", padx=24)
 
     if not config.SUPABASE_ACCESS_TOKEN:
-        link = tk.Label(foot, text="Sign In / Create Account",
+        link = tk.Label(foot, text="Create Free Account",
                          font=("Segoe UI", 9, "underline"), fg=CYN, bg=BG,
                          cursor="hand2")
         link.pack(side="right", padx=24)
@@ -265,9 +264,21 @@ def _show_menu():
 
 def _do_logout():
     """Clear the local Supabase session so the account menu shows signed-out
-    state again. This only forgets the session on this machine -- it does
-    not delete the account itself. PSN_NAME is left alone so it still
-    pre-fills next time this or another account signs in."""
+    state again. PSN_NAME is left alone so it still pre-fills next time.
+
+    Accounts are anonymous (no email/password), so there is no way to sign
+    back into one after logging out -- the laps already submitted stay on
+    the leaderboard but can't be edited or deleted from here any more.
+    Warn before doing it."""
+    from tkinter import messagebox
+    if not messagebox.askyesno(
+            "Log out?",
+            "TRACE accounts have no email or password, so once you log out "
+            "you can't sign back into this one.\n\n"
+            "Laps you've already submitted stay on the leaderboard, but you "
+            "won't be able to manage them. You can create a new free account "
+            "any time.\n\nLog out anyway?", parent=root):
+        return
     config.SUPABASE_ACCESS_TOKEN = ""
     config.SUPABASE_REFRESH_TOKEN = ""
     config.SUPABASE_USER_ID = ""

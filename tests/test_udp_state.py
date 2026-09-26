@@ -27,7 +27,7 @@ def race(monkeypatch):
         "_race_active": False, "_speed_hold_start": None, "_prev_paused": False,
         "_prev_loading": False, "_grid_start_armed_until": 0.0, "_event_callbacks": {},
         "_debug_prev_state": {}, "_incidents": [], "_fuel_hist": deque(),
-        "_last_incident_t": {}, "_last_mix_change_t": None,
+        "_last_incident_t": {}, "_last_mix_change_t": None, "_loading_since": None,
     }.items():
         monkeypatch.setattr(udp, name, value)
 
@@ -35,10 +35,10 @@ def race(monkeypatch):
     for event in ("race_start", "race_end"):
         udp.register_event(event, lambda parsed, event=event: fired.append(event))
 
-    def drive(lap, total, speed, seconds, hz=60):
+    def drive(lap, total, speed, seconds, hz=60, loading=False):
         for _ in range(int(seconds * hz)):
             udp._check_events({
-                "paused": False, "car_on_track": True, "loading": False,
+                "paused": False, "car_on_track": True, "loading": loading,
                 "speed_kmh": speed, "lap_number": lap, "total_laps": total,
                 "track_position": 0.0, "fuel_remaining": 50.0,
             })
@@ -63,6 +63,39 @@ def test_the_next_race_still_starts_after_a_finished_one(race):
     drive(lap=4, total=3, speed=120, seconds=5)
     drive(lap=1, total=5, speed=150, seconds=5)
     assert fired == ["race_start", "race_end", "race_start"]
+
+
+def test_time_trial_driving_never_starts_a_race(race):
+    """Time trial / practice report total_laps == 0. A rolling start used to
+    fire there after 2 s at 80 km/h and the "race" never ended."""
+    drive, fired = race
+    drive(lap=1, total=0, speed=200, seconds=30)
+    drive(lap=2, total=0, speed=200, seconds=30)
+    assert fired == []
+    assert udp._race_active is False
+
+
+def test_quitting_mid_race_ends_it_and_the_next_race_starts(race):
+    drive, fired = race
+    drive(lap=2, total=5, speed=150, seconds=5)
+    drive(lap=2, total=5, speed=0, seconds=0.5, loading=True)   # brief blip: still racing
+    assert fired == ["race_start"]
+    drive(lap=2, total=5, speed=0, seconds=2, loading=True)     # quit to menu
+    assert fired == ["race_start", "race_end"]
+    drive(lap=1, total=3, speed=150, seconds=5)
+    assert fired == ["race_start", "race_end", "race_start"]
+
+
+def test_is_connected_goes_false_when_packets_stop(monkeypatch):
+    now = [500.0]
+    monkeypatch.setattr(udp.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(udp, "_connected", True)
+    monkeypatch.setattr(udp, "_last_packet_mono", 500.0)
+    assert udp.is_connected()
+    now[0] += udp.STALE_AFTER - 0.1
+    assert udp.is_connected()
+    now[0] += 0.2
+    assert not udp.is_connected()
 
 
 def _plain_packet(lap, x):
@@ -187,3 +220,25 @@ def test_no_refuel_no_pit():
     from gt7telem.race_analyst import _infer_pit_flag
     df = pd.DataFrame({"speed_kmh": np.full(20, 50.0), "fuel_remaining": np.linspace(50, 40, 20)})
     assert _infer_pit_flag(df).sum() == 0
+
+
+def test_partial_last_lap_is_not_the_best_lap():
+    """A recording stopped mid-lap (or ended on the cool-down lap) left a
+    short final segment that became "Best Lap" and skewed the average."""
+    pytest.importorskip("tkinter")
+    from gt7telem.race_analyst import build_stats, lap_split_stats
+    hz = 10
+    laps = [1] * 950 + [2] * 950 + [3] * 150          # lap 3 stopped after 15 s
+    n = len(laps)
+    df = pd.DataFrame({
+        "t": np.arange(n) / hz, "lap_number": laps, "speed_kmh": 150.0,
+        "brake": 0.0, "throttle": 1.0, "lat_g": 0.0, "long_g": 0.0,
+        "fuel_remaining": np.linspace(80, 70, n), "coasting": 0.0, "pit_flag": 0.0,
+        "current_position": [3] * 20 + [-1] * (n - 20), "total_positions": [16] * 20 + [-1] * (n - 20),
+    })
+    splits = lap_split_stats(df)
+    assert [s["complete"] for s in splits] == [True, True, False]
+    stats = build_stats({"race_duration_s": n / hz}, df)
+    assert stats["Best Lap"] == "1:35.000"
+    assert stats["Laps"] == "2 (+1 partial)"
+    assert stats["Grid Pos"] == "P3"

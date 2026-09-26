@@ -53,9 +53,10 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Real-time speed, RPM, gear, throttle/brake, tyre temps & slip
 - Mini track map with live position
 - Configurable recording sample rate (10/20/30/60 Hz)
-- Live delta vs. a reference lap
+- Live delta vs. your best lap in the same car on the same track (`reference_<car>.json`)
 - Connection diagnostics — heartbeats, packet loss, decrypt/parse failures, actionable error messages
 - Remembers every PS4/PS5 IP you've connected to (most recent first), plus an Auto-Detect button that finds the console on your network
+- Automatic race recording — starts on a detected race start (race sessions only, not time trial/practice), stops at the flag or when you quit
 - Incident timeline
 - Lap history table with alerts
 
@@ -70,6 +71,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 ### Race Analyst
 - Same chart-group depth as Lap Analyst (15 groups, race-oriented: Race overview + Laps in place of Sectors + Extended)
 - Race timeline, minimap heatmap, replay with speed control up to 32×
+- Per-lap splits (a partial final lap is shown but never counts as best/average), starting grid slot, and pit stops worked out from refuelling — GT7 sends no pit flag or live race position
 
 ### Tooling
 - `gt7telem-add-car` / `gt7telem-add-track` — add a missing car/track ID to the local database from the terminal (also runnable as `python -m gt7telem.add_car` / `python -m gt7telem.add_track`). Additions are saved beside `settings.json` (`car_ids_local.csv` / `course_ids_local.csv`), so they survive upgrades
@@ -77,7 +79,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 ### Community Leaderboard (Lap Analyst)
 - Submit any recorded lap to a public per-car, per-track leaderboard with one click; live Top-10 panel in the sidebar
-- Server-side anti-cheat — physically-impossible times are rejected outright, times beating the record by more than 20% are held for manual review
+- Server-side anti-cheat — physically-impossible times are rejected outright; times beating the record by more than 20%, and suspiciously fast first times for a car/track, are held for manual review
 - Ghost lap download — pull any Top-10 lap straight into the A/B compare view as Lap B
 - Consensus racing line — overlay a community-average speed/throttle/brake line, bucketed from the current top 10 laps for your car and track
 - Optional free account (display name only, no email or password) so a submission ties to something real; entirely skippable — viewing the leaderboard, ghost downloads, and the consensus line all work without one

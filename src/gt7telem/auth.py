@@ -17,10 +17,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-__all__ = ["sign_up_anonymous", "refresh_session", "set_display_name"]
+__all__ = ["sign_up_anonymous", "refresh_session", "set_display_name", "last_refresh_error"]
 
 _SUPABASE_URL = "https://hignsvyojdqsjoidgkud.supabase.co"
 _SUPABASE_ANON_KEY = "sb_publishable_OdzGvcypa0GI7TVxxUkusQ_KJ_Apa8i"
+
+# Why the last refresh_session() call failed: "invalid" (the server rejected
+# the refresh token -- the account was logged out elsewhere or removed as
+# unused), "network" (couldn't reach it / server error), or None (success).
+# Callers use it to tell "sign in again" apart from "try again later"
+# without refresh_session() having to raise.
+last_refresh_error = None
 
 
 def _parse_session(body: dict) -> dict:
@@ -62,8 +69,10 @@ def refresh_session(refresh_token: str, timeout: float = 8):
     old one expires (Supabase access tokens are short-lived, ~1h). Returns
     the same {"access_token", "refresh_token", "user_id"} shape as
     sign_up_anonymous() on success, None on any failure (including an
-    empty/missing refresh_token). Never raises."""
+    empty/missing refresh_token). Never raises; sets last_refresh_error."""
+    global last_refresh_error
     if not refresh_token:
+        last_refresh_error = "invalid"
         return None
     try:
         data = json.dumps({"refresh_token": refresh_token}).encode("utf-8")
@@ -77,8 +86,14 @@ def refresh_session(refresh_token: str, timeout: float = 8):
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             session = _parse_session(json.loads(resp.read().decode("utf-8")))
+            last_refresh_error = None if session["access_token"] else "network"
             return session if session["access_token"] else None
+    except urllib.error.HTTPError as e:
+        # 400/401/403 = token rejected; 5xx = server trouble, not the token.
+        last_refresh_error = "invalid" if 400 <= e.code < 500 else "network"
+        return None
     except Exception:
+        last_refresh_error = "network"
         return None
 
 

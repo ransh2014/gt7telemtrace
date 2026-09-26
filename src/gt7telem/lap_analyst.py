@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import math
+import os
 import threading
 import time
 import tkinter as tk
@@ -91,6 +92,9 @@ def load_lap_data(data):
     for col in ["surface_type", "car_category"]:
         if col not in df: df[col] = ""
     df = df.fillna(0)
+    # GT7 sends suspension height in metres; every chart labels it mm.
+    for _c in ("susp_fl", "susp_fr", "susp_rl", "susp_rr"):
+        df[_c] = df[_c] * 1000.0
     dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
     dv = df["speed_kmh"].diff().fillna(0) / 3.6
     df["long_g"]       = (dv / dt / 9.81).clip(-4, 4)
@@ -287,9 +291,9 @@ def draw_engine(fig, df, dfb=None):
     ax2.set_ylabel("RPM", color=C["rpm"], fontsize=7)
     ax2.tick_params(colors=DIM, labelsize=7); _ax(axs[0,1], "RPM + Gear", yl="")
     _L(axs[0,2], df, x, "boost",            ORG, fill=True); _ax(axs[0,2], "Boost",         yl="bar")
-    _L(axs[1,0], df, x, "oil_temp",         ACC);            _ax(axs[1,0], "Oil Temp",       yl="°C")
-    _L(axs[1,1], df, x, "water_temp",       CYN);            _ax(axs[1,1], "Water Temp",     yl="°C")
-    _L(axs[1,2], df, x, "oil_pressure",     GRN);            _ax(axs[1,2], "Oil Pressure",   yl="kPa")
+    _L(axs[1,0], df, x, "oil_temp",         ACC);            _ax(axs[1,0], "Oil Temp (GT7 constant)", yl="°C")
+    _L(axs[1,1], df, x, "water_temp",       CYN);            _ax(axs[1,1], "Water Temp (GT7 constant)", yl="°C")
+    _L(axs[1,2], df, x, "oil_pressure",     GRN);            _ax(axs[1,2], "Oil Pressure",   yl="bar")
     _L(axs[2,0], df, x, "rpm_after_clutch", PRP);            _ax(axs[2,0], "RPM @ Clutch")
     axs[2,1].hist(df["rpm"], bins=40, color=C["rpm"], alpha=0.85, edgecolor="none", label="A")
     _ax(axs[2,1], "RPM Distribution", xl="RPM", yl="Count"); axs[2,1].grid(False)
@@ -431,7 +435,7 @@ def draw_gforce(fig, df, dfb=None):
 def draw_fuel(fig, df, dfb=None):
     axs = fig.subplots(2, 3); fig.subplots_adjust(hspace=0.52, wspace=0.4)
     x = "track_position"
-    _L(axs[0,0], df, x, "fuel_remaining", GRN, fill=True); _ax(axs[0,0], "Fuel Remaining",  yl="L/kWh")
+    _L(axs[0,0], df, x, "fuel_remaining", GRN, fill=True); _ax(axs[0,0], "Fuel Remaining",  yl="% (GT7)")
     _L(axs[0,1], df, x, "fuel_burn",      ORG);            _ax(axs[0,1], "Fuel Burn Rate",   yl="L/s")
     axs[0,2].fill_between(df[x], df["coasting"], alpha=0.6, color=DIM2, step="post")
     _ax(axs[0,2], "Coasting Zones", yl="1=coasting")
@@ -961,7 +965,7 @@ def draw_extended(fig, df, dfb=None):
         surf_map = {"T": 0, "C": 1, "D": 2, "G": 3, "S": 4, "s": 5}
         code = df["surface_type"].astype(str).str[0].map(surf_map).fillna(0)
         gf = df.copy(); gf["surf_code"] = code.astype(float)
-        _track_map(axs[2,0], gf, "surf_code", "tab10", "Surface (FL) — 0=T 1=C 2=D 3=G 4=S 5=s")
+        _track_map(axs[2,0], gf, "surf_code", "tab10", "Surface (FL) — 0=Tarmac 1=Kerb 2=Dirt 3=Grass 4=Sand 5=Snow")
     else:
         axs[2,0].text(0.5,0.5,"No surface/GPS data",ha="center",va="center",color=DIM,fontsize=9)
         axs[2,0].axis("off")
@@ -1498,6 +1502,7 @@ class AnalystApp(tk.Tk):
         self.minsize(1100, 700)
         self._da = self._dfa = None
         self._db = self._dfb = None
+        self._path_a = None
         self._consensus_line = None
         self._cfigs        = {}
         self._group_names  = []
@@ -1599,6 +1604,30 @@ class AnalystApp(tk.Tk):
                               insertbackground=CYN, relief="flat",
                               wrap="word", padx=4, pady=4)
         self._notes.pack(fill="x", padx=8, pady=4)
+        tk.Button(fn, text="💾  Save Notes", command=self._save_notes,
+                  bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
+
+    def _save_notes(self):
+        """Notes used to live only in the text box and were lost on close.
+        They're stored in Lap A's own JSON file under "notes" (written via a
+        temp file so a failed write can't corrupt the lap)."""
+        if self._da is None or not self._path_a:
+            messagebox.showinfo("Lap Notes", "Load Lap A from a file first."); return
+        notes = self._notes.get("1.0", "end").strip()
+        path = Path(self._path_a)
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            data["notes"] = notes
+            tmp = path.with_name(path.name + ".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, path)
+            self._da["notes"] = notes
+            messagebox.showinfo("Lap Notes", "Notes saved with this lap.")
+        except Exception as e:
+            messagebox.showerror("Lap Notes", f"Couldn't save notes:\n{e}")
 
     def _update_stats(self, data, df):
         for w in self._sf.winfo_children(): w.destroy()
@@ -1687,6 +1716,9 @@ class AnalystApp(tk.Tk):
         lbl = lap_label(data)
         if slot == "a":
             self._da, self._dfa = data, df
+            self._path_a = path
+            self._notes.delete("1.0", "end")
+            self._notes.insert("1.0", data.get("notes", ""))
             self._la.config(text=lbl, fg=CYN)
             self._update_stats(data, df)
             self._update_sectors(df)
@@ -1768,12 +1800,15 @@ class AnalystApp(tk.Tk):
         b64 = base64.b64encode(buf.getvalue()).decode()
         html = (
             "<!DOCTYPE html><html><head>"
-            f"<title>GT7 Analyst — {name}</title>"
+            # Written as UTF-8 below; without this a browser opening the file
+            # over file:// guesses the locale encoding and the dash garbles.
+            '<meta charset="utf-8">'
+            f"<title>TRACE Lap Analyst — {name}</title>"
             "<style>body{background:#07080f;display:flex;justify-content:center;"
             "align-items:flex-start;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}"
             "img{max-width:100%;border-radius:8px;box-shadow:0 0 30px #00f0d444}"
             "h3{color:#00f0d4;font-family:monospace;text-align:center}</style></head>"
-            f"<body><div><h3>GT7 Lap Analyst — {name}</h3>"
+            f"<body><div><h3>TRACE Lap Analyst — {name}</h3>"
             f"<img src='data:image/png;base64,{b64}'></div></body></html>"
         )
         Path(path).write_text(html, encoding="utf-8")
@@ -1907,7 +1942,7 @@ class AnalystApp(tk.Tk):
             f"Submitting: {car} @ {track}  —  {lap_time_ms/1000:.3f}s\n\nPSN name:",
             initialvalue=runtime_config.PSN_NAME, parent=self)
         if not psn: return
-        psn = psn.strip()
+        psn = " ".join(psn.split())[:32]   # the leaderboard accepts 1-32 characters
         if not psn: return
         runtime_config.PSN_NAME = psn
         runtime_config.save(PSN_NAME=psn)
@@ -1919,6 +1954,11 @@ class AnalystApp(tk.Tk):
                 user_id=runtime_config.SUPABASE_USER_ID)
             if not ok and reason == "server":
                 session = auth.refresh_session(runtime_config.SUPABASE_REFRESH_TOKEN)
+                if not session and auth.last_refresh_error == "invalid":
+                    # Refresh token rejected: the anonymous account is gone
+                    # (logged out elsewhere, or removed as an unused account).
+                    # A network failure keeps the session and says "server".
+                    reason = "session"
                 if session:
                     runtime_config.SUPABASE_ACCESS_TOKEN = session["access_token"]
                     runtime_config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
@@ -2024,8 +2064,9 @@ class AnalystApp(tk.Tk):
             # Say so briefly instead of closing as if nothing happened.
             set_busy(False)
             status.config(
-                text="Account created — display name didn't sync (known "
-                     "Supabase issue). Continuing anyway...", fg=ACC)
+                text="Account created — the display name didn't save. "
+                     "Submissions use the name you type when submitting, so "
+                     "this doesn't matter. Continuing...", fg=ACC)
             win.after(1800, win.destroy)
 
         create_btn.config(command=do_create)
@@ -2039,6 +2080,16 @@ class AnalystApp(tk.Tk):
             messagebox.showinfo("Submit to Leaderboard",
                                  "Submitted! If it's a new top time it'll appear on the leaderboard shortly.")
             self._refresh_top10()
+        elif reason == "session":
+            runtime_config.SUPABASE_ACCESS_TOKEN = ""
+            runtime_config.SUPABASE_REFRESH_TOKEN = ""
+            runtime_config.SUPABASE_USER_ID = ""
+            runtime_config.save(SUPABASE_ACCESS_TOKEN="", SUPABASE_REFRESH_TOKEN="", SUPABASE_USER_ID="")
+            messagebox.showinfo("Submit to Leaderboard",
+                                "Your leaderboard account on this PC is no longer valid. "
+                                "Create a new free account (just a display name) and submit again.")
+            if self._prompt_create_account():
+                self._submit_leaderboard()
         elif reason == "server":
             messagebox.showerror("Submit to Leaderboard",
                                   "The server rejected the submission -- this is a server-side issue, "

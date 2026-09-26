@@ -35,6 +35,8 @@ HEARTBEAT_EVERY = 1.0
 _latest       = {}
 _lock         = threading.Lock()
 _connected    = False
+_last_packet_mono = None   # time.monotonic() of the last packet that decoded and parsed
+STALE_AFTER   = 2.0        # seconds without a good packet before is_connected() reports False
 _source       = None
 _track        = "unknown_track"
 _car          = "unknown_car"
@@ -164,6 +166,8 @@ GRID_START_ARM_WINDOW = 8.0 # seconds after a loading->grid transition during
                              # still in a menu/garage (also car_on_track=True)
                              # will NOT trigger a race start.
 _prev_loading         = False
+_loading_since        = None   # when a mid-race loading screen began (see RACE_ABANDON_LOADING_S)
+RACE_ABANDON_LOADING_S = 1.0   # loading this long while a race is active = quit/restart
 _grid_start_armed_until = 0.0
 
 # Debug state tracking -- fires a 'debug_state' event any time loading,
@@ -303,7 +307,7 @@ def _check_events(parsed):
       - Grid start:    speed ~= 0 and car_on_track True (stationary on the grid)
     car_on_track alone is NOT used by itself -- it's also true while sitting in
     menus/replay, so it's only trusted here in the grid-start combo with speed."""
-    global _prev_paused, _race_active, _speed_hold_start, _prev_loading, _grid_start_armed_until
+    global _prev_paused, _race_active, _speed_hold_start, _prev_loading, _grid_start_armed_until, _loading_since
 
     paused       = parsed.get("paused", False)
     car_on_track = parsed.get("car_on_track", False)
@@ -343,8 +347,13 @@ def _check_events(parsed):
     if race_over:
         _speed_hold_start = None
     elif not _race_active:
-        # Rolling start: sustained speed above threshold
-        if speed >= ROLLING_START_KPH:
+        # Rolling start: sustained speed above threshold -- only inside a
+        # race session (total_laps > 0), the same gate the grid start uses.
+        # Time trial / practice / free run report total_laps == 0, and 2 s at
+        # 80 km/h there used to start a "race" that never ended (lap_number
+        # never passes total_laps == 0), recording the whole session and
+        # blocking detection of the next real race.
+        if speed >= ROLLING_START_KPH and total_laps > 0:
             if _speed_hold_start is None:
                 _speed_hold_start = now
             elif now - _speed_hold_start >= ROLLING_START_HOLD:
@@ -355,7 +364,7 @@ def _check_events(parsed):
                 _last_incident_t.clear()
                 _fire_event("race_start", parsed)
         else:
-            _speed_hold_start = None  # speed dropped -- reset the hold timer
+            _speed_hold_start = None  # speed dropped (or not a race) -- reset the hold timer
 
         # Grid start: stationary and on track, only within the arm window
         # right after a loading screen ends, AND only when total_laps is
@@ -382,11 +391,33 @@ def _check_events(parsed):
         # last lap. Watch lap_number cross past total_laps instead (e.g. 11/10).
         if total_laps > 0 and lap_number > total_laps:
             _race_active = False
+            _loading_since = None
             _fire_event("race_end", parsed)
+        # Quit / restart mid-race: GT7 shows a loading screen. Without this
+        # the race stayed "active" forever and the next race was never
+        # detected. Debounced so a single-packet loading blip can't end it.
+        elif loading:
+            if _loading_since is None:
+                _loading_since = now
+            elif now - _loading_since >= RACE_ABANDON_LOADING_S:
+                _race_active = False
+                _loading_since = None
+                _fire_event("race_end", dict(parsed, race_abandoned=True))
+        else:
+            _loading_since = None
 
 def set_track(name: str) -> None: global _track; _track = name
 def set_car(name: str) -> None:   global _car;   _car   = name
-def is_connected() -> bool:  return _connected
+def is_connected() -> bool:
+    """True while good packets are arriving. GT7 streams ~60 packets/s, so
+    STALE_AFTER seconds of silence means the console stopped (game closed,
+    PS asleep, network dropped). This used to stay True forever after the
+    first packet: the Dashboard kept showing LIVE and the recorders kept
+    appending the last frozen frame ~10 times a second."""
+    if not _connected:
+        return False
+    last = _last_packet_mono
+    return last is None or (time.monotonic() - last) < STALE_AFTER
 def get_ip() -> str:         return _ps4_ip
 
 def set_ip(new_ip: str) -> None:
@@ -610,7 +641,7 @@ def _parse(data):
         slip_rl = (tyre_spd_rl / speed_kmh) if speed_kmh > 1 else 1.0
         slip_rr = (tyre_spd_rr / speed_kmh) if speed_kmh > 1 else 1.0
 
-        susp_fl = f(0xC4);  susp_fr = f(0xC8)
+        susp_fl = f(0xC4);  susp_fr = f(0xC8)   # suspension height, metres
         susp_rl = f(0xCC);  susp_rr = f(0xD0)
 
         best_lap_ms = i(0x78)
@@ -618,6 +649,11 @@ def _parse(data):
 
         packet_id       = i(0x70)
         total_laps      = h(0x76)
+        # NOT a live race position: GT7 sends the starting-grid slot and the
+        # number of cars *before* the start, and -1 for both once the race is
+        # under way (Nenkai/PDTools PreRaceStartPositionOrQualiPos /
+        # NumCarsAtPreRace). Field names kept for saved-file compatibility;
+        # grid_position / grid_cars below are the honest aliases.
         current_pos     = h(0x84)
         total_positions = h(0x86)
 
@@ -628,7 +664,8 @@ def _parse(data):
 
         oil_temp        = f(0x5C)
         water_temp      = f(0x58)
-        oil_pressure    = f(0x54)
+        oil_pressure    = f(0x54)   # bar
+        # water_temp / oil_temp: GT7 sends constants (85 / 110 C), not a simulation
         ride_height     = f(0x38) * 1000
 
         clutch           = f(0xF4)
@@ -778,6 +815,8 @@ def _parse(data):
             "total_laps":       total_laps,
             "current_position": current_pos,
             "total_positions":  total_positions,
+            "grid_position":    current_pos if current_pos > 0 else None,
+            "grid_cars":        total_positions if total_positions > 0 else None,
             "best_lap_ms":      best_lap_ms,
             "last_lap_ms":      last_lap_ms,
             "in_pit":           in_pit,
@@ -828,7 +867,7 @@ def _normalise_steering(angle, source, heading_estimate, car_id, speed_kmh):
     _steer_lock[key] = lock
     # Only learn the sign from clear, moving turns -- parked or straight-line
     # noise would make it flap.
-    if speed_kmh > 30.0 and abs(heading_estimate) > 0.02 and abs(angle) > 0.02:
+    if speed_kmh > 30.0 and abs(heading_estimate) > 0.005 and abs(angle) > 0.02:
         _steer_corr += angle * heading_estimate
     if _steer_corr == 0.0:
         return None   # sign not learned yet (no clear turn so far) -- caller keeps the estimate
@@ -845,9 +884,11 @@ def _ingest(raw):
     if parsed is None:
         _diag_incr("parse_failures")
         return
+    global _last_packet_mono
     with _lock:
         _latest    = parsed
         _connected = True
+        _last_packet_mono = time.monotonic()
     _diag_update(last_good_packet_at=time.time())
     _check_events(parsed)
 

@@ -19,7 +19,25 @@ on:
       - "v*.*.*"
 
 jobs:
+  test:
+    # Gate: a tag must not publish or build a release whose tests fail.
+    # (These release workflows used to run straight off the tag, in parallel
+    # with -- and regardless of -- CI.)
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Tk (Race Analyst tests import tkinter)
+        run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m ruff check .
+      - run: xvfb-run -a python -m pytest tests/ -q
+
   build:
+    needs: test
     name: Build distribution
     runs-on: ubuntu-latest
     steps:

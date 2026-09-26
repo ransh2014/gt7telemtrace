@@ -82,6 +82,9 @@ def load_race(path):
                 "total_positions","in_pit","t"]:
         if col not in df: df[col] = 0.0
     df = df.fillna(0)
+    # GT7 sends suspension height in metres; every chart labels it mm.
+    for _c in ("susp_fl", "susp_fr", "susp_rl", "susp_rr"):
+        df[_c] = df[_c] * 1000.0
     df = df.sort_values("t").reset_index(drop=True)
     dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
     dv = df["speed_kmh"].diff().fillna(0) / 3.6
@@ -98,7 +101,7 @@ def load_race(path):
     return data, df
 
 PIT_LANE_MAX_KPH = 100.0   # generous: GT7 pit limiters are 60-80 km/h
-REFUEL_MIN_JUMP  = 0.5     # fuel units (L / % / kWh) gained between two samples
+REFUEL_MIN_JUMP  = 0.5     # fuel % gained between two samples
 
 def _infer_pit_flag(df):
     """GT7 has no known "in pit" bit (see udp.py), so `in_pit` is always
@@ -176,8 +179,13 @@ def get_lap_segments(df):
     return [s for s in segs if len(s) >= 3]
 
 def lap_split_stats(df):
-    """Returns list of dicts: lap, time_s, avg_speed, top_speed, brake%, throttle%, max_lat_g"""
+    """Returns list of dicts: lap, time_s, complete, avg_speed, top_speed,
+    brake%, throttle%, max_lat_g. `complete` is False for the last lap when
+    the recording stopped before its line (manual stop, quit, or a race that
+    ended on the cool-down lap) -- such a partial lap used to become the
+    "Best Lap" and drag the average down."""
     segs = get_lap_segments(df)
+    last_lap_seen = int(df["lap_number"].iloc[-1]) if len(df) else 0
     # Lap 0 is the grid / pre-start roll, not a lap.
     if len(segs) > 1:
         segs = [s for s in segs if int(s["lap_number"].iloc[0]) != 0] or segs
@@ -187,9 +195,11 @@ def lap_split_stats(df):
         # otherwise every lap loses one sample interval (up to 0.1s at 10 Hz).
         end_t = segs[i]["t"].iloc[0] if i < len(segs) else seg["t"].iloc[-1]
         lap_time = float(end_t - seg["t"].iloc[0])
+        lap_no = int(seg["lap_number"].iloc[0])
         out.append({
-            "lap": int(seg["lap_number"].iloc[0]) or i,
+            "lap": lap_no or i,
             "time_s": lap_time,
+            "complete": i < len(segs) or last_lap_seen > lap_no,
             "avg_speed": float(seg["speed_kmh"].mean()),
             "top_speed": float(seg["speed_kmh"].max()),
             "brake_pct": float(seg["brake"].mean() * 100),
@@ -204,14 +214,15 @@ def count_pit_stops(df):
 
 def build_stats(data, df):
     splits = lap_split_stats(df)
-    lap_times = [s["time_s"] for s in splits if s["time_s"] > 1]
+    lap_times = [s["time_s"] for s in splits if s["complete"] and s["time_s"] > 1]
     best_lap = min(lap_times) if lap_times else 0
     avg_lap  = float(np.mean(lap_times)) if lap_times else 0
     fuel_used = df["fuel_remaining"].iloc[0] - df["fuel_remaining"].iloc[-1]
     dur = data.get("race_duration_s", df["t"].iloc[-1] - df["t"].iloc[0])
     return {
         "Duration":     fmt_dur(dur),
-        "Laps":         f"{len(splits)}",
+        "Laps":         f"{len(lap_times)}" + (f" (+{len(splits) - len(lap_times)} partial)"
+                                                    if len(splits) > len(lap_times) else ""),
         "Best Lap":     fmt_dur(best_lap) if best_lap else "--",
         "Avg Lap":      fmt_dur(avg_lap) if avg_lap else "--",
         "Samples":      f"{len(df)}",
@@ -223,7 +234,9 @@ def build_stats(data, df):
         "Max Long G":   f"{df['long_g'].abs().max():.2f}g",
         "Fuel Used":    f"{fuel_used:.2f}",
         "Pit Stops":    f"{count_pit_stops(df)}",
-        "Best Pos":     f"{int(df['current_position'][df['current_position']>0].min())}"
+        # GT7 only sends the starting-grid slot (-1 once racing), so this
+        # is where the race started from -- there is no live/finish position.
+        "Grid Pos":     f"P{int(df['current_position'][df['current_position']>0].iloc[0])}"
                         if (df['current_position']>0).any() else "--",
     }
 
@@ -306,9 +319,9 @@ def draw_engine(fig, df, dfb=None):
     ax2.set_ylabel("RPM", color=C["rpm"], fontsize=7)
     ax2.tick_params(colors=DIM, labelsize=7); _ax(axs[0,1], "RPM + Gear", yl="")
     _L(axs[0,2], df, x, "boost",            ORG, fill=True); _ax(axs[0,2], "Boost",         yl="bar")
-    _L(axs[1,0], df, x, "oil_temp",         ACC);            _ax(axs[1,0], "Oil Temp",       yl="°C")
-    _L(axs[1,1], df, x, "water_temp",       CYN);            _ax(axs[1,1], "Water Temp",     yl="°C")
-    _L(axs[1,2], df, x, "oil_pressure",     GRN);            _ax(axs[1,2], "Oil Pressure",   yl="kPa")
+    _L(axs[1,0], df, x, "oil_temp",         ACC);            _ax(axs[1,0], "Oil Temp (GT7 constant)", yl="°C")
+    _L(axs[1,1], df, x, "water_temp",       CYN);            _ax(axs[1,1], "Water Temp (GT7 constant)", yl="°C")
+    _L(axs[1,2], df, x, "oil_pressure",     GRN);            _ax(axs[1,2], "Oil Pressure",   yl="bar")
     _L(axs[2,0], df, x, "rpm_after_clutch", PRP);            _ax(axs[2,0], "RPM @ Clutch")
     axs[2,1].hist(df["rpm"], bins=40, color=C["rpm"], alpha=0.85, edgecolor="none", label="A")
     _ax(axs[2,1], "RPM Distribution", xl="RPM", yl="Count"); axs[2,1].grid(False)
@@ -449,7 +462,7 @@ def draw_gforce(fig, df, dfb=None):
 def draw_fuel(fig, df, dfb=None):
     axs = fig.subplots(2, 3); fig.subplots_adjust(hspace=0.52, wspace=0.4)
     x = X
-    _L(axs[0,0], df, x, "fuel_remaining", GRN, fill=True); _ax(axs[0,0], "Fuel Remaining",  yl="L/kWh")
+    _L(axs[0,0], df, x, "fuel_remaining", GRN, fill=True); _ax(axs[0,0], "Fuel Remaining",  yl="% (GT7)")
     refuels = df[df["fuel_remaining"].diff() > 1]
     if len(refuels):
         axs[0,0].scatter(refuels[x], refuels["fuel_remaining"], c=YLW, s=20, zorder=5, label="Refuel")
@@ -640,18 +653,21 @@ def draw_race(fig, df, dfb=None):
     axs = fig.subplots(2, 2); fig.subplots_adjust(hspace=0.45, wspace=0.32)
     x = X
 
-    has_pos = (df["current_position"] > 0).any()
-    if has_pos:
-        axs[0,0].step(df[x], df["current_position"], color=CYN, lw=1.5, where="post", label="A")
-        if dfb is not None and (dfb["current_position"] > 0).any():
-            axs[0,0].step(dfb[x], dfb["current_position"], color=ACC, lw=1.3, alpha=0.75,
-                          ls="--", where="post", label="B")
-            axs[0,0].legend(fontsize=7)
-        axs[0,0].invert_yaxis()
-        _ax(axs[0,0], "Position Over Race", yl="Position")
-    else:
-        axs[0,0].text(0.5,0.5,"No position data",ha="center",va="center",color=DIM)
-        axs[0,0].axis("off")
+    # GT7's telemetry has no live race position -- only the starting-grid
+    # slot, which reads -1 once the race is under way. The old "Position
+    # Over Race" chart was just that grid slot until the start.
+    def _grid(d):
+        g = d["current_position"][d["current_position"] > 0]
+        n = d["total_positions"][d["total_positions"] > 0]
+        return (f"P{int(g.iloc[0])}" + (f" of {int(n.iloc[0])}" if len(n) else "")) if len(g) else "--"
+    txt = f"Grid (A): {_grid(df)}"
+    if dfb is not None:
+        txt += f"\nGrid (B): {_grid(dfb)}"
+    axs[0,0].text(0.5, 0.6, txt, ha="center", va="center", color=FG, fontsize=12,
+                  transform=axs[0,0].transAxes)
+    axs[0,0].text(0.5, 0.25, "GT7 sends the starting grid slot only --\nno live race position",
+                  ha="center", va="center", color=DIM, fontsize=8, transform=axs[0,0].transAxes)
+    axs[0,0].axis("off")
 
     axs[0,1].fill_between(df[x], df["pit_flag"], alpha=0.6, color=ORG, step="post", label="A")
     if dfb is not None:
@@ -665,7 +681,7 @@ def draw_race(fig, df, dfb=None):
     if len(refuels):
         axs[1,0].scatter(refuels[x], refuels["fuel_remaining"], c=YLW, s=18, zorder=5)
     if dfb is not None: _Lb(axs[1,0], dfb, x, "fuel_remaining")
-    _ax(axs[1,0], "Fuel Over Race", yl="L/kWh")
+    _ax(axs[1,0], "Fuel Over Race", yl="% (GT7)")
 
     splits = lap_split_stats(df)
     if splits:
@@ -804,7 +820,7 @@ def draw_ratings(fig, df, dfb=None):
         has_sg = d["suggested_gear"].abs().max() > 0
         gear_m = float((d["gear"] == d["suggested_gear"]).mean() * 100) if has_sg else 60.0
         splits = lap_split_stats(d)
-        lap_times = [s["time_s"] for s in splits if s["time_s"] > 1]
+        lap_times = [s["time_s"] for s in splits if s["complete"] and s["time_s"] > 1]
         consist = (max(0.0, min(100.0, 100.0 - (np.std(lap_times) / max(1.0, np.mean(lap_times))) * 100))
                    if len(lap_times) > 1 else 60.0)
         slip_var = float(d[["tyre_slip_rl", "tyre_slip_rr"]].std().mean())
