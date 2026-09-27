@@ -23,6 +23,7 @@ if __name__ == "__main__" and (not __package__):
 
 import threading
 import tkinter as tk
+import webbrowser
 
 from . import __version__, analytics, auth, config, lap_analyst, race_analyst
 
@@ -32,17 +33,74 @@ from . import __version__, analytics, auth, config, lap_analyst, race_analyst
 from . import dashboard as gt7telem
 
 # ── Theme (matches the analysis tools) ──────────────────────────────────
-BG     = "#0a0e1a"
-PANEL  = "#10152a"
-PANEL2 = "#161c36"
-CYN    = "#00e5ff"
-PRP    = "#7c5cff"
-PINK   = "#ff5c8a"
-FG     = "#e8eaf6"
-DIM    = "#6b7290"
-DIM2   = "#333a5c"
+if config.THEME == "light":
+    BG     = "#f4f5fa"
+    PANEL  = "#ffffff"
+    PANEL2 = "#eceef5"
+    CYN    = "#0088aa"
+    PRP    = "#6a3fd6"
+    PINK   = "#c72d5c"
+    FG     = "#14162a"
+    DIM    = "#7a7f9a"
+    DIM2   = "#d7dae6"
+else:
+    BG     = "#0a0e1a"
+    PANEL  = "#10152a"
+    PANEL2 = "#161c36"
+    CYN    = "#00e5ff"
+    PRP    = "#7c5cff"
+    PINK   = "#ff5c8a"
+    FG     = "#e8eaf6"
+    DIM    = "#6b7290"
+    DIM2   = "#333a5c"
 
 WIN_W, WIN_H = 900, 650
+
+_LATEST_RELEASE_URL = None  # set by _check_for_update() if a newer tag exists
+
+
+def _check_for_update():
+    """Background: compare the installed version against GitHub's latest
+    release tag. Silent on any failure (offline, rate-limited, API shape
+    change) -- an update nag is a nice-to-have, never worth an error dialog.
+    Runs once per launch, only if the user hasn't turned it off."""
+    if not config.UPDATE_CHECK_ENABLED:
+        return
+
+    def worker():
+        global _LATEST_RELEASE_URL
+        try:
+            import json as _json
+            import urllib.request
+            req = urllib.request.Request(
+                "https://api.github.com/repos/ransh2014/gt7telemtrace/releases/latest",
+                headers={"Accept": "application/vnd.github+json", "User-Agent": "TRACE-updater"})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+            tag = str(data.get("tag_name", "")).lstrip("vV")
+            if not tag:
+                return
+            cur = tuple(int(p) for p in __version__.split(".") if p.isdigit())
+            new = tuple(int(p) for p in tag.split(".") if p.isdigit())
+            if new > cur:
+                _LATEST_RELEASE_URL = data.get("html_url") or \
+                    "https://github.com/ransh2014/gt7telemtrace/releases/latest"
+                if root is not None:
+                    root.after(0, lambda: _show_update_banner(tag))
+        except Exception:
+            pass  # offline / rate-limited / API changed -- fail silent
+
+    threading.Thread(target=worker, daemon=True).start()
+
+
+def _show_update_banner(new_version: str):
+    if _content is None:
+        return
+    bar = tk.Label(
+        _content, text=f"  🔔  TRACE {new_version} is available — click to open the release  ",
+        font=("Segoe UI", 9, "bold"), bg=PINK, fg="#ffffff", cursor="hand2")
+    bar.place(relx=0.5, rely=0.0, anchor="n")
+    bar.bind("<Button-1>", lambda e: webbrowser.open(_LATEST_RELEASE_URL))
 
 root = None
 _content = None   # the frame currently swapped into root (onboarding or menu)
@@ -248,6 +306,18 @@ def _show_menu():
     tk.Label(foot, text="community tool - not affiliated with Polyphony Digital",
               font=("Segoe UI", 8), fg=DIM2, bg=BG).pack(side="left", padx=24)
 
+    theme_lbl = tk.Label(
+        foot, text=("☀  Light" if config.THEME == "dark" else "🌙  Dark"),
+        font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG, cursor="hand2")
+    theme_lbl.pack(side="right", padx=(0, 24))
+    theme_lbl.bind("<Button-1>", lambda e: _toggle_theme())
+
+    backup_lbl = tk.Label(foot, text="🗄  Backup Laps",
+                           font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG,
+                           cursor="hand2")
+    backup_lbl.pack(side="right", padx=(0, 24))
+    backup_lbl.bind("<Button-1>", lambda e: _do_backup_laps())
+
     if not config.SUPABASE_ACCESS_TOKEN:
         link = tk.Label(foot, text="Create Free Account",
                          font=("Segoe UI", 9, "underline"), fg=CYN, bg=BG,
@@ -260,6 +330,31 @@ def _show_menu():
                          cursor="hand2")
         logout_link.pack(side="right", padx=24)
         logout_link.bind("<Button-1>", lambda e: _do_logout())
+
+
+def _toggle_theme():
+    """Flips the saved theme and asks the user to relaunch -- the color
+    constants above are module-level and used throughout every widget in
+    this file (and lap_analyst/race_analyst), so re-skinning live without
+    rebuilding every open window isn't worth the risk. Dashboard keeps its
+    own fixed dark palette regardless (its colors are inline, not themed)."""
+    new_theme = "light" if config.THEME == "dark" else "dark"
+    config.THEME = new_theme
+    config.save(THEME=new_theme)
+    from tkinter import messagebox
+    messagebox.showinfo(
+        "Theme",
+        f"Switched to {new_theme} mode. Close and reopen TRACE (or just "
+        f"the tool you launch next) to see it.", parent=root)
+
+
+def _do_backup_laps():
+    from tkinter import messagebox
+    path = config.backup_laps()
+    if path is None:
+        messagebox.showinfo("Backup Laps", "No laps found to back up yet.", parent=root)
+        return
+    messagebox.showinfo("Backup Laps", f"Saved to:\n{path}", parent=root)
 
 
 def _do_logout():
@@ -337,6 +432,9 @@ def main():
         _show_menu()
     else:
         _show_onboarding()
+
+    if config.UPDATE_CHECK_ENABLED:
+        _check_for_update()
 
     root.mainloop()
 

@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from . import __version__, leaderboard, metrics_server
+from . import __version__, leaderboard, metrics_server, notify
 from . import cars as car_db
 from . import config as runtime_config
 from . import tracks as track_db
@@ -1374,6 +1374,7 @@ class App(tk.Tk):
         if session.race_recording:
             self._stop_record_race()
             self.log_msg("Auto: race end detected -- recording saved")
+            notify.notify("🏁 Race Ended", "Recording saved.", root=self)
 
     def _on_pause(self, parsed):
         self.after(0, self._handle_pause)
@@ -1918,6 +1919,9 @@ class App(tk.Tk):
         if is_pb:
             self._write_personal_best(track, car_safe, ui_car or car, new_time, ts)
             self.log_msg(f"New personal best for {ui_car or car} @ {track}!")
+            m = int(new_time // 60); s = new_time % 60
+            notify.notify("🏆 New Personal Best", f"{ui_car or car} @ {track}\n{m}:{s:06.3f}",
+                           root=self)
 
         ref_time = 0.0
         if ref.exists():

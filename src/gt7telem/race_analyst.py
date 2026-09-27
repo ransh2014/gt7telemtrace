@@ -26,20 +26,35 @@ from matplotlib.patches import Polygon as MplPolygon
 warnings.filterwarnings("ignore")
 
 from . import __version__, leaderboard  # noqa: E402  (kept with the other package imports)
+from . import config as runtime_config  # noqa: E402
 
 # ── Theme (matches lap_analyst.py) ─────────────────────────────────────────────
-BG   = "#07080f"
-PNL  = "#0d0e1a"
-PNL2 = "#13141f"
-ACC  = "#ff2255"
-CYN  = "#00f0d4"
-GRN  = "#39ff85"
-YLW  = "#ffd500"
-ORG  = "#ff8c00"
-PRP  = "#b06aff"
-FG   = "#c8d3f5"
-DIM  = "#343856"
-DIM2 = "#232438"
+if runtime_config.THEME == "light":
+    BG   = "#f4f5fa"
+    PNL  = "#ffffff"
+    PNL2 = "#eceef5"
+    ACC  = "#d1004a"
+    CYN  = "#00897a"
+    GRN  = "#1c8a45"
+    YLW  = "#a67d00"
+    ORG  = "#c0621a"
+    PRP  = "#7a3fd6"
+    FG   = "#14162a"
+    DIM  = "#7a7f9a"
+    DIM2 = "#d7dae6"
+else:
+    BG   = "#07080f"
+    PNL  = "#0d0e1a"
+    PNL2 = "#13141f"
+    ACC  = "#ff2255"
+    CYN  = "#00f0d4"
+    GRN  = "#39ff85"
+    YLW  = "#ffd500"
+    ORG  = "#ff8c00"
+    PRP  = "#b06aff"
+    FG   = "#c8d3f5"
+    DIM  = "#343856"
+    DIM2 = "#232438"
 FONT  = ("Consolas", 9)
 FONTB = ("Consolas", 9, "bold")
 FONTL = ("Consolas", 8)

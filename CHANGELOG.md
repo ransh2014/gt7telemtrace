@@ -5,6 +5,36 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-27
+New features.
+
+Lap Analyst
+- New "Style" chart tab: driving-style classification (Smooth / Balanced /
+  Aggressive, from steering/throttle/brake rate-of-change) and cornering
+  balance (understeer- vs oversteer-leaning, from front vs rear tyre slip
+  while cornering), with an A/B comparison and a corner-by-corner scatter
+  of balance across the lap.
+- 3+ lap overlay: a new OVERLAY sidebar section lets you add any number of
+  extra saved laps on top of A/B; they're overlaid as dotted lines (speed/
+  throttle/brake/steering) on the Inputs tab, each in its own color.
+- Search/filter lap picker: Lap A/B/overlay "Browse" now opens a searchable
+  list (filter by car, track, or date) built from your saved laps' own
+  metadata, instead of a bare native file dialog.
+- "Backup All Laps" button (sidebar EXPORT section) zips your whole laps
+  folder to `~/TRACE/backups/`.
+- (Correction: Lap Notes/journal already existed as of 0.4.x -- no changes
+  needed there.)
+
+App-wide
+- Desktop notifications (with a sound where supported) on a new personal
+  best and when a race recording ends automatically.
+- Dark/light theme toggle (Launcher footer, applies on next tool launch;
+  Lap Analyst and Race Analyst also honor it).
+- In-app update checker: Launcher silently checks GitHub releases on
+  startup and shows a small banner when a newer version is available.
+- Local lap backup/export: `config.backup_laps()` + a "Backup Laps" link in
+  the Launcher footer, zips the laps folder to `~/TRACE/backups/`.
+
 ## [0.4.2] - 2026-09-25
 Full audit pass -- every module re-read and all three apps driven headless on
 synthetic GT7 telemetry; each fix below was reproduced before fixing.

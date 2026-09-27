@@ -15,7 +15,8 @@ from pathlib import Path
 __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_RATE", "KNOWN_IPS", "DEBUG_LOG",
            "ANALYTICS_ENABLED", "PSN_NAME",
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
-           "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL"]
+           "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL",
+           "THEME", "NOTIFY_ENABLED", "UPDATE_CHECK_ENABLED", "backup_laps"]
 
 _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
 _ENC_PREFIX = "enc:v1:"
@@ -182,6 +183,15 @@ _DEFAULTS = {
     # on the same Wi-Fi/LAN, not just this machine. Turn on only if you're
     # scraping from a remote Grafana/Prometheus on a network you trust.
     "METRICS_BIND_ALL": False,
+    # UI color theme -- "dark" (default) or "light". Applied by each GUI
+    # tool (launcher/dashboard/lap_analyst/race_analyst) at startup; switch
+    # takes effect the next time a tool window is opened.
+    "THEME": "dark",
+    # Desktop + sound alerts for new personal bests and session/race end.
+    "NOTIFY_ENABLED": True,
+    # Check GitHub for a newer release on launcher startup. Read-only HEAD
+    # request-equivalent to the public releases API -- no data sent.
+    "UPDATE_CHECK_ENABLED": True,
 }
 
 def remember_good_ip(ip: str) -> list:
@@ -241,3 +251,27 @@ ONBOARDING_DONE = _cfg["ONBOARDING_DONE"]
 METRICS_ENABLED = _cfg["METRICS_ENABLED"]
 METRICS_PORT = _cfg["METRICS_PORT"]
 METRICS_BIND_ALL = _cfg["METRICS_BIND_ALL"]
+THEME = _cfg["THEME"]
+NOTIFY_ENABLED = _cfg["NOTIFY_ENABLED"]
+UPDATE_CHECK_ENABLED = _cfg["UPDATE_CHECK_ENABLED"]
+
+
+def backup_laps() -> "Path | None":
+    """Zip the whole laps folder to ~/TRACE/backups/laps_backup_<ts>.zip and
+    return the path, or None if there's nothing to back up / it fails.
+    Local-only, no network -- a simple safety net against a deleted laps
+    folder, disk wipe, or moving to a new machine by hand."""
+    import shutil
+    from datetime import datetime
+    src = Path(LAPS_FOLDER)
+    if not src.exists() or not any(src.iterdir()):
+        return None
+    backups_dir = Path.home() / "TRACE" / "backups"
+    backups_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest_base = backups_dir / f"laps_backup_{ts}"
+    try:
+        archive = shutil.make_archive(str(dest_base), "zip", root_dir=str(src))
+        return Path(archive)
+    except Exception:
+        return None

@@ -9,6 +9,7 @@ import os
 import threading
 import time
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
@@ -31,18 +32,32 @@ from matplotlib.patches import Polygon as MplPolygon
 warnings.filterwarnings("ignore")
 
 # ── Theme ─────────────────────────────────────────────────────────────────────
-BG   = "#07080f"
-PNL  = "#0d0e1a"
-PNL2 = "#13141f"
-ACC  = "#ff2255"
-CYN  = "#00f0d4"
-GRN  = "#39ff85"
-YLW  = "#ffd500"
-ORG  = "#ff8c00"
-PRP  = "#b06aff"
-FG   = "#c8d3f5"
-DIM  = "#343856"
-DIM2 = "#232438"
+if runtime_config.THEME == "light":
+    BG   = "#f4f5fa"
+    PNL  = "#ffffff"
+    PNL2 = "#eceef5"
+    ACC  = "#d1004a"
+    CYN  = "#00897a"
+    GRN  = "#1c8a45"
+    YLW  = "#a67d00"
+    ORG  = "#c0621a"
+    PRP  = "#7a3fd6"
+    FG   = "#14162a"
+    DIM  = "#7a7f9a"
+    DIM2 = "#d7dae6"
+else:
+    BG   = "#07080f"
+    PNL  = "#0d0e1a"
+    PNL2 = "#13141f"
+    ACC  = "#ff2255"
+    CYN  = "#00f0d4"
+    GRN  = "#39ff85"
+    YLW  = "#ffd500"
+    ORG  = "#ff8c00"
+    PRP  = "#b06aff"
+    FG   = "#c8d3f5"
+    DIM  = "#343856"
+    DIM2 = "#232438"
 FONT  = ("Consolas", 9)
 FONTB = ("Consolas", 9, "bold")
 FONTL = ("Consolas", 8)
@@ -250,7 +265,7 @@ def _track_map(ax, df, col, cmap="turbo", title=""):
     cb.ax.tick_params(labelsize=6, colors=DIM)
 
 # ── Chart groups ──────────────────────────────────────────────────────────────
-def draw_inputs(fig, df, dfb=None):
+def draw_inputs(fig, df, dfb=None, extra=None):
     axs = fig.subplots(3, 3); fig.subplots_adjust(hspace=0.55, wspace=0.38)
     x = "track_position"
     _L(axs[0,0], df, x, "speed_kmh",  C["speed"],    fill=True); _ax(axs[0,0], "Speed",    yl="km/h")
@@ -279,6 +294,17 @@ def draw_inputs(fig, df, dfb=None):
                       label="B", histtype="step", lw=1.5)
         axs[2,1].legend(fontsize=7)
         axs[2,2].scatter(dfb["throttle"]*100, dfb["speed_kmh"], c=ACC, s=1, alpha=0.22)
+    if extra:
+        # 3rd-and-beyond overlay laps -- one dotted line per lap, speed/
+        # throttle/brake/steering only (the other panels stay A/B-focused
+        # so this doesn't turn into visual soup past a couple of extras).
+        for elbl, edf, ecol in extra:
+            if edf is None or "speed_kmh" not in edf.columns: continue
+            axs[0,0].plot(edf[x], edf["speed_kmh"], color=ecol, lw=1.1, alpha=0.75, ls=":", label=elbl)
+            axs[0,1].plot(edf[x], edf["throttle"],  color=ecol, lw=1.1, alpha=0.75, ls=":")
+            axs[0,2].plot(edf[x], edf["brake"],     color=ecol, lw=1.1, alpha=0.75, ls=":")
+            axs[1,2].plot(edf[x], edf["steering"],  color=ecol, lw=1.1, alpha=0.75, ls=":")
+        axs[0,0].legend(fontsize=6)
 
 def draw_engine(fig, df, dfb=None):
     axs = fig.subplots(3, 3); fig.subplots_adjust(hspace=0.55, wspace=0.38)
@@ -1028,6 +1054,93 @@ def draw_consensus(fig, df, dfb=None, consensus=None):
                   color=DIM, fontsize=9, transform=axs[1,1].transAxes)
     axs[1,1].axis("off")
 
+def draw_style(fig, df, dfb=None):
+    """Driving-style classification: how smooth vs aggressive the inputs are
+    (rate-of-change of steering/throttle/brake), and whether the car tends
+    to understeer or oversteer while cornering (front vs rear tyre slip
+    while lat_g is meaningful). This is a heuristic read on style, not a
+    physics model or a lap-time verdict -- it won't tell you the lap was
+    fast, just how it was driven."""
+    axs = fig.subplots(2, 2); fig.subplots_adjust(hspace=0.55, wspace=0.4)
+
+    def style_metrics(d):
+        dt = d["steering"].diff().abs().fillna(0)
+        tt = d["throttle"].diff().abs().fillna(0)
+        bt = d["brake"].diff().abs().fillna(0)
+        aggression = float(min(100.0, (dt.mean()*220 + tt.mean()*140 + bt.mean()*140)))
+        corner = d[d["lat_g"].abs() > 0.5]
+        slip_cols = {"tyre_slip_fl", "tyre_slip_fr", "tyre_slip_rl", "tyre_slip_rr"}
+        if len(corner) > 10 and slip_cols <= set(d.columns):
+            front = corner[["tyre_slip_fl", "tyre_slip_fr"]].mean(axis=1)
+            rear  = corner[["tyre_slip_rl", "tyre_slip_rr"]].mean(axis=1)
+            balance = float((rear - front).mean())  # + oversteer, - understeer
+        else:
+            balance = 0.0
+        return aggression, balance, corner
+
+    agg_a, bal_a, corn_a = style_metrics(df)
+    agg_b, bal_b, corn_b = style_metrics(dfb) if dfb is not None else (None, None, None)
+
+    def style_label(agg):
+        return "Smooth" if agg < 33 else "Balanced" if agg < 66 else "Aggressive"
+
+    def balance_label(bal):
+        if bal > 0.015: return "Oversteer-leaning"
+        if bal < -0.015: return "Understeer-leaning"
+        return "Neutral"
+
+    ax1 = axs[0, 0]
+    labels_ = ["A"] + (["B"] if dfb is not None else [])
+    vals = [agg_a] + ([agg_b] if dfb is not None else [])
+    cols = [GRN if v < 33 else YLW if v < 66 else ACC for v in vals]
+    ax1.barh(labels_, vals, color=cols, height=0.5)
+    for i, v in enumerate(vals):
+        ax1.text(v + 2, i, f"{v:.0f} — {style_label(v)}", va="center", color=FG, fontsize=8)
+    ax1.set_xlim(0, 130); ax1.set_title("Driving Style (Smooth ↔ Aggressive)", color=FG, fontsize=9)
+    ax1.set_xlabel("Aggression index (0-100)", fontsize=7, color=DIM)
+    ax1.set_facecolor(PNL2); ax1.tick_params(colors=DIM, labelsize=8); ax1.grid(axis="x", alpha=0.3)
+
+    ax2 = axs[0, 1]
+    bvals = [bal_a] + ([bal_b] if dfb is not None else [])
+    bcols = [ACC if b > 0.015 else CYN if b < -0.015 else DIM for b in bvals]
+    ax2.barh(labels_, bvals, color=bcols, height=0.5)
+    ax2.axvline(0, color=FG, lw=0.8)
+    for i, b in enumerate(bvals):
+        ax2.text(b + (0.002 if b >= 0 else -0.002), i, balance_label(b),
+                  va="center", ha="left" if b >= 0 else "right", color=FG, fontsize=8)
+    lim = max(0.05, max(abs(b) for b in bvals) * 1.6)
+    ax2.set_xlim(-lim, lim)
+    ax2.set_title("Cornering Balance (← Understeer | Oversteer →)", color=FG, fontsize=9)
+    ax2.set_xlabel("Rear − front slip while cornering", fontsize=7, color=DIM)
+    ax2.set_facecolor(PNL2); ax2.tick_params(colors=DIM, labelsize=8); ax2.grid(axis="x", alpha=0.3)
+
+    ax3 = axs[1, 0]
+    if len(corn_a) > 10:
+        front_a = corn_a[["tyre_slip_fl", "tyre_slip_fr"]].mean(axis=1)
+        rear_a  = corn_a[["tyre_slip_rl", "tyre_slip_rr"]].mean(axis=1)
+        ax3.scatter(corn_a["track_position"], rear_a - front_a, s=6, color=CYN, alpha=0.6, label="A")
+    if dfb is not None and corn_b is not None and len(corn_b) > 10:
+        front_b = corn_b[["tyre_slip_fl", "tyre_slip_fr"]].mean(axis=1)
+        rear_b  = corn_b[["tyre_slip_rl", "tyre_slip_rr"]].mean(axis=1)
+        ax3.scatter(corn_b["track_position"], rear_b - front_b, s=6, color=ACC, alpha=0.5, label="B")
+    ax3.axhline(0, color=DIM, lw=0.7)
+    ax3.set_title("Balance Through Corners", color=FG, fontsize=9)
+    ax3.set_xlabel("Track Position (m)", fontsize=7, color=DIM)
+    ax3.set_ylabel("Rear − front slip", fontsize=7, color=DIM)
+    if dfb is not None: ax3.legend(fontsize=7)
+    ax3.set_facecolor(PNL2); ax3.tick_params(colors=DIM, labelsize=7); ax3.grid(alpha=0.3)
+
+    ax4 = axs[1, 1]; ax4.axis("off"); ax4.set_facecolor(PNL2)
+    bcol = ACC if bal_a > 0.015 else CYN if bal_a < -0.015 else FG
+    ax4.text(0.5, 0.75, style_label(agg_a), ha="center", color=CYN, fontsize=20,
+             fontweight="bold", transform=ax4.transAxes)
+    ax4.text(0.5, 0.55, f"Aggression {agg_a:.0f}/100", ha="center", color=FG, fontsize=9,
+             transform=ax4.transAxes)
+    ax4.text(0.5, 0.35, balance_label(bal_a), ha="center", color=bcol, fontsize=14,
+             fontweight="bold", transform=ax4.transAxes)
+    ax4.text(0.5, 0.18, "Lap A summary", ha="center", color=DIM, fontsize=8, transform=ax4.transAxes)
+    ax4.set_title("Style Summary", color=FG, fontsize=9)
+
 # ── Groups registry ────────────────────────────────────────────────────────────
 GROUPS = [
     ("Inputs",    draw_inputs,          (3,3), (13,10)),
@@ -1046,6 +1159,7 @@ GROUPS = [
     ("Timeline",  draw_timeline,        (3,1), (13, 9)),
     ("Extended",  draw_extended,        (3,3), (13,10)),
     ("Consensus", draw_consensus,       (2,2), (12, 8)),
+    ("Style",     draw_style,           (2,2), (12, 8)),
 ]
 
 # ── Replay ────────────────────────────────────────────────────────────────────
@@ -1507,6 +1621,7 @@ class AnalystApp(tk.Tk):
         self._cfigs        = {}
         self._group_names  = []
         self._compare_mode = False
+        self._extra = []  # 3rd+ overlay laps: [{"label","df","color"}, ...]
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._quit)
 
@@ -1570,12 +1685,23 @@ class AnalystApp(tk.Tk):
                   bg=DIM2, fg=ACC, relief="flat", font=FONT, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(2,4))
 
+        fo = _section("OVERLAY (3+ LAPS)", PRP)
+        self._ov_list_f = tk.Frame(fo, bg=PNL)
+        self._ov_list_f.pack(fill="x", padx=8)
+        tk.Button(fo, text="➕  Add Overlay Lap", command=self._add_overlay_lap,
+                  bg=DIM2, fg=PRP, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(2,4))
+        self._refresh_overlay_list()
+
         fe = _section("EXPORT", DIM)
         tk.Button(fe, text="💾  Export CSV", command=self._export_csv,
                   bg=DIM2, fg=GRN, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(2,2))
         tk.Button(fe, text="🌐  Export Chart HTML", command=self._export_html,
                   bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
+        tk.Button(fe, text="🗄  Backup All Laps", command=self._backup_all_laps,
+                  bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
         fl = _section("LEADERBOARD", YLW)
@@ -1628,6 +1754,134 @@ class AnalystApp(tk.Tk):
             messagebox.showinfo("Lap Notes", "Notes saved with this lap.")
         except Exception as e:
             messagebox.showerror("Lap Notes", f"Couldn't save notes:\n{e}")
+
+    # ── overlay laps (3+ lap comparison) ────────────────────────────────────
+    _OVERLAY_COLORS = [YLW, GRN, PRP, ORG, "#8899ff", "#ff9ecb"]
+
+    def _refresh_overlay_list(self):
+        for w in self._ov_list_f.winfo_children(): w.destroy()
+        if not self._extra:
+            tk.Label(self._ov_list_f, text="none added", fg=DIM, bg=PNL,
+                     font=FONTL).pack(anchor="w")
+            return
+        for i, ov in enumerate(self._extra):
+            row = tk.Frame(self._ov_list_f, bg=PNL); row.pack(fill="x", pady=1)
+            tk.Label(row, text="●", fg=ov["color"], bg=PNL, font=FONTL).pack(side="left")
+            tk.Label(row, text=ov["label"], fg=FG, bg=PNL, font=FONTL,
+                     wraplength=150, justify="left", anchor="w").pack(side="left", padx=4)
+            tk.Button(row, text="✕", command=lambda i=i: self._remove_overlay(i),
+                      bg=PNL, fg=ACC, relief="flat", font=FONTL, bd=0,
+                      cursor="hand2").pack(side="right")
+
+    def _add_overlay_lap(self):
+        path = self._browse_laps_dialog("overlay lap")
+        if not path: return
+        try:
+            data, df = load_lap(path)
+        except Exception as e:
+            messagebox.showerror("Load Error", str(e)); return
+        color = self._OVERLAY_COLORS[len(self._extra) % len(self._OVERLAY_COLORS)]
+        self._extra.append({"label": lap_label(data), "df": df, "color": color})
+        self._refresh_overlay_list()
+        for k in list(self._cfigs):
+            if self._cfigs[k]: plt.close(self._cfigs[k])
+            self._cfigs[k] = None
+        self._draw_active_chart()
+
+    def _remove_overlay(self, i):
+        if 0 <= i < len(self._extra):
+            del self._extra[i]
+        self._refresh_overlay_list()
+        for k in list(self._cfigs):
+            if self._cfigs[k]: plt.close(self._cfigs[k])
+            self._cfigs[k] = None
+        self._draw_active_chart()
+
+    def _backup_all_laps(self):
+        path = runtime_config.backup_laps()
+        if path is None:
+            messagebox.showinfo("Backup Laps", "No laps found to back up yet.")
+            return
+        messagebox.showinfo("Backup Laps", f"Saved to:\n{path}")
+
+    # ── search/filter lap picker (replaces the bare native file dialog) ────
+    def _browse_laps_dialog(self, slot_label):
+        """Scans the configured laps folder, pulling car/track/date out of
+        each lap's own JSON so laps can be filtered without guessing from
+        filenames in a native file browser. Falls back to that native
+        dialog if the folder is missing/empty or nothing parses."""
+        folder = Path(runtime_config.LAPS_FOLDER)
+        entries = []
+        if folder.exists():
+            for p in sorted(folder.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+                try:
+                    with open(p, encoding="utf-8") as f:
+                        d = json.load(f)
+                except Exception:
+                    continue
+                car = d.get("ui_car") or d.get("car") or "Unknown car"
+                track = d.get("track") or "Unknown track"
+                date_s = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+                lt = d.get("lap_time")
+                lt_s = ""
+                if lt:
+                    m, s = divmod(lt, 60)
+                    lt_s = f"{int(m)}:{s:06.3f}"
+                entries.append({"path": str(p), "car": str(car), "track": str(track),
+                                 "date": date_s, "lap_time": lt_s})
+        if not entries:
+            return filedialog.askopenfilename(
+                title=f"Load {slot_label}", filetypes=[("JSON", "*.json"), ("All", "*.*")])
+
+        result = {"path": None}
+        dlg = tk.Toplevel(self)
+        dlg.title(f"Load {slot_label} — Search")
+        dlg.configure(bg=PNL2)
+        dlg.geometry("580x480")
+        dlg.transient(self); dlg.grab_set()
+
+        top = tk.Frame(dlg, bg=PNL2); top.pack(fill="x", padx=10, pady=8)
+        car_var, track_var, date_var = tk.StringVar(), tk.StringVar(), tk.StringVar()
+        for lbl_, var in [("Car:", car_var), ("Track:", track_var), ("Date:", date_var)]:
+            tk.Label(top, text=lbl_, fg=DIM, bg=PNL2, font=FONTL).pack(side="left")
+            tk.Entry(top, textvariable=var, bg=DIM2, fg=FG, insertbackground=FG,
+                      relief="flat", width=14).pack(side="left", padx=(4, 10))
+
+        list_f = tk.Frame(dlg, bg=PNL); list_f.pack(fill="both", expand=True, padx=10, pady=(0, 8))
+        lb = tk.Listbox(list_f, bg=PNL, fg=FG, font=FONTL, selectbackground=DIM2,
+                         relief="flat", activestyle="none")
+        sb = ttk.Scrollbar(list_f, command=lb.yview); lb.config(yscrollcommand=sb.set)
+        lb.pack(side="left", fill="both", expand=True); sb.pack(side="right", fill="y")
+
+        shown = []
+        def refresh(*_):
+            lb.delete(0, "end"); shown.clear()
+            cq, tq, dq = car_var.get().lower(), track_var.get().lower(), date_var.get().lower()
+            for e in entries:
+                if cq and cq not in e["car"].lower(): continue
+                if tq and tq not in e["track"].lower(): continue
+                if dq and dq not in e["date"].lower(): continue
+                shown.append(e)
+                lb.insert("end", f"{e['date']}  |  {e['car']}  |  {e['track']}  |  {e['lap_time']}")
+        for v in (car_var, track_var, date_var):
+            v.trace_add("write", refresh)
+        refresh()
+
+        def pick(_e=None):
+            sel = lb.curselection()
+            if not sel: return
+            result["path"] = shown[sel[0]]["path"]
+            dlg.destroy()
+
+        lb.bind("<Double-Button-1>", pick)
+        btn_f = tk.Frame(dlg, bg=PNL2); btn_f.pack(fill="x", padx=10, pady=(0, 10))
+        tk.Button(btn_f, text="Load Selected", command=pick, bg=DIM2, fg=CYN,
+                  relief="flat", font=FONTB, padx=10, pady=4, cursor="hand2").pack(side="right")
+        tk.Button(btn_f, text="Cancel", command=dlg.destroy, bg=DIM2, fg=DIM,
+                  relief="flat", font=FONTB, padx=10, pady=4, cursor="hand2").pack(side="right", padx=(0, 8))
+
+        dlg.wait_window()
+        return result["path"]
 
     def _update_stats(self, data, df):
         for w in self._sf.winfo_children(): w.destroy()
@@ -1699,6 +1953,9 @@ class AnalystApp(tk.Tk):
         dfb = self._dfb if self._compare_mode else None
         if name == "Consensus":
             fn(fig, self._dfa, dfb, self._consensus_line)
+        elif name == "Inputs" and self._extra:
+            extra = [(ov["label"], ov["df"], ov["color"]) for ov in self._extra]
+            fn(fig, self._dfa, dfb, extra)
         else:
             fn(fig, self._dfa, dfb)
         cv = FigureCanvasTkAgg(fig, master=f)
@@ -1707,9 +1964,7 @@ class AnalystApp(tk.Tk):
 
     # ── load ──────────────────────────────────────────────────────────────────
     def _load(self, slot):
-        path = filedialog.askopenfilename(
-            title=f"Load Lap {slot.upper()}",
-            filetypes=[("JSON","*.json"),("All","*.*")])
+        path = self._browse_laps_dialog(f"Lap {slot.upper()}")
         if not path: return
         try: data, df = load_lap(path)
         except Exception as e: messagebox.showerror("Load Error", str(e)); return
