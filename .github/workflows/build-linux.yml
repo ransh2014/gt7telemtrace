@@ -60,7 +60,7 @@ jobs:
           sudo apt-get install -y python3-tk
 
       - name: Install package and PyInstaller
-        run: python -m pip install . pyinstaller
+        run: python -m pip install . pyinstaller certifi
 
       - name: Write PyInstaller entry point
         run: |
@@ -76,6 +76,7 @@ jobs:
         run: |
           PKG_DIR=$(python -c "import gt7telem, os; print(os.path.dirname(gt7telem.__file__))")
           pyinstaller --onefile --name TRACE \
+            --collect-data certifi \
             --add-data "$PKG_DIR/car_ids.csv:gt7telem" \
             --add-data "$PKG_DIR/course_ids.csv:gt7telem" \
             entrypoint.py

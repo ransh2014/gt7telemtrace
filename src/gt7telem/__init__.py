@@ -15,6 +15,7 @@ directly: gt7telem.dashboard, gt7telem.lap_analyst, gt7telem.race_analyst.
 """
 __version__ = "0.5.0"
 
+from . import _certs  # noqa: F401  (finds a CA trust store before any HTTPS call)
 from .cars import get_car_name
 from .config import load, remember_good_ip, save
 from .tracks import all_track_names, get_track_name

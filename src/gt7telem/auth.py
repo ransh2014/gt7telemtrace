@@ -17,7 +17,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-__all__ = ["sign_up_anonymous", "refresh_session", "set_display_name", "last_refresh_error"]
+from . import _certs
+
+__all__ = ["sign_up_anonymous", "refresh_session", "set_display_name", "last_refresh_error", "last_signup_error"]
 
 _SUPABASE_URL = "https://hignsvyojdqsjoidgkud.supabase.co"
 _SUPABASE_ANON_KEY = "sb_publishable_OdzGvcypa0GI7TVxxUkusQ_KJ_Apa8i"
@@ -28,6 +30,11 @@ _SUPABASE_ANON_KEY = "sb_publishable_OdzGvcypa0GI7TVxxUkusQ_KJ_Apa8i"
 # Callers use it to tell "sign in again" apart from "try again later"
 # without refresh_session() having to raise.
 last_refresh_error = None
+
+# Why the last sign_up_anonymous() call failed: "certs" (TLS certificate check failed --
+# usually missing system CA certificates), "dns", "timeout", "http:<code>", "network`,
+# or None (success). Lets the UI say what went wrong instead of a generic message.
+last_signup_error = None
 
 
 def _parse_session(body: dict) -> dict:
@@ -46,6 +53,8 @@ def sign_up_anonymous(timeout: float = 8):
     submission. Returns {"access_token", "refresh_token", "user_id"} on
     success, None on any failure (offline, Supabase down, anonymous auth
     disabled, malformed response). Never raises."""
+    global last_signup_error
+    last_signup_error = None
     try:
         data = json.dumps({}).encode("utf-8")
         req = urllib.request.Request(
@@ -59,8 +68,12 @@ def sign_up_anonymous(timeout: float = 8):
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             session = _parse_session(json.loads(resp.read().decode("utf-8")))
-            return session if session["access_token"] and session["user_id"] else None
-    except Exception:
+            if session["access_token"] and session["user_id"]:
+                return session
+            last_signup_error = "network"
+            return None
+    except Exception as e:
+        last_signup_error = _certs.explain_error(e)
         return None
 
 

@@ -239,9 +239,15 @@ def _show_onboarding(from_menu: bool = False):
     def after_create(session, name, name_saved=True):
         set_busy(False)
         if not session:
-            status.config(
-                text="Couldn't reach the server — check your connection "
-                     "and try again, or skip for now.", fg=PINK)
+            why = auth.last_signup_error or ""
+            if why == "certs":
+                msg = ("Couldn't verify the server's security certificate — your system may be "
+                       "missing CA certificates (install the 'ca-certificates' package). Or skip for now.")
+            elif why.startswith("http:"):
+                msg = f"The server had a problem ({why[5:]}) — try again later, or skip for now."
+            else:
+                msg = "Couldn't reach the server — check your connection and try again, or skip for now."
+            status.config(text=msg, fg=PINK)
             return
         config.SUPABASE_ACCESS_TOKEN = session["access_token"]
         config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
