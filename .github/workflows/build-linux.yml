@@ -45,7 +45,9 @@ jobs:
   build:
     needs: test
     name: Build TRACE binary
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: a PyInstaller binary needs at least the glibc of the machine
+    # that built it, so a moving 'latest' silently drops support for older distros.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 

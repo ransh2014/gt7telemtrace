@@ -51,10 +51,10 @@ def notify(title: str, message: str, sound: bool = True, root=None):
                           highlightbackground="#00f0d4")
         frame.pack(fill="both", expand=True)
         tk.Label(frame, text=title, fg="#00f0d4", bg="#13141f",
-                 font=("Consolas", 10, "bold"), anchor="w",
+                 font=(config.MONO, 10, "bold"), anchor="w",
                  justify="left").pack(fill="x", padx=10, pady=(10, 2))
         tk.Label(frame, text=message, fg="#c8d3f5", bg="#13141f",
-                 font=("Consolas", 9), anchor="w", justify="left",
+                 font=(config.MONO, 9), anchor="w", justify="left",
                  wraplength=280).pack(fill="x", padx=10)
         toast.after(4200, toast.destroy)
     except Exception:

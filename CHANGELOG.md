@@ -5,6 +5,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-01
+Cross-platform polish.
+
+Fixes
+- Dashboard left-panel mouse-wheel scrolling now works on macOS and with touchpads / smooth-scroll
+  mice on Windows (it assumed Windows' 120-per-notch wheel delta, which truncated to zero elsewhere).
+- The UI's monospace font is now chosen per OS (Consolas on Windows, Menlo on macOS, the system
+  monospace font on Linux) instead of hardcoding Consolas, so number columns line up on every platform.
+- The Linux binary is now built on a pinned Ubuntu 22.04 runner (glibc 2.35+), so future releases keep
+  running on older distros instead of tracking whatever `ubuntu-latest` becomes.
+
 ## [0.5.1] - 2026-10-01
 Linux compatibility fix.
 

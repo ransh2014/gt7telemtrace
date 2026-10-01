@@ -189,3 +189,9 @@ def test_explain_error_categories():
     assert config.explain_error(socket.timeout("slow")) == "timeout"
     assert config.explain_error(urllib.error.HTTPError("u", 503, "x", {}, None)) == "http:503"
     assert config.explain_error(OSError("weird")) == "network"
+
+def test_mono_font_per_platform():
+    assert config._mono_font("win32") == "Consolas"
+    assert config._mono_font("darwin") == "Menlo"
+    assert config._mono_font("linux") == "monospace"
+    assert config.MONO == config._mono_font(sys.platform)

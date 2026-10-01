@@ -173,34 +173,34 @@ class App(tk.Tk):
         hdr.pack(fill="x")
 
         tk.Label(hdr, text="TRACE  LIVE DASHBOARD", fg=ACC, bg="#0f3460",
-                 font=("Consolas", 14, "bold")).pack(side="left", padx=16)
+                 font=(runtime_config.MONO, 14, "bold")).pack(side="left", padx=16)
         self.conn_dot = tk.Label(hdr, text="● OFFLINE", fg=DIM, bg="#0f3460",
-                                 font=("Consolas", 10))
+                                 font=(runtime_config.MONO, 10))
         self.conn_dot.pack(side="left", padx=8)
 
         tk.Button(hdr, text="Export Session",
                   command=self._export_session,
                   bg="#16213e", fg=FG, relief="flat",
-                  font=("Consolas", 10), padx=12, pady=3).pack(side="right", padx=4)
+                  font=(runtime_config.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
         tk.Button(hdr, text="Session Summary",
                   command=self._show_session_summary,
                   bg="#16213e", fg=FG, relief="flat",
-                  font=("Consolas", 10), padx=12, pady=3).pack(side="right", padx=4)
+                  font=(runtime_config.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
         tk.Button(hdr, text="Incidents",
                   command=self._show_incident_timeline,
                   bg="#16213e", fg=FG, relief="flat",
-                  font=("Consolas", 10), padx=12, pady=3).pack(side="right", padx=4)
+                  font=(runtime_config.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
 
         self.rec_btn = tk.Button(hdr, text="Record Lap",
                                  command=self._toggle_record,
                                  bg="#16213e", fg=FG, relief="flat",
-                                 font=("Consolas", 10, "bold"), padx=12, pady=3)
+                                 font=(runtime_config.MONO, 10, "bold"), padx=12, pady=3)
         self.rec_btn.pack(side="right", padx=6)
 
         self.race_btn = tk.Button(hdr, text="Record Race",
                                   command=self._toggle_record_race,
                                   bg="#16213e", fg=FG, relief="flat",
-                                  font=("Consolas", 10, "bold"), padx=12, pady=3)
+                                  font=(runtime_config.MONO, 10, "bold"), padx=12, pady=3)
         self.race_btn.pack(side="right", padx=6)
 
         # ── Header row 2: IP / Track / Car ── own row so it can never get
@@ -209,7 +209,7 @@ class App(tk.Tk):
         hdr2.pack(fill="x")
 
         tk.Label(hdr2, text="CONSOLE IP", fg=DIM, bg="#0f3460",
-                 font=("Consolas", 8)).pack(side="left", padx=(16, 2))
+                 font=(runtime_config.MONO, 8)).pack(side="left", padx=(16, 2))
         self.ip_var = tk.StringVar(value=PS4_IP)
         _ip_values = list(KNOWN_IPS)
         if PS4_IP and PS4_IP not in _ip_values:
@@ -218,7 +218,7 @@ class App(tk.Tk):
         st_ip.configure("Ip.TCombobox", fieldbackground="#16213e",
                         background="#16213e", foreground=HI)
         ip_entry = ttk.Combobox(hdr2, textvariable=self.ip_var, values=_ip_values,
-                                font=("Consolas", 9), width=15, style="Ip.TCombobox")
+                                font=(runtime_config.MONO, 9), width=15, style="Ip.TCombobox")
         ip_entry.pack(side="left", padx=(0, 12))
         self.ip_combo_widget = ip_entry
         ip_entry.bind("<Return>",     lambda e: self._on_ip_change(force=True))
@@ -228,26 +228,26 @@ class App(tk.Tk):
         self.discover_btn = tk.Button(hdr2, text="Auto-Detect",
                                        command=self._on_discover_ip,
                                        bg="#16213e", fg=HI, relief="flat",
-                                       font=("Consolas", 8), padx=6, pady=1)
+                                       font=(runtime_config.MONO, 8), padx=6, pady=1)
         self.discover_btn.pack(side="left", padx=(0, 12))
 
         tk.Label(hdr2, text="TRACK", fg=DIM, bg="#0f3460",
-                 font=("Consolas", 9)).pack(side="left", padx=(8, 2))
+                 font=(runtime_config.MONO, 9)).pack(side="left", padx=(8, 2))
         self.track_var = tk.StringVar(value="")
         st_track = ttk.Style()
         st_track.configure("Track.TCombobox", fieldbackground="#16213e",
                            background="#16213e", foreground=FG)
         track_entry = ttk.Combobox(hdr2, textvariable=self.track_var,
                                    values=track_db.all_track_names(),
-                                   font=("Consolas", 10), width=20,
+                                   font=(runtime_config.MONO, 10), width=20,
                                    style="Track.TCombobox")
         track_entry.pack(side="left", padx=(0, 12))
 
         tk.Label(hdr2, text="CAR", fg=DIM, bg="#0f3460",
-                 font=("Consolas", 9)).pack(side="left", padx=(8, 2))
+                 font=(runtime_config.MONO, 9)).pack(side="left", padx=(8, 2))
         self.car_var = tk.StringVar(value="")
         tk.Entry(hdr2, textvariable=self.car_var, bg="#16213e", fg=FG,
-                 font=("Consolas", 10), width=18, relief="flat",
+                 font=(runtime_config.MONO, 10), width=18, relief="flat",
                  insertbackground=FG).pack(side="left", padx=(0, 4))
 
         # ── Advanced / debug (hidden by default) ────────────────────────────
@@ -255,25 +255,25 @@ class App(tk.Tk):
         tk.Checkbutton(hdr2, text="DEBUG LOG", variable=self.debug_var,
                        command=self._on_debug_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
-                       font=("Consolas", 8)).pack(side="right", padx=(4, 16))
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 16))
 
         self.analytics_var = tk.BooleanVar(value=bool(runtime_config.ANALYTICS_ENABLED))
         tk.Checkbutton(hdr2, text="SHARE USAGE DATA", variable=self.analytics_var,
                        command=self._on_analytics_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
-                       font=("Consolas", 8)).pack(side="right", padx=(4, 4))
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.metrics_var = tk.BooleanVar(value=bool(runtime_config.METRICS_ENABLED))
         tk.Checkbutton(hdr2, text=f"METRICS :{runtime_config.METRICS_PORT}", variable=self.metrics_var,
                        command=self._on_metrics_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
-                       font=("Consolas", 8)).pack(side="right", padx=(4, 4))
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.metrics_bind_var = tk.BooleanVar(value=bool(runtime_config.METRICS_BIND_ALL))
         tk.Checkbutton(hdr2, text="ALLOW REMOTE", variable=self.metrics_bind_var,
                        command=self._on_metrics_bind_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
-                       font=("Consolas", 8)).pack(side="right", padx=(4, 4))
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
         # ── Recording sample rate ────────────────────────────────────────────
         self.rate_var = tk.StringVar(value=f"{self._record_rate} Hz")
@@ -282,12 +282,12 @@ class App(tk.Tk):
                           background="#16213e", foreground=HI)
         rate_combo = ttk.Combobox(hdr2, textvariable=self.rate_var,
                                   values=[f"{r} Hz" for r in RECORD_RATE_OPTIONS],
-                                  font=("Consolas", 9), width=6, state="readonly",
+                                  font=(runtime_config.MONO, 9), width=6, state="readonly",
                                   style="Rate.TCombobox")
         rate_combo.pack(side="right", padx=(0, 4))
         rate_combo.bind("<<ComboboxSelected>>", lambda e: self._on_rate_change())
         tk.Label(hdr2, text="REC RATE", fg=DIM, bg="#0f3460",
-                 font=("Consolas", 8)).pack(side="right", padx=(8, 2))
+                 font=(runtime_config.MONO, 8)).pack(side="right", padx=(8, 2))
 
         # ── Body ─────────────────────────────────────────────────────────────
         body = tk.Frame(self, bg=BG)
@@ -312,9 +312,10 @@ class App(tk.Tk):
         _lcanvas.bind("<Configure>", _on_canvas_resize)
         # Wheel scrolling only while the pointer is over the left panel --
         # bind_all on its own also scrolled it from the log and lap history.
+        # (sign of delta only: it is 120/notch on Windows, ~1 on macOS, tiny on touchpads)
         def _wheel_on(_e=None):
             _lcanvas.bind_all("<MouseWheel>",
-                              lambda e: _lcanvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+                              lambda e: _lcanvas.yview_scroll(-1 if e.delta > 0 else 1, "units"))
             _lcanvas.bind_all("<Button-4>", lambda e: _lcanvas.yview_scroll(-1, "units"))
             _lcanvas.bind_all("<Button-5>", lambda e: _lcanvas.yview_scroll(1, "units"))
         def _wheel_off(_e=None):
@@ -331,21 +332,21 @@ class App(tk.Tk):
         sg = tk.Frame(left, bg=PNL, pady=8)
         sg.pack(fill="x", pady=(0, 4))
         self.speed_lbl = tk.Label(sg, text="0", fg=HI, bg=PNL,
-                                  font=("Consolas", 64, "bold"))
+                                  font=(runtime_config.MONO, 64, "bold"))
         self.speed_lbl.pack(side="left", padx=20)
         tk.Label(sg, text="km/h", fg=DIM, bg=PNL,
-                 font=("Consolas", 14)).pack(side="left", pady=(24, 0))
+                 font=(runtime_config.MONO, 14)).pack(side="left", pady=(24, 0))
         sg_mid = tk.Frame(sg, bg=PNL)
         sg_mid.pack(side="left", expand=True)
-        tk.Label(sg_mid, text="SUGGEST", fg=DIM, bg=PNL, font=("Consolas", 8)).pack()
+        tk.Label(sg_mid, text="SUGGEST", fg=DIM, bg=PNL, font=(runtime_config.MONO, 8)).pack()
         self.sug_gear_lbl = tk.Label(sg_mid, text="--", fg="#f39c12", bg=PNL,
-                                     font=("Consolas", 20, "bold"))
+                                     font=(runtime_config.MONO, 20, "bold"))
         self.sug_gear_lbl.pack()
         self.gear_lbl = tk.Label(sg, text="N", fg="#f39c12", bg=PNL,
-                                 font=("Consolas", 64, "bold"))
+                                 font=(runtime_config.MONO, 64, "bold"))
         self.gear_lbl.pack(side="right", padx=20)
         tk.Label(sg, text="gear", fg=DIM, bg=PNL,
-                 font=("Consolas", 14)).pack(side="right", pady=(24, 0))
+                 font=(runtime_config.MONO, 14)).pack(side="right", pady=(24, 0))
 
         # ── Lap info ──────────────────────────────────────────────────────────
         lap_f = tk.Frame(left, bg=PNL, pady=6)
@@ -358,8 +359,8 @@ class App(tk.Tk):
         ]:
             col_f = tk.Frame(lap_f, bg=PNL)
             col_f.pack(side="left", expand=True)
-            tk.Label(col_f, text=label, fg=DIM, bg=PNL, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="--", fg=col, bg=PNL, font=("Consolas", 13, "bold"))
+            tk.Label(col_f, text=label, fg=DIM, bg=PNL, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="--", fg=col, bg=PNL, font=(runtime_config.MONO, 13, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
 
@@ -368,12 +369,12 @@ class App(tk.Tk):
             f = tk.Frame(parent, bg=BG)
             f.pack(fill="x", pady=2)
             tk.Label(f, text=label, fg=DIM, bg=BG,
-                     font=("Consolas", 9), width=9).pack(side="left", padx=4)
+                     font=(runtime_config.MONO, 9), width=9).pack(side="left", padx=4)
             var = tk.DoubleVar()
             ttk.Progressbar(f, variable=var, maximum=100,
                             length=300, mode="determinate").pack(
                 side="left", fill="x", expand=True, padx=4)
-            lbl = tk.Label(f, text="0", fg=fc, bg=BG, font=("Consolas", 10), width=10)
+            lbl = tk.Label(f, text="0", fg=fc, bg=BG, font=(runtime_config.MONO, 10), width=10)
             lbl.pack(side="left")
             setattr(self, av, var)
             setattr(self, al, lbl)
@@ -384,34 +385,34 @@ class App(tk.Tk):
         bar_row(left, "CLUTCH",   "clt_var", "clt_lbl", "#f39c12")
 
         # ── Tyres ─────────────────────────────────────────────────────────────
-        tyre_f = tk.LabelFrame(left, text=" TYRES ", fg=ACC, bg=BG, font=("Consolas", 9))
+        tyre_f = tk.LabelFrame(left, text=" TYRES ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         tyre_f.pack(fill="x", pady=4, padx=2)
         for label, ta, sa in [("FL", "tyre_fl", "slip_fl"), ("FR", "tyre_fr", "slip_fr"),
                                ("RL", "tyre_rl", "slip_rl"), ("RR", "tyre_rr", "slip_rr")]:
             col_f = tk.Frame(tyre_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=8, pady=4)
-            tk.Label(col_f, text=label, fg=DIM, bg=BG, font=("Consolas", 9)).pack()
-            t_lbl = tk.Label(col_f, text="--C", fg=HI, bg=BG, font=("Consolas", 13, "bold"))
+            tk.Label(col_f, text=label, fg=DIM, bg=BG, font=(runtime_config.MONO, 9)).pack()
+            t_lbl = tk.Label(col_f, text="--C", fg=HI, bg=BG, font=(runtime_config.MONO, 13, "bold"))
             t_lbl.pack()
-            s_lbl = tk.Label(col_f, text="slip --", fg=DIM, bg=BG, font=("Consolas", 8))
+            s_lbl = tk.Label(col_f, text="slip --", fg=DIM, bg=BG, font=(runtime_config.MONO, 8))
             s_lbl.pack()
             setattr(self, ta, t_lbl)
             setattr(self, sa, s_lbl)
 
         # ── Suspension ────────────────────────────────────────────────────────
-        susp_f = tk.LabelFrame(left, text=" SUSPENSION (mm) ", fg=ACC, bg=BG, font=("Consolas", 9))
+        susp_f = tk.LabelFrame(left, text=" SUSPENSION (mm) ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         susp_f.pack(fill="x", pady=4, padx=2)
         for label, attr in [("FL", "susp_fl_lbl"), ("FR", "susp_fr_lbl"),
                              ("RL", "susp_rl_lbl"), ("RR", "susp_rr_lbl")]:
             col_f = tk.Frame(susp_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=8, pady=4)
-            tk.Label(col_f, text=label, fg=DIM, bg=BG, font=("Consolas", 9)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 12, "bold"))
+            tk.Label(col_f, text=label, fg=DIM, bg=BG, font=(runtime_config.MONO, 9)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 12, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
 
         # ── Driver aids ───────────────────────────────────────────────────────
-        aids_f = tk.LabelFrame(left, text=" DRIVER AIDS ", fg=ACC, bg=BG, font=("Consolas", 9))
+        aids_f = tk.LabelFrame(left, text=" DRIVER AIDS ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         aids_f.pack(fill="x", pady=4, padx=2)
         self._aid_lbls = {}
         for key, label in [
@@ -421,13 +422,13 @@ class App(tk.Tk):
         ]:
             col_f = tk.Frame(aids_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=6, pady=4)
-            tk.Label(col_f, text=label, fg=DIM, bg=BG, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="NO", fg=DIM, bg=BG, font=("Consolas", 11, "bold"))
+            tk.Label(col_f, text=label, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="NO", fg=DIM, bg=BG, font=(runtime_config.MONO, 11, "bold"))
             lbl.pack()
             self._aid_lbls[key] = lbl
 
         # ── Engine and Fluids ─────────────────────────────────────────────────
-        eng_f = tk.LabelFrame(left, text=" ENGINE AND FLUIDS ", fg=ACC, bg=BG, font=("Consolas", 9))
+        eng_f = tk.LabelFrame(left, text=" ENGINE AND FLUIDS ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         eng_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("FUEL", "fuel_lbl"), ("FUEL LAPS", "fuellaps_lbl"),
                              ("BOOST bar", "boost_lbl"), ("OIL C*", "oil_lbl"),
@@ -435,15 +436,15 @@ class App(tk.Tk):
                              ("RIDE mm", "ride_lbl")]:
             col_f = tk.Frame(eng_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=6, pady=4)
-            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 12, "bold"))
+            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 12, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
         tk.Label(eng_f, text="* GT7 sends fixed values for these (85 / 110 C) -- not simulated",
-                 fg=DIM, bg=BG, font=("Consolas", 7)).pack(side="bottom", anchor="w", padx=6)
+                 fg=DIM, bg=BG, font=(runtime_config.MONO, 7)).pack(side="bottom", anchor="w", padx=6)
 
         # ── Dynamics ─────────────────────────────────────────────────────────
-        dyn_f = tk.LabelFrame(left, text=" DYNAMICS ", fg=ACC, bg=BG, font=("Consolas", 9))
+        dyn_f = tk.LabelFrame(left, text=" DYNAMICS ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         dyn_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("VEL X", "velx_lbl"), ("VEL Y", "vely_lbl"),
                              ("VEL Z", "velz_lbl"), ("ANG X", "angx_lbl"),
@@ -451,44 +452,44 @@ class App(tk.Tk):
                              ("HEADING", "hdg_lbl")]:
             col_f = tk.Frame(dyn_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=4, pady=4)
-            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 11, "bold"))
+            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 11, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
 
         # ── Position ──────────────────────────────────────────────────────────
-        pos_f = tk.LabelFrame(left, text=" POSITION ", fg=ACC, bg=BG, font=("Consolas", 9))
+        pos_f = tk.LabelFrame(left, text=" POSITION ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         pos_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("WORLD X", "wx_lbl"), ("WORLD Y", "wy_lbl"),
                              ("WORLD Z", "wz_lbl"), ("TRACK POS", "tpos_lbl")]:
             col_f = tk.Frame(pos_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=6, pady=4)
-            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 11, "bold"))
+            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 11, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
 
         # ── Drivetrain extras ─────────────────────────────────────────────────
-        drv_f = tk.LabelFrame(left, text=" DRIVETRAIN EXTRAS ", fg=ACC, bg=BG, font=("Consolas", 9))
+        drv_f = tk.LabelFrame(left, text=" DRIVETRAIN EXTRAS ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         drv_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("STEERING", "steer_lbl"), ("CLUTCH ENG", "clteng_lbl"),
                              ("RPM WARN", "rpmwarn_lbl"), ("RPM LIM", "rpmlim_lbl"),
                              ("RPM@CLUTCH", "rpmclt_lbl")]:
             col_f = tk.Frame(drv_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=6, pady=4)
-            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 11, "bold"))
+            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 11, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
 
         gr_f = tk.Frame(left, bg=BG)
         gr_f.pack(fill="x", pady=(0, 4), padx=4)
-        tk.Label(gr_f, text="GEAR RATIOS:", fg=DIM, bg=BG, font=("Consolas", 8)).pack(side="left", padx=4)
-        self.gr_lbl = tk.Label(gr_f, text="--", fg=FG, bg=BG, font=("Consolas", 8))
+        tk.Label(gr_f, text="GEAR RATIOS:", fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack(side="left", padx=4)
+        self.gr_lbl = tk.Label(gr_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 8))
         self.gr_lbl.pack(side="left")
 
         # ── Extended (Packet B/~/C) ───────────────────────────────────────────
-        ext_f = tk.LabelFrame(left, text=" EXTENDED (B/~/C) ", fg=ACC, bg=BG, font=("Consolas", 9))
+        ext_f = tk.LabelFrame(left, text=" EXTENDED (B/~/C) ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         ext_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("CUR LAP", "extcurlap_lbl"), ("CATEGORY", "extcat_lbl"),
                              ("WHEELBASE", "extwb_lbl"), ("SWAY", "extsway_lbl"),
@@ -496,42 +497,42 @@ class App(tk.Tk):
                              ("ENERGY RECOV", "extenergy_lbl")]:
             col_f = tk.Frame(ext_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=6, pady=4)
-            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 11, "bold"))
+            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 11, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
 
-        surf_f = tk.LabelFrame(left, text=" SURFACE (per tyre) ", fg=ACC, bg=BG, font=("Consolas", 9))
+        surf_f = tk.LabelFrame(left, text=" SURFACE (per tyre) ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         surf_f.pack(fill="x", pady=4, padx=2)
         self._surf_lbls = {}
         for label, key in [("FL", "fl"), ("FR", "fr"), ("RL", "rl"), ("RR", "rr")]:
             col_f = tk.Frame(surf_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=8, pady=4)
-            tk.Label(col_f, text=label, fg=DIM, bg=BG, font=("Consolas", 9)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 13, "bold"))
+            tk.Label(col_f, text=label, fg=DIM, bg=BG, font=(runtime_config.MONO, 9)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 13, "bold"))
             lbl.pack()
             self._surf_lbls[key] = lbl
 
-        steer_f = tk.LabelFrame(left, text=" WHEEL STEERING ANGLE ", fg=ACC, bg=BG, font=("Consolas", 9))
+        steer_f = tk.LabelFrame(left, text=" WHEEL STEERING ANGLE ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         steer_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("FRONT L", "extsteerl_lbl"), ("FRONT R", "extsteerr_lbl")]:
             col_f = tk.Frame(steer_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=6, pady=4)
-            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 11, "bold"))
+            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 11, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
 
         # ── Session misc ──────────────────────────────────────────────────────
-        misc_f = tk.LabelFrame(left, text=" SESSION / MISC ", fg=ACC, bg=BG, font=("Consolas", 9))
+        misc_f = tk.LabelFrame(left, text=" SESSION / MISC ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         misc_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("TIME OF DAY", "tod_lbl"), ("IS EV", "isev_lbl"),
                              ("CAR ID", "carid_lbl"), ("FLAG 8E", "f8e_lbl"),
                              ("FLAG 8F", "f8f_lbl"), ("FLAG 93", "f93_lbl")]:
             col_f = tk.Frame(misc_f, bg=BG)
             col_f.pack(side="left", expand=True, padx=6, pady=4)
-            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=("Consolas", 8)).pack()
-            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=("Consolas", 11, "bold"))
+            tk.Label(col_f, text=title, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+            lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 11, "bold"))
             lbl.pack()
             setattr(self, attr, lbl)
 
@@ -544,11 +545,11 @@ class App(tk.Tk):
         af.pack(fill="x", pady=(0, 4))
 
         self.alert_hot  = tk.Label(af, text="TYRE HOT",  bg="#e74c3c", fg="#fff",
-                                   font=("Consolas", 8, "bold"), padx=5, pady=2)
+                                   font=(runtime_config.MONO, 8, "bold"), padx=5, pady=2)
         self.alert_cold = tk.Label(af, text="TYRE COLD", bg="#1a6a8a", fg="#4fc3f7",
-                                   font=("Consolas", 8, "bold"), padx=5, pady=2)
+                                   font=(runtime_config.MONO, 8, "bold"), padx=5, pady=2)
         self.alert_fuel = tk.Label(af, text="FUEL LOW",  bg="#f39c12", fg="#000",
-                                   font=("Consolas", 8, "bold"), padx=5, pady=2)
+                                   font=(runtime_config.MONO, 8, "bold"), padx=5, pady=2)
         # hidden until triggered — _poll calls grid / grid_remove
         self.alert_hot.grid( in_=af, row=0, column=0, padx=2, pady=1)
         self.alert_cold.grid(in_=af, row=0, column=1, padx=2, pady=1)
@@ -559,16 +560,16 @@ class App(tk.Tk):
 
         # ── Track map ────────────────────────────────────────────────────────
         tk.Label(right, text="TRACK MAP", fg=ACC, bg=BG,
-                 font=("Consolas", 9, "bold")).pack(anchor="w", padx=2)
+                 font=(runtime_config.MONO, 9, "bold")).pack(anchor="w", padx=2)
         self.map_canvas = tk.Canvas(right, bg="#050510", width=240, height=180,
                                     highlightthickness=1, highlightbackground=DIM)
         self.map_canvas.pack(pady=(0, 4))
         self.map_canvas.create_text(120, 90, text="WAITING FOR DATA",
-                                    fill="#333344", font=("Consolas", 9))
+                                    fill="#333344", font=(runtime_config.MONO, 9))
 
         # ── Lap history ──────────────────────────────────────────────────────
         tk.Label(right, text="LAP HISTORY", fg=ACC, bg=BG,
-                 font=("Consolas", 9, "bold")).pack(anchor="w", padx=2)
+                 font=(runtime_config.MONO, 9, "bold")).pack(anchor="w", padx=2)
 
         hist_outer = tk.Frame(right, bg=BG)
         hist_outer.pack(fill="x", pady=(0, 4))
@@ -577,10 +578,10 @@ class App(tk.Tk):
         st.configure("Hist.Treeview",
                      background="#050510", foreground="#c0c0e0",
                      fieldbackground="#050510",
-                     font=("Consolas", 8), rowheight=18)
+                     font=(runtime_config.MONO, 8), rowheight=18)
         st.configure("Hist.Treeview.Heading",
                      background="#0f0f1e", foreground=ACC,
-                     font=("Consolas", 8, "bold"))
+                     font=(runtime_config.MONO, 8, "bold"))
         st.map("Hist.Treeview",
                background=[("selected", "#1a3a5a")],
                foreground=[("selected", "#4fc3f7")])
@@ -608,9 +609,9 @@ class App(tk.Tk):
 
         # ── Log ──────────────────────────────────────────────────────────────
         tk.Label(right, text="LOG", fg=ACC, bg=BG,
-                 font=("Consolas", 9, "bold")).pack(anchor="w", pady=(2, 2), padx=2)
+                 font=(runtime_config.MONO, 9, "bold")).pack(anchor="w", pady=(2, 2), padx=2)
         self.log = scrolledtext.ScrolledText(right, bg="#050510", fg="#00ff88",
-                                             font=("Consolas", 8), relief="flat")
+                                             font=(runtime_config.MONO, 8), relief="flat")
         self.log.pack(fill="both", expand=True)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -623,7 +624,7 @@ class App(tk.Tk):
 
         if len(pts) < 2:
             c.create_text(120, 90, text="WAITING FOR DATA",
-                          fill="#333344", font=("Consolas", 9))
+                          fill="#333344", font=(runtime_config.MONO, 9))
             return
 
         W, H, PAD = 240, 180, 14
@@ -1258,7 +1259,7 @@ class App(tk.Tk):
         dlg.grab_set()
 
         tk.Label(dlg, text="🏁 Session Recap", fg="#e94560", bg="#0a0a12",
-                 font=("Consolas", 12, "bold")).pack(pady=(14, 10), padx=24)
+                 font=(runtime_config.MONO, 12, "bold")).pack(pady=(14, 10), padx=24)
 
         rows = [
             ("Laps completed", str(len(complete))),
@@ -1272,12 +1273,12 @@ class App(tk.Tk):
             r = tk.Frame(body, bg="#0a0a12")
             r.pack(fill="x", pady=2)
             tk.Label(r, text=label, fg="#888", bg="#0a0a12",
-                     font=("Consolas", 10), width=15, anchor="w").pack(side="left")
+                     font=(runtime_config.MONO, 10), width=15, anchor="w").pack(side="left")
             tk.Label(r, text=value, fg="#e0e0e0", bg="#0a0a12",
-                     font=("Consolas", 10, "bold"), anchor="w").pack(side="left")
+                     font=(runtime_config.MONO, 10, "bold"), anchor="w").pack(side="left")
 
         tk.Button(dlg, text="Close", command=dlg.destroy, bg="#e94560", fg="#000",
-                  font=("Consolas", 10, "bold"), relief="flat", padx=16, pady=4,
+                  font=(runtime_config.MONO, 10, "bold"), relief="flat", padx=16, pady=4,
                   cursor="hand2").pack(pady=(6, 16))
 
         dlg.update_idletasks()
@@ -1581,10 +1582,10 @@ class App(tk.Tk):
         st = ttk.Style()
         st.configure("Summary.Treeview",
                      background="#050510", foreground="#c0c0e0",
-                     fieldbackground="#050510", font=("Consolas", 9), rowheight=20)
+                     fieldbackground="#050510", font=(runtime_config.MONO, 9), rowheight=20)
         st.configure("Summary.Treeview.Heading",
                      background="#0f0f1e", foreground="#e94560",
-                     font=("Consolas", 9, "bold"))
+                     font=(runtime_config.MONO, 9, "bold"))
 
         tree = ttk.Treeview(dlg, columns=cols, show="headings", height=10,
                             style="Summary.Treeview")
@@ -1617,7 +1618,7 @@ class App(tk.Tk):
 
         if not timeline:
             tk.Label(dlg, text="No incidents recorded this session.",
-                     fg="#c0c0e0", bg="#0a0a12", font=("Consolas", 10),
+                     fg="#c0c0e0", bg="#0a0a12", font=(runtime_config.MONO, 10),
                      pady=20).pack()
             return
 
@@ -1628,10 +1629,10 @@ class App(tk.Tk):
         st = ttk.Style()
         st.configure("Incidents.Treeview",
                      background="#050510", foreground="#c0c0e0",
-                     fieldbackground="#050510", font=("Consolas", 9), rowheight=20)
+                     fieldbackground="#050510", font=(runtime_config.MONO, 9), rowheight=20)
         st.configure("Incidents.Treeview.Heading",
                      background="#0f0f1e", foreground="#e94560",
-                     font=("Consolas", 9, "bold"))
+                     font=(runtime_config.MONO, 9, "bold"))
 
         tree = ttk.Treeview(dlg, columns=cols, show="headings", height=12,
                             style="Incidents.Treeview")
@@ -1888,15 +1889,15 @@ class App(tk.Tk):
             dlg.resizable(False, False)
             tk.Label(dlg,
                      text=f"Incomplete lap ({new_time:.1f}s, {len(samples)} samples) -- save or discard?",
-                     fg="#f39c12", bg="#0a0a12", font=("Consolas", 11),
+                     fg="#f39c12", bg="#0a0a12", font=(runtime_config.MONO, 11),
                      pady=12, padx=16).pack()
             bf = tk.Frame(dlg, bg="#0a0a12")
             bf.pack(pady=(0, 12))
             tk.Button(bf, text="Save", bg="#f39c12", fg="#000",
-                      font=("Consolas", 10, "bold"), relief="flat", padx=10,
+                      font=(runtime_config.MONO, 10, "bold"), relief="flat", padx=10,
                       command=lambda: [_do_save(), dlg.destroy()]).pack(side="left", padx=8)
             tk.Button(bf, text="Discard", bg="#333", fg="#aaa",
-                      font=("Consolas", 10), relief="flat", padx=10,
+                      font=(runtime_config.MONO, 10), relief="flat", padx=10,
                       command=dlg.destroy).pack(side="left", padx=8)
             return None
 

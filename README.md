@@ -121,7 +121,7 @@ TRACE's binaries are unsigned on Windows today. If your browser or Windows Smart
 
 - **Windows** — Not yet signed. An application is in with **[SignPath Foundation](https://signpath.org/)**, a free code-signing program for open-source projects, and TRACE is expected to have a trusted signed `.exe` within the next month or two once that's approved.
 - **macOS** — `TRACE.app` is **ad-hoc signed** (a local signature with no Apple-issued certificate). This satisfies macOS's baseline "must be signed" check and avoids "app is damaged" errors, but you'll still see an "unidentified developer" warning on first launch — right-click the app and choose **Open** to bypass it. Full notarization requires a paid Apple Developer account, which isn't in place yet.
-- **Linux** — The release zip is signed with a dedicated GPG key so you can verify it wasn't tampered with after being built. Import the public key and verify with:
+- **Linux** — The binary is built on Ubuntu 22.04, so it needs glibc 2.35 or newer (Ubuntu 22.04+, Fedora 36+, Debian 12+ and equivalents). The release zip is signed with a dedicated GPG key so you can verify it wasn't tampered with after being built. Import the public key and verify with:
   ```bash
   gpg --import trace-public-key.asc
   gpg --verify gt7telem-linux.zip.asc gt7telem-linux.zip

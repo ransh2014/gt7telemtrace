@@ -19,7 +19,7 @@ __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_R
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL",
            "THEME", "NOTIFY_ENABLED", "UPDATE_CHECK_ENABLED", "backup_laps",
-           "ensure_ca_bundle", "explain_error"]
+           "ensure_ca_bundle", "explain_error", "MONO"]
 
 _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
 _ENC_PREFIX = "enc:v1:"
@@ -401,3 +401,17 @@ def explain_error(exc: BaseException) -> str:
 
 
 ensure_ca_bundle()
+
+
+def _mono_font(platform: str) -> str:
+    """Monospace UI font family for this OS. Consolas only ships with Windows; elsewhere Tk
+    would silently substitute some arbitrary (often proportional) font and misalign the
+    dashboard's number columns, so ask for the platform's own monospace face instead."""
+    if platform.startswith("win"):
+        return "Consolas"
+    if platform == "darwin":
+        return "Menlo"
+    return "monospace"  # fontconfig resolves this to the distro's default mono font
+
+
+MONO = _mono_font(sys.platform)

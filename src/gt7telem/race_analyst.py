@@ -55,10 +55,10 @@ else:
     FG   = "#c8d3f5"
     DIM  = "#343856"
     DIM2 = "#232438"
-FONT  = ("Consolas", 9)
-FONTB = ("Consolas", 9, "bold")
-FONTL = ("Consolas", 8)
-FONTH = ("Consolas", 13, "bold")
+FONT  = (runtime_config.MONO, 9)
+FONTB = (runtime_config.MONO, 9, "bold")
+FONTL = (runtime_config.MONO, 8)
+FONTH = (runtime_config.MONO, 13, "bold")
 
 C = dict(speed=CYN, throttle=GRN, brake=ACC, gear=YLW, rpm=ORG,
          steering=PRP, clutch="#8899ff",
@@ -1103,7 +1103,7 @@ class Replay:
         self._delta_var = tk.StringVar(value="")
         self._delta_lbl = tk.Label(parent, textvariable=self._delta_var,
                                    fg=YLW, bg=BG,
-                                   font=("Consolas", 11, "bold"), pady=3)
+                                   font=(runtime_config.MONO, 11, "bold"), pady=3)
         self._delta_lbl.pack(fill="x")
 
         ctrl = tk.Frame(parent, bg=PNL, pady=5)
@@ -1430,9 +1430,9 @@ class AnalystApp(tk.Tk):
 
         hdr = tk.Frame(self, bg=PNL2, pady=7); hdr.pack(fill="x")
         tk.Label(hdr, text="GT7", fg=ACC, bg=PNL2,
-                 font=("Consolas",15,"bold")).pack(side="left", padx=(16,2))
+                 font=(runtime_config.MONO,15,"bold")).pack(side="left", padx=(16,2))
         tk.Label(hdr, text="RACE ANALYST", fg=CYN, bg=PNL2,
-                 font=("Consolas",15,"bold")).pack(side="left")
+                 font=(runtime_config.MONO,15,"bold")).pack(side="left")
         self._hdr = tk.Label(hdr, text="", fg=DIM, bg=PNL2, font=FONT)
         self._hdr.pack(side="right", padx=16)
 
