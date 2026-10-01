@@ -5,6 +5,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-01
+Linux compatibility fix.
+
+Fixes
+- Fixed Create Account / leaderboard / update-check failing with "Couldn't reach the server"
+  on Linux distros other than Ubuntu (e.g. Fedora). The standalone Linux binary looked for
+  CA certificates only at Ubuntu's path, so every HTTPS call failed certificate verification.
+  TRACE now finds the system CA bundle or cert directory at startup (Fedora/RHEL, Debian/Ubuntu,
+  Arch, openSUSE, NixOS, Alpine, BSD, Termux), and the Linux build bundles certifi as a last resort.
+  Certificate verification stays on.
+
+Improvements
+- The onboarding screen now says why sign-up failed (missing certificates / server error /
+  connection) instead of a generic message.
+
 ## [0.5.0] - 2026-09-27
 New features.
 
