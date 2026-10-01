@@ -17,7 +17,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import _certs
+from .config import explain_error
 
 __all__ = ["sign_up_anonymous", "refresh_session", "set_display_name", "last_refresh_error", "last_signup_error"]
 
@@ -73,7 +73,7 @@ def sign_up_anonymous(timeout: float = 8):
             last_signup_error = "network"
             return None
     except Exception as e:
-        last_signup_error = _certs.explain_error(e)
+        last_signup_error = explain_error(e)
         return None
 
 
