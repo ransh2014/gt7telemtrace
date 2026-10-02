@@ -61,7 +61,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Lap history table with alerts
 
 ### Lap Analyst
-- **16 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus
+- **17 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus, Style
 - A/B lap comparison across every chart group
 - Dual replay — synced and realtime
 - Driver ratings radar
@@ -112,6 +112,25 @@ gt7telem
 
 ### Option 3 — standalone binaries
 No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.app` from **[gt7trace.netlify.app/setup.html](https://gt7trace.netlify.app/setup.html)**. The macOS build is produced automatically on a GitHub-hosted Apple Silicon runner (see [`build-macos.yml`](.github/workflows/build-macos.yml)) — on an older Intel Mac, use Option 1 or 2 instead.
+
+### Option 4 — package managers
+On Windows:
+```powershell
+winget install ransh2014.TRACE
+
+# or Scoop
+scoop bucket add gt7telem https://github.com/ransh2014/scoop-gt7telem
+scoop install gt7telem/gt7telem
+
+# or Chocolatey
+choco install gt7telem
+```
+On macOS (Apple Silicon):
+```bash
+brew tap ransh2014/gt7telem
+brew install --cask gt7telem
+```
+Package-manager releases go through a review step, so a new version can take a little while to appear there. The binaries above are always the latest build.
 
 ---
 

@@ -10,7 +10,8 @@ name: Update WinGet Package
 # NOTE: `wingetcreate update` builds the new manifest from the package's
 # most recently *merged* manifest in microsoft/winget-pkgs, so it can't do
 # anything until an initial manifest exists there. The first submission
-# (0.2.6, PR #425267) is still queued for a community moderator.
+# (0.2.6, PR #425267) has since been merged, so every release tag now
+# submits an update PR.
 #
 # Rather than failing every release until that merges -- which trains you to
 # ignore red X's on release runs, and is how a real failure slips past -- the
@@ -18,7 +19,8 @@ name: Update WinGet Package
 # if it isn't. Note the check only treats a 404 as "not published yet": any
 # other API response (rate limit, 5xx, auth) still fails the job, so this
 # can't quietly swallow a genuine problem. Once the PR merges, this starts
-# submitting on the next tag with no change needed here.
+# submitting on the next tag with no change needed here. (That PR has since
+# merged, so the skip is now just a safety net.)
 
 # NOTE: this triggers on the tag push directly (not `release: published`).
 # The release itself is created by build-windows.yml using the default

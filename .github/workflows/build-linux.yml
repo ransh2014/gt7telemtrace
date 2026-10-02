@@ -85,8 +85,10 @@ jobs:
 
       - name: Zip the binary
         run: |
+          cp tools/binary_readmes/linux.txt dist/README.txt
+          cp LICENSE dist/LICENSE.txt
           cd dist
-          zip ../gt7telem-linux.zip TRACE
+          zip ../gt7telem-linux.zip TRACE README.txt LICENSE.txt
 
       - name: Import GPG signing key
         run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import

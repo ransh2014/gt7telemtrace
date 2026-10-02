@@ -75,8 +75,10 @@ jobs:
       - name: Zip the exe
         shell: bash
         run: |
+          cp tools/binary_readmes/windows.txt dist/README.txt
+          cp LICENSE dist/LICENSE.txt
           cd dist
-          7z a ../gt7telem-windows.zip TRACE.exe
+          7z a ../gt7telem-windows.zip TRACE.exe README.txt LICENSE.txt
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

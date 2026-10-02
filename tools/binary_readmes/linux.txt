@@ -1,0 +1,38 @@
+TRACE - GT7 Telemetry Suite (Linux)
+https://gt7trace.netlify.app
+
+WHAT'S IN THIS ZIP
+  TRACE - the whole app as one binary. No Python needed.
+  Built on Ubuntu 22.04, so it needs glibc 2.35 or newer
+  (Ubuntu 22.04+, Fedora 36+, Debian 12+ and equivalents).
+  It needs a desktop session - it won't run headless.
+
+RUN IT
+  1. Unzip, open a terminal in that folder and run:
+       chmod +x TRACE && ./TRACE
+  2. A menu opens with three tools: Live Dashboard, Lap Analyst and
+     Race Analyst. Pick one.
+
+VERIFY THE DOWNLOAD (optional)
+  The release zip is signed with a dedicated GPG key. The public key
+  is in the repo: gpg-signing-key/trace-public-key.asc
+       gpg --import trace-public-key.asc
+       gpg --verify gt7telem-linux.zip.asc gt7telem-linux.zip
+
+CONNECT TO GT7
+  - Your PC and your PS4/PS5 must be on the same network.
+  - In the Live Dashboard enter your console's IP address, or use the
+    Auto-Detect button.
+  - TRACE sends a heartbeat to the console on UDP port 33739 and
+    receives telemetry on UDP port 33740. If nothing shows up, allow
+    UDP 33740 through your firewall.
+
+YOUR DATA
+  Laps are saved to ~/TRACE/laps, settings to ~/.gt7telem. If you run
+  TRACE from a folder you can write to, it stays portable and keeps
+  laps and settings.json next to the binary instead.
+
+HELP
+  Setup guide: https://gt7trace.netlify.app/setup
+  Issues:      https://github.com/ransh2014/gt7telemtrace/issues
+  License:     MIT (see LICENSE.txt)

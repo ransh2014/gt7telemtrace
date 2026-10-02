@@ -1,0 +1,38 @@
+TRACE - GT7 Telemetry Suite (macOS)
+https://gt7trace.netlify.app
+
+WHAT'S IN THIS ZIP
+  TRACE.app - the whole app. No Python or install needed.
+  Built for Apple Silicon. On an Intel Mac, use the pip or
+  source install instead (see the setup guide).
+
+RUN IT
+  1. Unzip and drag TRACE.app into Applications.
+  2. First launch: right-click TRACE.app -> Open -> Open again in the
+     dialog. macOS shows an "unidentified developer" warning because
+     the app is ad-hoc signed, not notarized (that needs a paid Apple
+     Developer account) - nothing is wrong with it.
+  3. Still refused? Run this once in Terminal, then open it again:
+       xattr -cr /Applications/TRACE.app
+  4. A menu opens with three tools: Live Dashboard, Lap Analyst and
+     Race Analyst. Pick one.
+
+CONNECT TO GT7
+  - Your Mac and your PS4/PS5 must be on the same network.
+  - In the Live Dashboard enter your console's IP address, or use the
+    Auto-Detect button.
+  - TRACE sends a heartbeat to the console on UDP port 33739 and
+    receives telemetry on UDP port 33740. If nothing shows up, allow
+    incoming connections for TRACE in the macOS firewall.
+
+YOUR DATA
+  Laps are saved to ~/TRACE/laps, settings to ~/.gt7telem.
+
+INSTALL WITH HOMEBREW INSTEAD
+  brew tap ransh2014/gt7telem
+  brew install --cask gt7telem
+
+HELP
+  Setup guide: https://gt7trace.netlify.app/setup
+  Issues:      https://github.com/ransh2014/gt7telemtrace/issues
+  License:     MIT (see LICENSE.txt)

@@ -79,8 +79,10 @@ jobs:
 
       - name: Zip the app bundle
         run: |
+          cp tools/binary_readmes/macos.txt dist/README.txt
+          cp LICENSE dist/LICENSE.txt
           cd dist
-          zip -r ../gt7telem-macos.zip TRACE.app
+          zip -r ../gt7telem-macos.zip TRACE.app README.txt LICENSE.txt
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

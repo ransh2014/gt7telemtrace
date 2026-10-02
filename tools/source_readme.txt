@@ -37,7 +37,7 @@ gt7telem/         The TRACE package itself (same source that ships on
   dashboard.py      Live telemetry dashboard (includes the Track Map panel
                     and the RECORD_RATE_OPTIONS list, if you want to add
                     your own recording sample rates)
-  lap_analyst.py    Lap analysis — 16 chart groups, A/B compare, replay,
+  lap_analyst.py    Lap analysis — 17 chart groups, A/B compare, replay,
                     CSV export, micro-sector heatmap, track boundary
                     overlay, leaderboard/ghost/consensus panel
   race_analyst.py   Race analysis — 15 chart groups, race-oriented

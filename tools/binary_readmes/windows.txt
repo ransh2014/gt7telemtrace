@@ -1,0 +1,37 @@
+TRACE - GT7 Telemetry Suite (Windows)
+https://gt7trace.netlify.app
+
+WHAT'S IN THIS ZIP
+  TRACE.exe - the whole app. No Python or install needed.
+
+RUN IT
+  1. Right-click this zip -> Extract All, then double-click TRACE.exe.
+  2. Windows SmartScreen warning? Click "More info" -> "Run anyway".
+     TRACE.exe isn't code-signed yet (a free signing certificate has
+     been applied for) - the warning doesn't mean anything is wrong.
+  3. A menu opens with three tools: Live Dashboard, Lap Analyst and
+     Race Analyst. Pick one.
+
+CONNECT TO GT7
+  - Your PC and your PS4/PS5 must be on the same network.
+  - In the Live Dashboard enter your console's IP address, or use the
+    Auto-Detect button.
+  - TRACE sends a heartbeat to the console on UDP port 33739 and
+    receives telemetry on UDP port 33740. If nothing shows up, allow
+    UDP 33740 through Windows Firewall.
+
+YOUR DATA
+  Laps are saved to ~/TRACE/laps. If you run TRACE from a folder you
+  can write to, it stays portable and keeps laps and settings.json
+  next to TRACE.exe instead.
+
+INSTALL WITH A PACKAGE MANAGER INSTEAD
+  winget install ransh2014.TRACE
+  scoop bucket add gt7telem https://github.com/ransh2014/scoop-gt7telem
+  scoop install gt7telem/gt7telem
+  choco install gt7telem
+
+HELP
+  Setup guide: https://gt7trace.netlify.app/setup
+  Issues:      https://github.com/ransh2014/gt7telemtrace/issues
+  License:     MIT (see LICENSE.txt)
