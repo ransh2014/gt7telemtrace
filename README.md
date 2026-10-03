@@ -57,6 +57,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Connection diagnostics — heartbeats, packet loss, decrypt/parse failures, actionable error messages
 - Remembers every PS4/PS5 IP you've connected to (most recent first), plus an Auto-Detect button that finds the console on your network
 - Automatic race recording — starts on a detected race start (race sessions only, not time trial/practice), stops at the flag or when you quit
+- **Fuel & tyre strategy (estimates)** — median fuel burn per lap, laps of fuel left, a finish check and a suggested pit-by lap, plus a tyre-stint readout (pace loss, trend, last-lap temperatures). GT7 sends no tyre wear, so the tyre figures are estimates and are labelled that way
 - Incident timeline
 - Lap history table with alerts
 
@@ -67,11 +68,13 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Driver ratings radar
 - Track-map heatmaps across 9 metrics (speed, throttle, brake, lateral/longitudinal/total G, tyre temp, RPM, steering)
 - CSV and HTML chart export
+- **Lap card** — one click turns a lap into a shareable 1200x630 PNG (car, track, time, thirds, headline stats, speed-coloured track map, speed/pedal traces)
 
 ### Race Analyst
 - Same chart-group depth as Lap Analyst (15 groups, race-oriented: Race overview + Laps in place of Sectors + Extended)
 - Race timeline, minimap heatmap, replay with speed control up to 32×
 - Per-lap splits (a partial final lap is shown but never counts as best/average), starting grid slot, and pit stops worked out from refuelling — GT7 sends no pit flag or live race position
+- Fuel per lap and laps per full tank, measured from the clean laps of the recording
 
 ### Tooling
 - `gt7telem-add-car` / `gt7telem-add-track` — add a missing car/track ID to the local database from the terminal (also runnable as `python -m gt7telem.add_car` / `python -m gt7telem.add_track`). Additions are saved beside `settings.json` (`car_ids_local.csv` / `course_ids_local.csv`), so they survive upgrades

@@ -32,6 +32,8 @@ from . import __version__, analytics, auth, config, lap_analyst, race_analyst
 # dynamic __import__() calls, PyInstaller can't see those.
 from . import dashboard as gt7telem
 
+config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
+
 # ── Theme (matches the analysis tools) ──────────────────────────────────
 if config.THEME == "light":
     BG     = "#f4f5fa"

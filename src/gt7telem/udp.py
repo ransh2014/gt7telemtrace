@@ -21,7 +21,7 @@ __all__ = [
     "get_snapshot", "get", "get_int", "get_float",
     "set_ip", "set_car", "set_track", "is_connected", "wait_for_connection",
     "get_diagnostics", "get_last_error", "get_incidents", "register_event",
-    "reset_lap", "get_log_lines", "discover_ps_ip", "get_ip",
+    "reset_lap", "get_log_lines", "discover_ps_ip", "get_ip", "StintTracker",
 ]
 
 _ps4_ip         = PS_IP    # mutable — updated by set_ip()
@@ -1115,3 +1115,197 @@ def discover_ps_ip(timeout: float = 2.0) -> str | None:
         return None
     finally:
         sock.close()
+
+# ── Fuel & tyre strategy (live estimates) ─────────────────────────────────────
+# GT7 reports fuel (as a % of the tank for nearly every car) and tyre
+# temperatures, but NOT tyre wear. Everything below is derived from the
+# live stream and is an estimate -- StintTracker.snapshot() says how much
+# data each number is based on so the UI can show that honestly.
+FUEL_WINDOW_LAPS = 5       # median fuel burn over the last N clean laps
+FUEL_SAFETY_LAPS = 0.5     # reserve, in laps of fuel, kept when suggesting a pit lap / checking the finish
+FUEL_MIN_LAP_USE = 0.05    # % -- a "lap" that used less fuel than this isn't a real lap (pause / glitch)
+REFUEL_JUMP_PCT  = 0.5     # fuel gained between two samples = a refuel (also treated as a tyre change)
+TYRE_HOT_C       = 100.0   # same thresholds as the dashboard's tyre colours / alerts
+TYRE_COLD_C      = 60.0
+PACE_MIN_LAPS    = 3       # clean stint laps needed before a pace-loss estimate is shown
+TREND_MIN_LAPS   = 4       # ... and before a per-lap trend is shown
+PACE_SPIKE       = 1.03    # a lap this much slower than BOTH neighbours is a one-off (traffic / off-track), not wear
+_PACE_BANDS = ((0.3, "Fresh"), (0.8, "Good"), (1.5, "Fading"), (float("inf"), "Worn"))
+
+
+def _median(values):
+    vals = sorted(values)
+    n = len(vals)
+    if n == 0:
+        return None
+    mid = n // 2
+    return vals[mid] if n % 2 else (vals[mid - 1] + vals[mid]) / 2.0
+
+
+def _valid_pace_laps(laps):
+    """Drop laps that say nothing about the tyres: anything over 25 % off the
+    stint median (spin, pit lane, red flag) and one-off spikes that are
+    slower than *both* neighbouring laps by PACE_SPIKE (traffic, off-track).
+    A steady fade never trips either test."""
+    if not laps:
+        return []
+    med = _median(laps)
+    laps = [t for t in laps if t <= med * 1.25]
+    return [t for i, t in enumerate(laps)
+            if not (0 < i < len(laps) - 1 and t > PACE_SPIKE * max(laps[i - 1], laps[i + 1]))]
+
+
+def _theil_sen(ys):
+    """Median of all pairwise slopes of ys against 0..n-1 -- a trend that a
+    single slow lap can't drag around the way a least-squares line can."""
+    slopes = [(ys[j] - ys[i]) / (j - i)
+              for i in range(len(ys)) for j in range(i + 1, len(ys))]
+    return _median(slopes)
+
+
+class StintTracker:
+    """Rolling fuel-burn and tyre-stint estimates from the live telemetry
+    stream. Feed it every snapshot with update(); read the numbers with
+    snapshot(). Pure Python and independent of Tk, so it is unit-tested.
+
+    * Fuel per lap is the median of the last FUEL_WINDOW_LAPS *clean* laps
+      (no refuel, no restart), so one off-track lap or a lift-and-coast lap
+      can't skew it.
+    * A refuel is treated as a pit stop with a tyre change and starts a new
+      stint; reset_stint() does the same by hand (e.g. a tyre-only stop).
+    * Tyre state is the pace lost against the stint's best clean lap. Fuel
+      burn-off makes the car quicker as the stint goes on, which hides some
+      wear, so this under-reads rather than over-reads."""
+
+    def __init__(self):
+        self.reset_all()
+
+    def reset_all(self):
+        """Forget everything -- new car, new session or a race restart."""
+        self._fuel_laps = deque(maxlen=FUEL_WINDOW_LAPS)
+        self._prev_lap = 0
+        self._prev_fuel = None
+        self._lap_start_fuel = None
+        self._lap_dirty = False
+        self._total_laps = 0
+        self._last_fuel = None
+        self._heat = self._new_heat()
+        self._last_heat = None
+        self.reset_stint()
+
+    def reset_stint(self):
+        """Fresh tyres: start a new stint (pace history restarts)."""
+        self._stint_laps = []    # lap times (s) of clean laps after the stint's first lap
+        self._stint_age = 0      # laps completed this stint
+
+    @staticmethod
+    def _new_heat():
+        return {"n": 0, "hot": 0, "cold": 0, "front": 0.0, "rear": 0.0}
+
+    def _begin(self, lap, fuel):
+        self._prev_lap = lap
+        self._lap_start_fuel = fuel
+        self._lap_dirty = False
+        self._heat = self._new_heat()
+
+    def update(self, lap_number, total_laps, fuel, last_lap_ms, temps=None, speed_kmh=0.0):
+        """Call once per telemetry snapshot. `temps` is (fl, fr, rl, rr) in C."""
+        try:
+            lap = int(lap_number or 0)
+            fuel = None if fuel is None else float(fuel)
+        except (TypeError, ValueError):
+            return
+        if fuel is None or lap <= 0:
+            return
+        self._total_laps = int(total_laps or 0)
+        self._last_fuel = fuel
+
+        if self._prev_lap == 0 or self._lap_start_fuel is None:
+            self._begin(lap, fuel)
+            self._prev_fuel = fuel
+            return
+        if lap < self._prev_lap or lap > self._prev_lap + 1:
+            # race restarted or laps were skipped: nothing learned so far can be trusted
+            self._fuel_laps.clear()
+            self.reset_stint()
+            self._begin(lap, fuel)
+            self._prev_fuel = fuel
+            return
+
+        if self._prev_fuel is not None and fuel - self._prev_fuel > REFUEL_JUMP_PCT:
+            self._lap_dirty = True      # this lap's burn is meaningless
+            self.reset_stint()          # ... and a stop means new tyres
+
+        if temps and speed_kmh > 20:
+            vals = [float(x) for x in temps if x is not None]
+            if len(vals) == 4 and all(v > 0 for v in vals):
+                h = self._heat
+                h["n"] += 1
+                h["hot"] += 1 if max(vals) > TYRE_HOT_C else 0
+                h["cold"] += 1 if min(vals) < TYRE_COLD_C else 0
+                h["front"] += (vals[0] + vals[1]) / 2.0
+                h["rear"] += (vals[2] + vals[3]) / 2.0
+
+        if lap == self._prev_lap + 1:
+            self._finish_lap(fuel, last_lap_ms)
+            self._begin(lap, fuel)
+        self._prev_fuel = fuel
+
+    def _finish_lap(self, fuel, last_lap_ms):
+        used = self._lap_start_fuel - fuel
+        lap_s = (last_lap_ms / 1000.0) if (last_lap_ms and last_lap_ms > 0) else None
+        if not self._lap_dirty and used >= FUEL_MIN_LAP_USE:
+            self._fuel_laps.append(used)
+            # the first lap of a stint (standing start / out-lap, cold tyres) is slow for
+            # reasons that aren't wear, so it never goes into the pace history
+            if lap_s and self._stint_age > 0:
+                self._stint_laps.append(lap_s)
+        self._stint_age += 1
+        h = self._heat
+        if h["n"] >= 5:
+            self._last_heat = {
+                "front_avg": h["front"] / h["n"],
+                "rear_avg":  h["rear"] / h["n"],
+                "pct_hot":   100.0 * h["hot"] / h["n"],
+                "pct_cold":  100.0 * h["cold"] / h["n"],
+            }
+
+    def snapshot(self):
+        """Current estimates. Anything that can't be known yet is None."""
+        fpl = _median(self._fuel_laps)
+        out = {
+            "fuel_per_lap": fpl, "fuel_basis_laps": len(self._fuel_laps),
+            "laps_of_fuel": None, "spare_laps": None, "stop_needed": None,
+            "pit_by_lap": None, "stint_age": self._stint_age,
+            "stint_clean_laps": 0, "pace_loss_s": None, "trend_s_per_lap": None,
+            "tyre_state": None, "heat": self._last_heat,
+        }
+        if fpl and fpl > 0 and self._last_fuel is not None:
+            laps_of_fuel = self._last_fuel / fpl
+            out["laps_of_fuel"] = laps_of_fuel
+            lap = self._prev_lap
+            is_race = self._total_laps > 0 and 0 < lap <= self._total_laps
+            if is_race and self._lap_start_fuel is not None:
+                laps_to_run = self._total_laps - lap + 1          # includes the current lap
+                spare = self._lap_start_fuel / fpl - laps_to_run   # fixed for the whole lap
+                out["spare_laps"] = spare
+                out["stop_needed"] = spare < FUEL_SAFETY_LAPS
+            else:
+                out["stop_needed"] = True   # no race distance known: always show a pit-by lap
+            if out["stop_needed"]:
+                can_finish = int(math.floor(laps_of_fuel - FUEL_SAFETY_LAPS))
+                out["pit_by_lap"] = lap + max(0, can_finish - 1)
+
+        if self._stint_laps:
+            valid = _valid_pace_laps(self._stint_laps)
+            out["stint_clean_laps"] = len(valid)
+            if len(valid) >= PACE_MIN_LAPS:
+                recent = min(valid[-2:])   # the better of the last two, so one bad lap can't fake a verdict
+                out["pace_loss_s"] = max(0.0, recent - min(valid))
+                for limit, label in _PACE_BANDS:
+                    if out["pace_loss_s"] < limit:
+                        out["tyre_state"] = label
+                        break
+            if len(valid) >= TREND_MIN_LAPS:
+                out["trend_s_per_lap"] = _theil_sen(valid)
+        return out

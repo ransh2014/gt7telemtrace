@@ -28,6 +28,8 @@ warnings.filterwarnings("ignore")
 from . import __version__, leaderboard  # noqa: E402  (kept with the other package imports)
 from . import config as runtime_config  # noqa: E402
 
+runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
+
 # ── Theme (matches lap_analyst.py) ─────────────────────────────────────────────
 if runtime_config.THEME == "light":
     BG   = "#f4f5fa"
@@ -227,12 +229,40 @@ def count_pit_stops(df):
     transitions = (df["pit_flag"].diff() > 0).sum()
     return int(transitions)
 
+def fuel_per_lap_stats(df):
+    """Median fuel burn per full lap (units of GT7's fuel gauge, i.e. % for
+    nearly every car) and the laps one full tank would last, from the
+    recorded samples. Laps that contain a refuel / pit lane, the grid lap
+    and a trailing partial lap are skipped so a stop can't skew the figure.
+    Returns (fuel_per_lap, laps_per_tank, laps_used); the first two are None
+    when there isn't a clean full lap to measure."""
+    segs = [s for s in get_lap_segments(df) if int(s["lap_number"].iloc[0]) != 0]
+    used = []
+    # a lap's burn runs to the next lap's first sample; the last segment has no end, so it's skipped
+    for seg, nxt in zip(segs, segs[1:]):
+        fuel = seg["fuel_remaining"].to_numpy(dtype=float)
+        if len(fuel) < 2:
+            continue
+        pit = float(seg["pit_flag"].max()) if "pit_flag" in seg.columns else 0.0
+        if (np.diff(fuel) > REFUEL_MIN_JUMP).any() or pit > 0:
+            continue
+        burn = float(fuel[0] - float(nxt["fuel_remaining"].iloc[0]))
+        if burn >= 0.05:
+            used.append(burn)
+    if not used:
+        return None, None, 0
+    fpl = float(np.median(used))
+    cap = float(df["fuel_capacity"].max()) if "fuel_capacity" in df.columns else 100.0
+    if cap <= 0:   # EVs report a capacity of 0; the gauge is still a 0-100 %
+        cap = 100.0
+    return fpl, cap / fpl, len(used)
 def build_stats(data, df):
     splits = lap_split_stats(df)
     lap_times = [s["time_s"] for s in splits if s["complete"] and s["time_s"] > 1]
     best_lap = min(lap_times) if lap_times else 0
     avg_lap  = float(np.mean(lap_times)) if lap_times else 0
     fuel_used = df["fuel_remaining"].iloc[0] - df["fuel_remaining"].iloc[-1]
+    fuel_lap, laps_tank, _n_fuel_laps = fuel_per_lap_stats(df)
     dur = data.get("race_duration_s", df["t"].iloc[-1] - df["t"].iloc[0])
     return {
         "Duration":     fmt_dur(dur),
@@ -248,6 +278,8 @@ def build_stats(data, df):
         "Max Lat G":    f"{df['lat_g'].abs().max():.2f}g",
         "Max Long G":   f"{df['long_g'].abs().max():.2f}g",
         "Fuel Used":    f"{fuel_used:.2f}",
+        "Fuel / Lap":   f"{fuel_lap:.2f}" if fuel_lap else "--",
+        "Laps / Tank":  f"{laps_tank:.1f}" if laps_tank else "--",
         "Pit Stops":    f"{count_pit_stops(df)}",
         # GT7 only sends the starting-grid slot (-1 once racing), so this
         # is where the race started from -- there is no live/finish position.

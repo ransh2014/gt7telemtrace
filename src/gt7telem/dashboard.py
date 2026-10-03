@@ -23,6 +23,8 @@ from . import udp as telem
 from .config import KNOWN_IPS
 from .config import PS_IP as PS4_IP
 
+runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Recording sample rate
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,6 +113,8 @@ class App(tk.Tk):
         self.minsize(1100, 700)
         self._fuel_per_lap      = 0.0
         self._fuel_at_lap_start = 0.0
+        self._strategy          = telem.StintTracker()   # live fuel / tyre-stint estimates
+        self._strat_car_id      = None
         self._track_pts  = deque(maxlen=3000)
         self._flash_tick = 0
         self._flash_on   = False
@@ -443,6 +447,37 @@ class App(tk.Tk):
         tk.Label(eng_f, text="* GT7 sends fixed values for these (85 / 110 C) -- not simulated",
                  fg=DIM, bg=BG, font=(runtime_config.MONO, 7)).pack(side="bottom", anchor="w", padx=6)
 
+        # ── Strategy (live estimates) ─────────────────────────────────────────
+        # GT7 doesn't send tyre wear, so the tyre figures are estimates built
+        # from lap-time drop-off (see udp.StintTracker); fuel is measured.
+        strat_f = tk.LabelFrame(left, text=" STRATEGY (est.) ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
+        strat_f.pack(fill="x", pady=4, padx=2)
+        for row_items in (
+            [("FUEL/LAP", "st_fpl_lbl"), ("FUEL LAPS", "st_laps_lbl"),
+             ("FINISH", "st_finish_lbl"), ("PIT BY", "st_pit_lbl")],
+            [("STINT", "st_stint_lbl"), ("PACE LOSS", "st_loss_lbl"),
+             ("TREND", "st_trend_lbl"), ("TYRES", "st_tyre_lbl")],
+        ):
+            row_f = tk.Frame(strat_f, bg=BG)
+            row_f.pack(fill="x")
+            for title, attr in row_items:
+                col_f = tk.Frame(row_f, bg=BG)
+                col_f.pack(side="left", expand=True, padx=6, pady=3)
+                tk.Label(col_f, text=title, fg=DIM, bg=BG, font=(runtime_config.MONO, 8)).pack()
+                lbl = tk.Label(col_f, text="--", fg=FG, bg=BG, font=(runtime_config.MONO, 12, "bold"))
+                lbl.pack()
+                setattr(self, attr, lbl)
+        self.st_heat_lbl = tk.Label(strat_f, text="Tyre temps last lap: --", fg=DIM, bg=BG,
+                                    font=(runtime_config.MONO, 8), anchor="w")
+        self.st_heat_lbl.pack(fill="x", padx=6)
+        foot_f = tk.Frame(strat_f, bg=BG)
+        foot_f.pack(fill="x", padx=6, pady=(0, 3))
+        tk.Label(foot_f, text="Estimates from live data. GT7 sends no tyre wear; fuel burn-off hides some pace loss.",
+                 fg=DIM, bg=BG, font=(runtime_config.MONO, 7), anchor="w").pack(side="left")
+        new_tyres = tk.Label(foot_f, text="[ NEW TYRES ]", fg=ACC, bg=BG, cursor="hand2",
+                             font=(runtime_config.MONO, 8, "bold"))
+        new_tyres.pack(side="right")
+        new_tyres.bind("<Button-1>", lambda _e: self._on_new_tyres())
         # ── Dynamics ─────────────────────────────────────────────────────────
         dyn_f = tk.LabelFrame(left, text=" DYNAMICS ", fg=ACC, bg=BG, font=(runtime_config.MONO, 9))
         dyn_f.pack(fill="x", pady=4, padx=2)
@@ -701,6 +736,59 @@ class App(tk.Tk):
                 self._delta_ref_cache["samples"] = None
         return self._delta_ref_cache["samples"]
 
+    def _on_new_tyres(self):
+        """[ NEW TYRES ] -- start a fresh tyre stint (a refuel already does this)."""
+        self._strategy.reset_stint()
+        self.log_msg("Strategy: new tyre stint started")
+
+    def _update_strategy_labels(self, st, cur_lap, unit):
+        """Paint the STRATEGY panel from a StintTracker snapshot. A leading
+        '~' marks a figure based on fewer than 3 laps of data."""
+        GRN, AMB, RED = "#2ecc71", "#f39c12", "#e74c3c"
+        FGC, DIMC = "#c0c0e0", "#555566"
+        rough = "~" if st["fuel_basis_laps"] < 3 else ""
+
+        fpl = st["fuel_per_lap"]
+        self.st_fpl_lbl.config(text=f"{rough}{fpl:.2f}{unit}" if fpl else "--",
+                               fg=FGC if fpl else DIMC)
+        lof = st["laps_of_fuel"]
+        self.st_laps_lbl.config(text=f"{rough}{lof:.1f}" if lof is not None else "--",
+                                fg=(RED if lof < 2 else AMB if lof < 4 else FGC) if lof is not None else DIMC)
+
+        spare = st["spare_laps"]
+        if spare is None:
+            self.st_finish_lbl.config(text="--", fg=DIMC)
+        elif spare < 0:
+            self.st_finish_lbl.config(text=f"-{abs(spare):.1f} laps", fg=RED)
+        elif st["stop_needed"]:
+            self.st_finish_lbl.config(text="TIGHT", fg=AMB)
+        else:
+            self.st_finish_lbl.config(text=f"+{spare:.1f} laps", fg=GRN)
+
+        pit = st["pit_by_lap"]
+        if pit is not None:
+            self.st_pit_lbl.config(text=f"LAP {pit}", fg=RED if pit <= cur_lap else AMB)
+        elif st["stop_needed"] is False:
+            self.st_pit_lbl.config(text="NO STOP", fg=GRN)
+        else:
+            self.st_pit_lbl.config(text="--", fg=DIMC)
+
+        self.st_stint_lbl.config(text=f"{st['stint_age']} laps", fg=FGC)
+        loss, trend, state = st["pace_loss_s"], st["trend_s_per_lap"], st["tyre_state"]
+        self.st_loss_lbl.config(text=f"+{loss:.2f}s" if loss is not None else "--",
+                                fg=FGC if loss is not None else DIMC)
+        self.st_trend_lbl.config(text=f"{trend:+.2f}s/lap" if trend is not None else "--",
+                                 fg=(AMB if trend > 0.15 else FGC) if trend is not None else DIMC)
+        state_col = {"Fresh": GRN, "Good": GRN, "Fading": AMB, "Worn": RED}
+        self.st_tyre_lbl.config(text=state if state else "--", fg=state_col.get(state, DIMC))
+
+        heat = st["heat"]
+        if heat:
+            self.st_heat_lbl.config(
+                text=(f"Tyre temps last lap: front {heat['front_avg']:.0f}C / rear {heat['rear_avg']:.0f}C"
+                      f"  | hot {heat['pct_hot']:.0f}%  cold {heat['pct_cold']:.0f}% of the lap"))
+        else:
+            self.st_heat_lbl.config(text="Tyre temps last lap: --")
     def _on_ip_change(self, force=False):
         """force=True (Enter) reconnects even to the same IP, as a manual
         retry. FocusOut and dropdown selection only act when the IP actually
@@ -971,11 +1059,28 @@ class App(tk.Tk):
             fuel_str = f"{fuel_r:.1f}/{fuel_c:.0f}"
         self.fuel_lbl.config(text=fuel_str)
 
-        _fuel_laps_num = (fuel_r / self._fuel_per_lap) \
-                         if (fuel_r > 0 and self._fuel_per_lap > 0) else 999
+        # Fuel & tyre strategy: forget everything on a car change, then feed
+        # every snapshot to the tracker (it works out laps/stints itself).
+        _strat_car = d.get("car_id")
+        if _strat_car and _strat_car != self._strat_car_id:
+            if self._strat_car_id is not None:
+                self._strategy.reset_all()
+            self._strat_car_id = _strat_car
+        self._strategy.update(
+            cur_lap, tot_lap, fuel_r, last_ms,
+            (d.get("tyre_temp_fl"), d.get("tyre_temp_fr"),
+             d.get("tyre_temp_rl"), d.get("tyre_temp_rr")), spd)
+        _st = self._strategy.snapshot()
+        self._update_strategy_labels(_st, cur_lap, "%" if (fuel_c == 100 or is_ev) else "")
+
+        # FUEL LAPS: the tracker's estimate; before it has seen a clean lap,
+        # fall back to the burn of the last lap that was recorded/saved
+        _fl = _st["laps_of_fuel"]
+        if _fl is None and fuel_r > 0 and self._fuel_per_lap > 0:
+            _fl = fuel_r / self._fuel_per_lap
+        _fuel_laps_num = _fl if _fl is not None else 999
         laps_rem = f"{_fuel_laps_num:.1f}" if _fuel_laps_num < 999 else "--"
         self.fuellaps_lbl.config(text=laps_rem)
-
         boost = float(d.get("boost") or 0)
         self.boost_lbl.config(text=f"{boost:.2f}" if boost > 0 else "--")
         self.oil_lbl.config(text=f"{float(d.get('oil_temp') or 0):.0f}")

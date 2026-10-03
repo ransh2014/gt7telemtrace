@@ -19,7 +19,7 @@ __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_R
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL",
            "THEME", "NOTIFY_ENABLED", "UPDATE_CHECK_ENABLED", "backup_laps",
-           "ensure_ca_bundle", "explain_error", "MONO"]
+           "ensure_ca_bundle", "explain_error", "MONO", "install_mac_buttons"]
 
 _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
 _ENC_PREFIX = "enc:v1:"
@@ -415,3 +415,122 @@ def _mono_font(platform: str) -> str:
 
 
 MONO = _mono_font(sys.platform)
+
+def _make_mac_button_class(tk):
+    """Build the label-based button class. A function so that importing
+    config never imports tkinter (the headless modules and tests rely on that)."""
+
+    class MacButton(tk.Label):
+        """A flat button drawn as a Label. macOS's native (Aqua) Tk ignores a
+        Button's bg/fg, so TRACE's dark theme -- and light text on a dark
+        button -- came out as unreadable default-white buttons there. A Label
+        honours colours on every OS; this gives it the parts of tk.Button the
+        app uses: command=, state=, hover/press colours and invoke()."""
+
+        def __init__(self, master=None, cnf=None, **kw):
+            kw = dict(cnf or {}, **kw)
+            self._command = kw.pop("command", None)
+            self._state = kw.pop("state", "normal")
+            self._active_bg = kw.pop("activebackground", None)
+            self._active_fg = kw.pop("activeforeground", None)
+            for ignored in ("default", "overrelief", "repeatdelay", "repeatinterval", "disabledforeground"):
+                kw.pop(ignored, None)
+            kw.setdefault("relief", "flat")
+            tk.Label.__init__(self, master, **kw)
+            self._bg = self.cget("bg")
+            self._fg = self.cget("fg")
+            self._down = False
+            self.bind("<Enter>", self._enter)
+            self.bind("<Leave>", self._leave)
+            self.bind("<ButtonPress-1>", self._press)
+            self.bind("<ButtonRelease-1>", self._release)
+            self._apply_state()
+
+        def _paint(self, bg, fg):
+            tk.Label.configure(self, bg=bg, fg=fg)
+
+        def _apply_state(self):
+            if self._state == "disabled":
+                tk.Label.configure(self, bg=self._bg, fg="#777777", cursor="arrow")
+            else:
+                tk.Label.configure(self, bg=self._bg, fg=self._fg, cursor="hand2")
+
+        def _enter(self, _e):
+            if self._state != "disabled" and self._active_bg:
+                self._paint(self._active_bg, self._active_fg or self._fg)
+
+        def _leave(self, _e):
+            self._down = False
+            self._apply_state()
+
+        def _press(self, _e):
+            if self._state == "disabled":
+                return
+            self._down = True
+            if self._active_bg:
+                self._paint(self._active_bg, self._active_fg or self._fg)
+
+        def _release(self, e):
+            was_down, self._down = self._down, False
+            if not was_down or self._state == "disabled":
+                return
+            self._apply_state()
+            inside = 0 <= e.x < self.winfo_width() and 0 <= e.y < self.winfo_height()
+            if inside and self._command:
+                self._command()
+
+        def configure(self, cnf=None, **kw):
+            if cnf is None and not kw:
+                return tk.Label.configure(self)   # a plain query
+            kw = dict(cnf or {}, **kw)
+            if "command" in kw:
+                self._command = kw.pop("command")
+            if "state" in kw:
+                self._state = kw.pop("state")
+            if "activebackground" in kw:
+                self._active_bg = kw.pop("activebackground")
+            if "activeforeground" in kw:
+                self._active_fg = kw.pop("activeforeground")
+            for key in ("bg", "background"):
+                if key in kw:
+                    self._bg = kw.pop(key)
+            for key in ("fg", "foreground"):
+                if key in kw:
+                    self._fg = kw.pop(key)
+            if kw:
+                tk.Label.configure(self, **kw)
+            self._apply_state()
+
+        config = configure
+
+        def cget(self, key):
+            if key == "state":
+                return self._state
+            if key == "command":
+                return self._command
+            return tk.Label.cget(self, key)
+
+        __getitem__ = cget   # Misc binds its own cget to `w[key]`; point it at this one
+
+        def invoke(self):
+            if self._state != "disabled" and self._command:
+                return self._command()
+
+    return MacButton
+
+
+def install_mac_buttons():
+    """On macOS, make tk.Button a label-based button (see MacButton) so the
+    app's colours show up there. A no-op everywhere else. Safe to call from
+    every GUI module; returns True when the replacement is in place."""
+    if sys.platform != "darwin":
+        return False
+    try:
+        import tkinter as tk
+    except ImportError:
+        return False
+    if not getattr(tk.Button, "_trace_label_button", False):
+        cls = _make_mac_button_class(tk)
+        cls._trace_label_button = True
+        tk.Button = cls
+    return True

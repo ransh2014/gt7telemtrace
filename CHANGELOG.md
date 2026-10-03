@@ -5,6 +5,26 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-03
+Live fuel & tyre strategy, shareable lap cards, and cross-platform polish.
+
+New
+- **Live Dashboard: STRATEGY (est.) panel.** Fuel per lap is the median of your last clean laps (a refuel or
+  restart never skews it), with laps of fuel left, a finish check (spare laps, or how far short) and a suggested
+  pit-by lap. The tyre readout shows stint age, pace lost against your best stint lap, the per-lap trend, a
+  Fresh / Good / Fading / Worn state and last-lap tyre temperatures. GT7 doesn't send tyre wear, so the tyre
+  figures are estimates and say so. A refuel starts a new stint; `[ NEW TYRES ]` does it by hand.
+- **Lap Analyst: Export Lap Card (PNG).** One click turns the loaded lap into a 1200x630 image: car, track, lap
+  time, thirds, headline stats, a speed-coloured track map (when the lap has GPS data) and the speed / pedal traces.
+- **Race Analyst:** the stats table now includes Fuel / Lap and Laps / Tank for a recorded race.
+
+Fixes
+- macOS: buttons now show TRACE's colours. Apple's native Tk ignores a button's background, which left light
+  text on white buttons; buttons are now drawn as labels there (no change on Windows or Linux).
+- The alert sound (new personal best, race end) now plays on macOS (`afplay`) and Linux (freedesktop / ALSA
+  players, then the Tk bell). It was Windows-only before; elsewhere it printed a terminal bell that a packaged
+  app can't play.
+
 ## [0.5.3] - 2026-10-02
 Maintenance release.
 

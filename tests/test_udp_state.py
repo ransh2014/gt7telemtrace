@@ -242,3 +242,199 @@ def test_partial_last_lap_is_not_the_best_lap():
     assert stats["Best Lap"] == "1:35.000"
     assert stats["Laps"] == "2 (+1 partial)"
     assert stats["Grid Pos"] == "P3"
+
+
+# ── Fuel & tyre strategy (udp.StintTracker) ───────────────────────────────────
+def _drive(tr, first_lap, laps, fuel, per_lap, total, times_ms, temps=(85, 85, 90, 90), refuel_on=None):
+    """Feed `tr` like the live stream does: 10 snapshots per lap, the lap
+    counter ticking over with the previous lap's time. Returns the fuel left
+    and the lap the car is on next. `refuel_on` = (lap, amount) adds fuel
+    halfway round that lap."""
+    lap = first_lap
+    tr.update(lap, total, fuel, -1, temps, 150)
+    for i in range(laps):
+        for k in range(10):
+            fuel -= per_lap / 10
+            if refuel_on and refuel_on[0] == lap and k == 5:
+                fuel += refuel_on[1]
+            tr.update(lap, total, fuel, times_ms[i - 1] if i else -1, temps, 150)
+        lap += 1
+        tr.update(lap, total, fuel, times_ms[i], temps, 150)
+    return fuel, lap
+
+
+def test_fuel_per_lap_is_a_median_of_clean_laps():
+    tr = udp.StintTracker()
+    # burn per lap: 6, 6, 12 (one thirsty lap), 6, 6
+    fuel, lap = 100.0, 1
+    tr.update(lap, 20, fuel, -1)
+    for burn in (6.0, 6.0, 12.0, 6.0, 6.0):
+        fuel -= burn
+        lap += 1
+        tr.update(lap, 20, fuel, 90000)
+    snap = tr.snapshot()
+    assert snap["fuel_per_lap"] == pytest.approx(6.0)
+    assert snap["fuel_basis_laps"] == 5
+    assert snap["laps_of_fuel"] == pytest.approx(fuel / 6.0)
+
+
+def test_nothing_is_claimed_before_a_lap_is_done():
+    tr = udp.StintTracker()
+    tr.update(1, 10, 100.0, -1)
+    tr.update(1, 10, 99.0, -1)
+    snap = tr.snapshot()
+    assert snap["fuel_per_lap"] is None and snap["laps_of_fuel"] is None
+    assert snap["pit_by_lap"] is None and snap["tyre_state"] is None
+
+
+def test_finish_check_and_pit_by_lap():
+    # 12-lap race at 9 % a lap: after 6 laps there is fuel for 5.1 laps but 6 left to run
+    tr = udp.StintTracker()
+    fuel, lap = _drive(tr, 1, 6, 100.0, 9.0, 12, [92000] * 6)
+    snap = tr.snapshot()
+    assert lap == 7 and snap["stop_needed"] is True
+    assert snap["spare_laps"] == pytest.approx(46.0 / 9.0 - 6)
+    # 0.5 lap in hand: finish laps 7-10 then pit
+    assert snap["pit_by_lap"] == 10
+
+    # an 8-lap race at 5 % a lap has plenty: no stop, no pit-by lap
+    tr = udp.StintTracker()
+    _drive(tr, 1, 4, 100.0, 5.0, 8, [92000] * 4)
+    snap = tr.snapshot()
+    assert snap["stop_needed"] is False and snap["pit_by_lap"] is None and snap["spare_laps"] > 0.5
+
+
+def test_pit_by_is_this_lap_when_the_tank_is_nearly_empty():
+    tr = udp.StintTracker()
+    _drive(tr, 1, 6, 60.0, 9.0, 12, [92000] * 6)   # 6 % left = 0.67 laps
+    assert tr.snapshot()["pit_by_lap"] == 7          # box at the end of the lap it is on
+
+
+def test_practice_with_no_race_length_still_gives_a_pit_by_lap():
+    tr = udp.StintTracker()
+    _drive(tr, 1, 3, 100.0, 9.0, 0, [92000] * 3)
+    snap = tr.snapshot()
+    assert snap["spare_laps"] is None and snap["pit_by_lap"] is not None
+
+
+def test_a_refuel_is_not_counted_as_a_lap_and_starts_a_new_stint():
+    tr = udp.StintTracker()
+    _drive(tr, 1, 4, 100.0, 6.0, 20, [92000] * 4)
+    assert tr.snapshot()["stint_age"] == 4
+    # lap 5 includes a +40 refuel: its burn must not enter the average, and the stint restarts
+    fuel, lap = _drive(tr, 5, 1, 76.0, 6.0, 20, [95000], refuel_on=(5, 40.0))
+    snap = tr.snapshot()
+    assert snap["fuel_per_lap"] == pytest.approx(6.0)
+    assert snap["fuel_basis_laps"] == 4
+    assert snap["stint_age"] == 1
+
+
+def test_new_tyres_button_restarts_only_the_stint():
+    tr = udp.StintTracker()
+    _drive(tr, 1, 5, 100.0, 5.0, 20, [92000, 92100, 92200, 92300, 92400])
+    tr.reset_stint()
+    snap = tr.snapshot()
+    assert snap["stint_age"] == 0 and snap["pace_loss_s"] is None
+    assert snap["fuel_per_lap"] == pytest.approx(5.0)   # fuel history is kept
+
+
+def test_tyre_pace_loss_trend_and_state():
+    tr = udp.StintTracker()
+    # lap 1 (out-lap) is slow and ignored; then 92.0 climbing 0.4 s a lap
+    times = [95000, 92000, 92400, 92800, 93200, 93600]
+    _drive(tr, 1, 6, 100.0, 5.0, 20, times)
+    snap = tr.snapshot()
+    assert snap["stint_clean_laps"] == 5
+    assert snap["pace_loss_s"] == pytest.approx(1.2)      # best 92.0 vs the better of the last two (93.2)
+    assert snap["trend_s_per_lap"] == pytest.approx(0.4)
+    assert snap["tyre_state"] == "Fading"
+
+
+def test_a_traffic_lap_does_not_count_as_tyre_wear():
+    tr = udp.StintTracker()
+    times = [95000, 92000, 92100, 99000, 92200, 92300]   # lap 4 is 7 s slow (off / traffic)
+    _drive(tr, 1, 6, 100.0, 5.0, 20, times)
+    snap = tr.snapshot()
+    assert snap["stint_clean_laps"] == 4
+    assert snap["pace_loss_s"] < 0.5 and snap["tyre_state"] in ("Fresh", "Good")
+
+
+def test_race_restart_or_skipped_laps_wipe_the_estimates():
+    tr = udp.StintTracker()
+    _drive(tr, 1, 4, 100.0, 6.0, 12, [92000] * 4)
+    assert tr.snapshot()["fuel_per_lap"] is not None
+    tr.update(1, 12, 100.0, -1)          # lap counter went backwards: restarted
+    assert tr.snapshot()["fuel_per_lap"] is None
+    _drive(tr, 1, 2, 100.0, 6.0, 12, [92000] * 2)
+    tr.update(7, 12, 60.0, 92000)        # jumped from lap 3 to 7: don't trust the gap
+    assert tr.snapshot()["fuel_per_lap"] is None
+
+
+def test_tyre_heat_summary_for_the_last_lap():
+    tr = udp.StintTracker()
+    _drive(tr, 1, 2, 100.0, 5.0, 20, [92000] * 2, temps=(110, 112, 95, 96))
+    heat = tr.snapshot()["heat"]
+    assert heat["front_avg"] == pytest.approx(111.0) and heat["rear_avg"] == pytest.approx(95.5)
+    assert heat["pct_hot"] == pytest.approx(100.0) and heat["pct_cold"] == 0.0
+
+
+def test_ev_battery_is_tracked_like_fuel():
+    tr = udp.StintTracker()
+    _drive(tr, 1, 4, 100.0, 7.0, 10, [92000] * 4)
+    assert tr.snapshot()["fuel_per_lap"] == pytest.approx(7.0)
+
+
+# ── Race Analyst: fuel per lap from a recording ───────────────────────────────
+def test_race_fuel_per_lap_skips_refuel_laps_and_the_partial_lap():
+    from gt7telem.race_analyst import fuel_per_lap_stats
+    rows, fuel, t = [], 100.0, 0.0
+    for lap in range(1, 6):
+        for k in range(10):
+            if lap == 3 and k == 5:
+                fuel += 40
+            fuel -= 0.5
+            t += 1.0
+            rows.append(dict(t=t, lap_number=lap, fuel_remaining=fuel, fuel_capacity=100.0, pit_flag=0.0))
+    df = pd.DataFrame(rows)
+    fpl, laps_tank, used = fuel_per_lap_stats(df)
+    assert fpl == pytest.approx(5.0) and laps_tank == pytest.approx(20.0) and used == 3
+    assert fuel_per_lap_stats(df.iloc[:5]) == (None, None, 0)
+
+
+# ── Lap Analyst: shareable lap card ───────────────────────────────────────────
+def _card_lap(n=300, gps=True):
+    from gt7telem.lap_analyst import load_lap_data
+    th = np.linspace(0, 2 * np.pi, n)
+    x, z = 400 * np.cos(th), 250 * np.sin(th)
+    dist = np.concatenate([[0], np.cumsum(np.hypot(np.diff(x), np.diff(z)))])
+    samples = []
+    for i in range(n):
+        s = dict(t=i * 0.1, speed_kmh=float(150 + 80 * np.sin(3 * th[i])), throttle=0.6, brake=0.1,
+                 track_position=float(dist[i]), gear=3, ang_y=0.1, fuel_remaining=70 - i * 0.02,
+                 fuel_capacity=100.0, tyre_temp_fl=80, tyre_temp_fr=80, tyre_temp_rl=88, tyre_temp_rr=88)
+        if gps:
+            s.update(world_x=float(x[i]), world_z=float(z[i]))
+        samples.append(s)
+    return load_lap_data({"car": "Test Car", "track": "test_circuit", "lap_time_s": 83.456,
+                          "recorded_at": "20261002_141500", "samples": samples})
+
+
+@pytest.mark.parametrize("gps", [True, False])
+def test_lap_card_is_a_1200x630_png(gps):
+    import io
+
+    from PIL import Image
+
+    from gt7telem.lap_analyst import lap_card_png
+    data, df = _card_lap(gps=gps)
+    png = lap_card_png(data, df)
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    assert Image.open(io.BytesIO(png)).size == (1200, 630)
+
+
+def test_lap_card_for_a_ghost_lap_with_only_the_compact_fields():
+    from gt7telem.lap_analyst import lap_card_png, load_lap_data
+    samples = [dict(track_position=float(i * 5), speed_kmh=120.0 + i % 40, throttle=0.5, brake=0.0,
+                    steering=0.0, gear=3, t=i * 0.1) for i in range(200)]
+    data, df = load_lap_data({"car": "Ghost Car", "track": "somewhere", "lap_time_s": 99.9, "samples": samples})
+    assert lap_card_png(data, df)[:4] == b"\x89PNG"

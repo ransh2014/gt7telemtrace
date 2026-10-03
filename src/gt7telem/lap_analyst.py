@@ -31,6 +31,8 @@ from matplotlib.patches import Polygon as MplPolygon
 
 warnings.filterwarnings("ignore")
 
+runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
+
 # ── Theme ─────────────────────────────────────────────────────────────────────
 if runtime_config.THEME == "light":
     BG   = "#f4f5fa"
@@ -227,6 +229,160 @@ def build_sector_stats(df):
         out.append((f"S{i}", f"{t_seg:.2f}s", f"{avg_s:.0f}", f"{top_s:.0f}"))
     return out
 
+# ── Shareable lap card (PNG) ──────────────────────────────────────────────────
+# A fixed dark palette, so the image looks the same for everyone whatever
+# theme the app is set to. Drawn on a bare Figure + Agg canvas: no pyplot and
+# no Tk, so it works headless (and is unit-tested that way).
+_CARD = dict(bg="#07080f", panel="#0d0e1a", fg="#c8d3f5", dim="#6b7194",
+             cyan="#00f0d4", green="#39ff85", red="#ff2255", yellow="#ffd500")
+
+def _fmt_laptime(t):
+    m = int(t // 60)
+    return f"{m}:{t - m * 60:06.3f}"
+
+def _card_stats(df):
+    """The tiles on the lap card. Anything the lap file doesn't carry (a
+    downloaded ghost only has the compact input fields) shows as '--'."""
+    def col(name):
+        return df[name] if name in df.columns else None
+    def safe(fn, default="--"):
+        try:
+            return fn()
+        except Exception:
+            return default
+    spd, thr = col("speed_kmh"), col("throttle")
+    tyres = [col(c) for c in ("tyre_temp_fl", "tyre_temp_fr", "tyre_temp_rl", "tyre_temp_rr")]
+    fuel = col("fuel_remaining")
+    cap = col("fuel_capacity")
+    def fuel_used():
+        used = float(fuel.iloc[0] - fuel.iloc[-1])
+        if used <= 0:
+            return "--"
+        pct = cap is not None and float(cap.max()) in (0.0, 100.0)
+        return f"{used:.1f}" + ("%" if pct else "")
+    def tyre_avg():
+        vals = [float(s.mean()) for s in tyres]
+        return f"{sum(vals) / 4:.0f} C" if all(v > 0 for v in vals) else "--"
+    return [
+        ("TOP SPEED",  safe(lambda: f"{float(spd.max()):.0f} km/h")),
+        ("AVG SPEED",  safe(lambda: f"{float(spd.mean()):.0f} km/h")),
+        ("FULL THROTTLE", safe(lambda: f"{float((thr > 0.95).mean() * 100):.0f}%")),
+        ("MAX LAT G",  safe(lambda: f"{float(df['lat_g'].abs().max()):.2f} g")),
+        ("FUEL USED",  safe(fuel_used)),
+        ("AVG TYRE",   safe(tyre_avg)),
+    ]
+
+def lap_card_png(data, df, width=1200, height=630):
+    """Render a shareable summary card for a lap and return it as PNG bytes
+    (car, track, lap time, thirds, a few headline numbers, a speed-coloured
+    track map when the lap has GPS data, and the speed / pedal traces)."""
+    import matplotlib.colors as mcolors
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+
+    c = _CARD
+    dpi = 100
+    fig = Figure(figsize=(width / dpi, height / dpi), dpi=dpi, facecolor=c["bg"])
+    FigureCanvasAgg(fig)
+    mono = dict(family="monospace")
+
+    lap_s = float(data.get("lap_time_s") or 0)
+    if lap_s <= 0 and len(df) > 1 and "t" in df.columns:
+        lap_s = float(df["t"].iloc[-1] - df["t"].iloc[0])
+    car = str(data.get("car") or "Unknown car")
+    track = str(data.get("track") or "unknown track").replace("_", " ").title()
+    when = ""
+    try:
+        when = datetime.strptime(str(data.get("recorded_at"))[:15], "%Y%m%d_%H%M%S").strftime("%d %b %Y")
+    except (TypeError, ValueError):
+        pass
+    era = "" if leaderboard.is_current_era(data) else f"pre-{leaderboard.PHYSICS_ERA} physics"
+
+    # header
+    fig.text(0.05, 0.92, "TRACE", color=c["cyan"], fontsize=24, fontweight="bold", va="center", **mono)
+    fig.text(0.05, 0.865, "GT7 TELEMETRY", color=c["dim"], fontsize=8, va="center", **mono)
+    fig.text(0.95, 0.92, when, color=c["dim"], fontsize=10, ha="right", va="center", **mono)
+    # car / track / time
+    fig.text(0.05, 0.77, car[:34], color=c["fg"], fontsize=19, fontweight="bold", va="center", **mono)
+    fig.text(0.05, 0.705, track[:40], color=c["cyan"], fontsize=14, va="center", **mono)
+    fig.text(0.05, 0.575, _fmt_laptime(lap_s) if lap_s > 0 else "--:--.---",
+             color=c["green"], fontsize=50, fontweight="bold", va="center", **mono)
+    fig.text(0.05, 0.485, "LAP TIME" + (f"   [{era}]" if era else ""),
+             color=c["dim"], fontsize=9, va="center", **mono)
+
+    # thirds
+    try:
+        thirds = build_sector_stats(df)
+    except Exception:
+        thirds = []
+    for i, (name, tm, *_rest) in enumerate(thirds[:3]):
+        fig.text(0.05 + i * 0.15, 0.405, name, color=c["dim"], fontsize=8, va="center", **mono)
+        fig.text(0.05 + i * 0.15, 0.365, tm, color=c["fg"], fontsize=13, fontweight="bold", va="center", **mono)
+
+    # stat tiles (3 x 2)
+    for i, (label, value) in enumerate(_card_stats(df)):
+        x = 0.05 + (i % 3) * 0.15
+        y = 0.255 if i < 3 else 0.135
+        fig.text(x, y + 0.04, label, color=c["dim"], fontsize=7, va="center", **mono)
+        fig.text(x, y - 0.005, value, color=c["fg"], fontsize=13, fontweight="bold", va="center", **mono)
+
+    fig.text(0.05, 0.035, "gt7trace.netlify.app", color=c["cyan"], fontsize=10, va="center", **mono)
+    fig.text(0.95, 0.035, "made with TRACE", color=c["dim"], fontsize=8, ha="right", va="center", **mono)
+
+    def style(ax):
+        ax.set_facecolor(c["panel"])
+        for s in ax.spines.values():
+            s.set_visible(False)
+        ax.tick_params(colors=c["dim"], labelsize=7, length=0)
+        ax.grid(True, color="#1c1e30", lw=0.6)
+
+    # x axis for the traces: distance round the lap if we have it, else sample index
+    if "track_position" in df.columns and float(df["track_position"].max() - df["track_position"].min()) > 1:
+        xs = df["track_position"].to_numpy(dtype=float)
+    else:
+        xs = np.arange(len(df), dtype=float)
+    order = np.argsort(xs, kind="stable")
+    xs = xs[order]
+
+    has_map = ("world_x" in df.columns and "world_z" in df.columns and len(df) > 2
+               and float(df["world_x"].std()) > 1 and float(df["world_z"].std()) > 1)
+    if has_map:
+        axm = fig.add_axes([0.52, 0.40, 0.45, 0.47])
+        wx, wz = df["world_x"].to_numpy(dtype=float), df["world_z"].to_numpy(dtype=float)
+        v = df["speed_kmh"].to_numpy(dtype=float)
+        pts = np.array([wx, wz]).T.reshape(-1, 1, 2)
+        segs = np.concatenate([pts[:-1], pts[1:]], axis=1)
+        lc = LineCollection(segs, cmap="turbo", norm=mcolors.Normalize(v.min(), v.max() or 1), lw=3)
+        lc.set_array(v[:-1])
+        axm.add_collection(lc)
+        axm.autoscale()
+        axm.set_aspect("equal")
+        axm.axis("off")
+        axs = fig.add_axes([0.55, 0.20, 0.40, 0.17])
+        axp = fig.add_axes([0.55, 0.075, 0.40, 0.09], sharex=axs)
+    else:
+        axs = fig.add_axes([0.55, 0.38, 0.40, 0.40])
+        axp = fig.add_axes([0.55, 0.14, 0.40, 0.18], sharex=axs)
+    style(axs)
+    style(axp)
+    spd = df["speed_kmh"].to_numpy(dtype=float)[order]
+    axs.plot(xs, spd, color=c["cyan"], lw=1.6)
+    axs.fill_between(xs, spd, alpha=0.15, color=c["cyan"])
+    axs.set_ylabel("km/h", color=c["dim"], fontsize=7)
+    axs.tick_params(labelbottom=False)
+    thr = df["throttle"].to_numpy(dtype=float)[order] * 100 if "throttle" in df.columns else np.zeros(len(xs))
+    brk = df["brake"].to_numpy(dtype=float)[order] * 100 if "brake" in df.columns else np.zeros(len(xs))
+    axp.fill_between(xs, thr, color=c["green"], alpha=0.75, step="post")
+    axp.fill_between(xs, -brk, color=c["red"], alpha=0.8, step="post")
+    axp.set_ylim(-105, 105)
+    axp.set_yticks([])
+    axp.set_xlabel("distance round the lap (m)" if xs.max() > len(xs) else "samples", color=c["dim"], fontsize=7)
+    axp.text(0.995, 0.88, "throttle", color=c["green"], fontsize=6, ha="right", va="top", transform=axp.transAxes)
+    axp.text(0.995, 0.10, "brake", color=c["red"], fontsize=6, ha="right", va="bottom", transform=axp.transAxes)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, facecolor=c["bg"])
+    return buf.getvalue()
 # ── Chart helpers ─────────────────────────────────────────────────────────────
 def _ax(ax, title, xl="Track Pos (m)", yl=""):
     ax.set_title(title, color=FG, fontsize=9)
@@ -1700,6 +1856,9 @@ class AnalystApp(tk.Tk):
         tk.Button(fe, text="🌐  Export Chart HTML", command=self._export_html,
                   bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
+        tk.Button(fe, text="🖼  Export Lap Card (PNG)", command=self._export_card,
+                  bg=DIM2, fg=PRP, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
         tk.Button(fe, text="🗄  Backup All Laps", command=self._backup_all_laps,
                   bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
@@ -2069,6 +2228,22 @@ class AnalystApp(tk.Tk):
         Path(path).write_text(html, encoding="utf-8")
         messagebox.showinfo("Exported", f"Saved: {Path(path).name}")
 
+    def _export_card(self):
+        if self._dfa is None:
+            messagebox.showinfo("Export", "Load Lap A first."); return
+        d = self._da or {}
+        lap_s = float(d.get("lap_time_s") or 0)
+        base = f"TRACE_{d.get('track', 'lap')}_{lap_s:.3f}s"
+        base = "".join(ch if (ch.isalnum() or ch in "-_.") else "_" for ch in base)
+        path = filedialog.asksaveasfilename(
+            title="Save Lap Card", defaultextension=".png", initialfile=f"{base}.png",
+            filetypes=[("PNG image", "*.png"), ("All", "*.*")])
+        if not path: return
+        try:
+            Path(path).write_bytes(lap_card_png(d, self._dfa))
+        except Exception as e:
+            messagebox.showerror("Lap Card", f"Couldn't create the lap card:\n{e}"); return
+        messagebox.showinfo("Exported", f"Lap card saved: {Path(path).name}")
     def _on_tab(self, e):
         try:
             if self._nb.index("current") == 1:
