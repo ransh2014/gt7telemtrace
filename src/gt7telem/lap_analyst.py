@@ -17,7 +17,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import __version__, auth, leaderboard, tracks
+from . import __version__, auth, corners, leaderboard, tracks
 from . import config as runtime_config
 
 matplotlib.use("TkAgg")
@@ -1210,6 +1210,58 @@ def draw_consensus(fig, df, dfb=None, consensus=None):
                   color=DIM, fontsize=9, transform=axs[1,1].transAxes)
     axs[1,1].axis("off")
 
+def draw_corners(fig, df, dfb=None):
+    """Per-corner breakdown. With Compare on, lap B is the reference (load your
+    PB there) and every corner is scored against it: brake point, minimum speed,
+    throttle-on point and time gained/lost. With Compare off it just lists the
+    corners found on this lap. The label is a heuristic read on style, not a
+    lap-time verdict."""
+    ax1, ax2 = fig.subplots(2, 1, gridspec_kw={"height_ratios": [1, 1.4]})
+    fig.subplots_adjust(hspace=0.3, left=0.07, right=0.97, top=0.9, bottom=0.04)
+    if dfb is not None:
+        cs, _, deltas = corners.match_corners(df, dfb)
+    else:
+        cs, deltas = corners.detect_corners(df), []
+    label = corners.session_label(df, cs, deltas)
+    fig.suptitle(f"Corners — {label}" if label else "Corners", color=FG, fontsize=11)
+
+    ax1.set_facecolor(PNL2)
+    if deltas:
+        nums = [d.number for d in deltas]
+        vals = [d.time_s or 0.0 for d in deltas]
+        ax1.bar([str(n) for n in nums], vals, color=[GRN if v <= 0 else ACC for v in vals])
+        ax1.axhline(0, color=FG, lw=0.8)
+        ax1.set_title("Time vs reference per corner (above 0 = lost, s)", color=FG, fontsize=9)
+        ax1.set_xlabel("Corner", fontsize=7, color=DIM)
+        ax1.tick_params(colors=DIM, labelsize=8); ax1.grid(axis="y", alpha=0.3)
+    else:
+        msg = ("No corners found on this lap." if not cs else
+               "Turn Compare ON and load your PB as lap B\nto score each corner against it.")
+        ax1.text(0.5, 0.5, msg, ha="center", va="center", color=DIM, fontsize=10,
+                 transform=ax1.transAxes)
+        ax1.set_xticks([]); ax1.set_yticks([])
+
+    ax2.set_facecolor(PNL2); ax2.set_xticks([]); ax2.set_yticks([])
+    for s in ax2.spines.values(): s.set_visible(False)
+
+    def fmt(v, spec, unit):
+        return "--".rjust(len(format(0.0, spec)) + len(unit)) if v is None else f"{v:{spec}}{unit}"
+
+    if deltas:
+        lines = [" #   Brake pt     Min speed      Throttle-on     Time"]
+        for d in deltas:
+            lines.append(f"{d.number:>2}  {fmt(d.brake_m, '+7.0f', ' m')}  {fmt(d.min_speed_kmh, '+7.0f', ' km/h')}"
+                         f"  {fmt(d.throttle_m, '+7.0f', ' m')}  {fmt(d.time_s, '+7.2f', ' s')}")
+        lines += ["", "Brake pt +: braked later than reference.  Throttle-on −: back on power earlier.",
+                  "Min speed +: more speed through the corner."]
+    else:
+        lines = [" #   Brake at     Min speed      Throttle at"]
+        for c in cs:
+            lines.append(f"{c.number:>2}  {fmt(c.brake_pos, '7.0f', ' m')}  {fmt(c.min_speed, '7.0f', ' km/h')}"
+                         f"  {fmt(c.throttle_pos, '7.0f', ' m')}")
+    ax2.text(0.02, 0.97, "\n".join(lines), ha="left", va="top", color=FG, fontsize=8,
+             family="monospace", transform=ax2.transAxes)
+
 def draw_style(fig, df, dfb=None):
     """Driving-style classification: how smooth vs aggressive the inputs are
     (rate-of-change of steering/throttle/brake), and whether the car tends
@@ -1316,6 +1368,7 @@ GROUPS = [
     ("Extended",  draw_extended,        (3,3), (13,10)),
     ("Consensus", draw_consensus,       (2,2), (12, 8)),
     ("Style",     draw_style,           (2,2), (12, 8)),
+    ("Corners",   draw_corners,         (2,1), (12, 9)),
 ]
 
 # ── Replay ────────────────────────────────────────────────────────────────────

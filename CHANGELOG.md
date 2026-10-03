@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-03
+Per-corner analysis in the Lap Analyst.
+
+New
+- **Lap Analyst: Corners tab.** Finds each corner on the loaded lap and, with Compare on and your PB loaded as lap B, scores it
+  against the same corner on the PB: brake point, minimum speed, throttle-on point and time gained or lost. A one-line
+  session label (e.g. late braker, smooth) sits on top. New module `corners.py`; 7 new tests.
+
 ## [0.6.0] - 2026-10-03
 Live fuel & tyre strategy, shareable lap cards, and cross-platform polish.
 
