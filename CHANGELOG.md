@@ -5,6 +5,32 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-04
+Bug-fix release. No new features.
+
+Fixed
+- **Settings & account:** `settings.json` is written atomically and never overwritten when it can't be read or
+  decrypted (a locked file or a bad key no longer wipes your saved account). Corrupt files are kept as
+  `settings.json.bad`. Types are validated on load. The encryption key is created race-safely and never silently
+  replaced. A refresh-token network blip no longer signs you out. "Account created" is only shown when it was saved.
+- **Live Dashboard:** recording runs at the selected rate (timer drift on Windows capped 60 Hz at ~32 Hz); lap/race
+  saves happen off the UI thread as compact JSON; a lap-counter reset (restart) re-arms recording instead of merging
+  laps; short laps are no longer glued onto the next one; PB and reference laps only come from GT7-timed laps;
+  closing the window always completes; worker/UDP threads no longer touch Tk directly; a failed race save is no longer
+  reported as saved; stale alerts clear when the connection drops; long sessions no longer keep every lap in memory.
+- **Lap Analyst:** sectors and deltas align by track position; bad or partial lap files are handled instead of
+  crashing; leaderboard submit/refresh is thread-safe and can't double-submit; replay car arrow points the right
+  way and holds heading at standstill; backups run off the UI thread; CSV/HTML exports are atomic with proper errors.
+- **Race Analyst:** pit stops are found from 60 Hz refuel ramps; fuel used is the sum of drops; brake-zone, lap
+  split and CSV export code vectorised; dt no longer assumes 10 Hz; replay colourbar leak and slider feedback fixed.
+- **Network & platform:** UDP receive/heartbeat hardening (stale connection state, duplicate event handlers, log
+  flooding, Windows firewall error text, QuickEdit freeze); Prometheus exporter imported lazily and can't take the
+  app down; toast notifications no longer create a second Tk root; Scoop installs use the per-user settings folder;
+  update check compares versions numerically and keeps its banner across screens.
+- **Data files & CI:** car/track CSVs tolerate a BOM and are written atomically; GitHub workflows no longer
+  interpolate untrusted input into scripts, pin PyInstaller <7, check the tag matches the version, and run tests
+  under a virtual display. Docs now say 18 chart groups (with a test that keeps them in sync).
+
 ## [0.7.0] - 2026-10-03
 Per-corner analysis in the Lap Analyst.
 

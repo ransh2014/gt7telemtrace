@@ -15,6 +15,7 @@ Usage (any install):  gt7telem-add-car
    or:              python -m gt7telem.add_car
 """
 import csv
+import os
 from pathlib import Path
 
 from . import cars
@@ -25,7 +26,7 @@ SHIPPED_CSV = Path(__file__).parent / "car_ids.csv"
 def _read(path):
     if not path.exists():
         return []
-    with open(path, newline="", encoding="utf-8") as f:
+    with open(path, newline="", encoding="utf-8-sig") as f:
         return list(csv.DictReader(f))
 
 
@@ -45,10 +46,12 @@ def save_rows(rows):
     path = cars.local_csv_path()
     rows_sorted = sorted(rows, key=lambda r: int(r["ID"]))
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["ID", "ShortName", "Maker"])
         writer.writeheader()
         writer.writerows(rows_sorted)
+    os.replace(tmp, path)   # atomic: a crash can't leave a truncated list
 
 
 def prompt_int(label):

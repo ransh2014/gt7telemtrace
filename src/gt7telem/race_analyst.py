@@ -1,10 +1,11 @@
 # race_analyst.py — GT7 Race Analyst
 # pip install pandas matplotlib numpy
 import base64
-import csv
 import io
 import json
 import math
+import os
+import re
 import time
 import tkinter as tk
 from pathlib import Path
@@ -82,28 +83,46 @@ X = "t"          # race charts are plotted against elapsed race time, not track_
                   # (track_position resets every lap, which would zig-zag across a race)
 
 # ── Data ──────────────────────────────────────────────────────────────────────
+_RACE_NUM_COLS = [
+    "world_x","world_y","world_z","speed_kmh","throttle","brake","steering",
+    "clutch","clutch_engaged","gear","suggested_gear","rpm","max_rpm",
+    "rpm_warning","rpm_limiter","rpm_after_clutch","boost",
+    "tyre_temp_fl","tyre_temp_fr","tyre_temp_rl","tyre_temp_rr",
+    "tyre_slip_fl","tyre_slip_fr","tyre_slip_rl","tyre_slip_rr",
+    "susp_fl","susp_fr","susp_rl","susp_rr","ride_height_mm",
+    "fuel_remaining","fuel_capacity","oil_temp","water_temp","oil_pressure",
+    "ang_x","ang_y","ang_z","vel_x","vel_y","vel_z",
+    "heading","track_position","lap_number","current_position",
+    "total_positions","in_pit","t"]
+
+
+def _dt_series(df):
+    """Per-sample dt; zero / negative / missing gaps get the median dt rather
+    than a hard-coded 0.1 s (which is 6x too big at 60 Hz)."""
+    dt = df["t"].diff()
+    ok = dt[dt > 0]
+    fill = float(ok.median()) if len(ok) else 0.1
+    return dt.where(dt > 0, fill).fillna(fill)
+
+
 def load_race(path):
-    with open(path, encoding="utf-8") as f: data = json.load(f)
-    samples = data.get("samples", [])
+    with open(path, encoding="utf-8-sig") as f: data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError("Not a TRACE race file")
+    samples = [s for s in (data.get("samples") or []) if isinstance(s, dict)]
     if not samples: raise ValueError("No samples in file")
     df = pd.DataFrame(samples)
-    for col in ["world_x","world_y","world_z","speed_kmh","throttle","brake","steering",
-                "clutch","clutch_engaged","gear","suggested_gear","rpm","max_rpm",
-                "rpm_warning","rpm_limiter","rpm_after_clutch","boost",
-                "tyre_temp_fl","tyre_temp_fr","tyre_temp_rl","tyre_temp_rr",
-                "tyre_slip_fl","tyre_slip_fr","tyre_slip_rl","tyre_slip_rr",
-                "susp_fl","susp_fr","susp_rl","susp_rr","ride_height_mm",
-                "fuel_remaining","fuel_capacity","oil_temp","water_temp","oil_pressure",
-                "ang_x","ang_y","ang_z","vel_x","vel_y","vel_z",
-                "heading","track_position","lap_number","current_position",
-                "total_positions","in_pit","t"]:
+    for col in _RACE_NUM_COLS:
         if col not in df: df[col] = 0.0
-    df = df.fillna(0)
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
+    if len(df) > 1 and df["t"].nunique() <= 1:
+        df["t"] = np.arange(len(df)) * 0.1   # file without usable timestamps
     # GT7 sends suspension height in metres; every chart labels it mm.
     for _c in ("susp_fl", "susp_fr", "susp_rl", "susp_rr"):
         df[_c] = df[_c] * 1000.0
     df = df.sort_values("t").reset_index(drop=True)
-    dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
+    dt = _dt_series(df)
     dv = df["speed_kmh"].diff().fillna(0) / 3.6
     df["long_g"]       = (dv / dt / 9.81).clip(-4, 4)
     df["lat_g"]        = (df["ang_y"] * df["speed_kmh"] / 3.6 / 9.81).clip(-4, 4)
@@ -120,25 +139,41 @@ def load_race(path):
 PIT_LANE_MAX_KPH = 100.0   # generous: GT7 pit limiters are 60-80 km/h
 REFUEL_MIN_JUMP  = 0.5     # fuel % gained between two samples
 
+def _refuel_spans(fuel, max_gap=6):
+    """(start, end) sample-index spans where fuel was added. Looks at the
+    total gain over a run of rising samples rather than a single-sample
+    jump: at 60 Hz a refuel is a ramp of tiny per-sample steps that never
+    exceeded the old 0.5-per-sample threshold, so no stop was ever found."""
+    fuel = np.asarray(fuel, dtype=float)
+    if len(fuel) < 2:
+        return []
+    up = np.flatnonzero(np.diff(fuel) > 0.02) + 1
+    spans, i = [], 0
+    while i < len(up):
+        j = i
+        while j + 1 < len(up) and up[j + 1] - up[j] <= max_gap:
+            j += 1
+        start, end = int(up[i]) - 1, int(up[j])
+        if fuel[end] - fuel[start] >= REFUEL_MIN_JUMP:
+            spans.append((start, end))
+        i = j + 1
+    return spans
+
+
 def _infer_pit_flag(df):
     """GT7 has no known "in pit" bit (see udp.py), so `in_pit` is always
     False and the pit-stop count/charts were permanently empty. A refuel
     is unambiguous in the data though: fuel only ever goes up in the pits.
-    Each refuel sample is expanded to the surrounding slow section -- the
+    Each refuel is expanded to the surrounding slow section -- the
     pit-lane drive in and out. Tyre-only stops (no fuel added) still
     aren't detectable."""
-    fuel  = df["fuel_remaining"].to_numpy(dtype=float)
     speed = df["speed_kmh"].to_numpy(dtype=float)
     flag  = np.zeros(len(df))
-    if len(df) < 2:
-        return flag
-    for i in np.where(np.diff(fuel) > REFUEL_MIN_JUMP)[0] + 1:
-        if flag[i]:
-            continue
-        lo = i
+    for s, e in _refuel_spans(df["fuel_remaining"].to_numpy(dtype=float)):
+        lo = s
         while lo > 0 and speed[lo - 1] <= PIT_LANE_MAX_KPH:
             lo -= 1
-        hi = i
+        hi = e
         while hi < len(df) - 1 and speed[hi + 1] <= PIT_LANE_MAX_KPH:
             hi += 1
         flag[lo:hi + 1] = 1.0
@@ -146,35 +181,58 @@ def _infer_pit_flag(df):
 
 def export_csv(df, out_path):
     """Dump a race's per-sample telemetry to CSV. distance_m is derived by
-    integrating speed_kmh over each frame's dt (same dt pattern used to
-    build long_g in load_race), since GT7's telemetry has no raw distance
-    field of its own. Mirrors lap_analyst.export_csv's column set."""
-    dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
-    distance_m = (df["speed_kmh"] / 3.6 * dt).cumsum()
-    cols = ["distance_m","speed_kmh","throttle","brake","rpm","gear","steering"]
-    with open(out_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(cols)
-        for i in range(len(df)):
-            row = df.iloc[i]
-            w.writerow([
-                round(float(distance_m.iloc[i]), 2),
-                round(float(row.get("speed_kmh", 0)), 2),
-                round(float(row.get("throttle", 0)), 4),
-                round(float(row.get("brake", 0)), 4),
-                round(float(row.get("rpm", 0)), 1),
-                int(row.get("gear", 0)),
-                round(float(row.get("steering", 0)), 4),
-            ])
+    integrating speed_kmh over each frame's dt, since GT7's telemetry has no
+    raw distance field of its own. Mirrors lap_analyst.export_csv's column
+    set. Vectorised, and written via a temp file so a failure can't leave a
+    truncated CSV behind."""
+    dt = _dt_series(df)
+    out = pd.DataFrame({
+        "distance_m": (df["speed_kmh"] / 3.6 * dt).cumsum().round(2),
+        "speed_kmh":  df["speed_kmh"].round(2),
+        "throttle":   df["throttle"].round(4),
+        "brake":      df["brake"].round(4),
+        "rpm":        df["rpm"].round(1),
+        "gear":       df["gear"].fillna(0).astype(int),
+        "steering":   df["steering"].round(4),
+    })
+    tmp = str(out_path) + ".part"
+    try:
+        out.to_csv(tmp, index=False, encoding="utf-8")
+        os.replace(tmp, out_path)
+    except Exception:
+        try: os.unlink(tmp)
+        except OSError: pass
+        raise
+
+def _safe_name(s, default="race"):
+    s = re.sub(r'[^\w\-. ]+', "", str(s or "")).strip().replace(" ", "_")
+    return s[:80] or default
+
+def _save_df_csv(df, path):
+    tmp = str(path) + ".part"
+    try:
+        df.to_csv(tmp, index=False, encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception:
+        try: os.unlink(tmp)
+        except OSError: pass
+        raise
 
 def fmt_dur(t):
-    m = int(t // 60); s = t % 60
-    return f"{m}:{s:06.3f}"
+    try:
+        t = float(t)
+    except (TypeError, ValueError):
+        return "--"
+    if not math.isfinite(t) or t < 0:
+        return "--"
+    ms = int(round(t * 1000))
+    m, ms = divmod(ms, 60000)
+    return f"{m}:{ms / 1000:06.3f}"
 
 def race_label(data, short=False):
-    car   = data.get("car", "?")
-    track = data.get("track", "?").replace("_", " ").title()
-    dur   = data.get("race_duration_s", 0)
+    car   = str(data.get("car") or "?")
+    track = str(data.get("track") or "?").replace("_", " ").title()
+    dur   = data.get("race_duration_s") or 0
     if not leaderboard.is_current_era(data):
         car = f"{car} [pre-{leaderboard.PHYSICS_ERA}]"
     if short: return f"{car}  {fmt_dur(dur)}"
@@ -182,17 +240,12 @@ def race_label(data, short=False):
 
 def get_lap_segments(df):
     """Split race samples into per-lap segments using lap_number transitions."""
-    if df["lap_number"].abs().max() == 0:
+    laps = df["lap_number"].to_numpy()
+    if len(laps) == 0 or np.abs(laps).max() == 0:
         return [df]
-    segs = []
-    cur_lap = df["lap_number"].iloc[0]
-    start = 0
-    for i in range(1, len(df)):
-        if df["lap_number"].iloc[i] != cur_lap:
-            segs.append(df.iloc[start:i])
-            start = i
-            cur_lap = df["lap_number"].iloc[i]
-    segs.append(df.iloc[start:])
+    cuts = (np.flatnonzero(np.diff(laps) != 0) + 1).tolist()
+    bounds = [0, *cuts, len(df)]
+    segs = [df.iloc[a:b] for a, b in zip(bounds[:-1], bounds[1:])]
     return [s for s in segs if len(s) >= 3]
 
 def lap_split_stats(df):
@@ -244,7 +297,7 @@ def fuel_per_lap_stats(df):
         if len(fuel) < 2:
             continue
         pit = float(seg["pit_flag"].max()) if "pit_flag" in seg.columns else 0.0
-        if (np.diff(fuel) > REFUEL_MIN_JUMP).any() or pit > 0:
+        if _refuel_spans(fuel) or pit > 0:
             continue
         burn = float(fuel[0] - float(nxt["fuel_remaining"].iloc[0]))
         if burn >= 0.05:
@@ -261,7 +314,9 @@ def build_stats(data, df):
     lap_times = [s["time_s"] for s in splits if s["complete"] and s["time_s"] > 1]
     best_lap = min(lap_times) if lap_times else 0
     avg_lap  = float(np.mean(lap_times)) if lap_times else 0
-    fuel_used = df["fuel_remaining"].iloc[0] - df["fuel_remaining"].iloc[-1]
+    # Sum of the drops, so a refuel mid-race doesn't cancel the fuel burned.
+    fuel_used = float(-np.minimum(np.diff(df["fuel_remaining"].to_numpy(dtype=float)), 0).sum()) \
+        if len(df) > 1 else 0.0
     fuel_lap, laps_tank, _n_fuel_laps = fuel_per_lap_stats(df)
     dur = data.get("race_duration_s", df["t"].iloc[-1] - df["t"].iloc[0])
     return {
@@ -510,11 +565,12 @@ def draw_fuel(fig, df, dfb=None):
     axs = fig.subplots(2, 3); fig.subplots_adjust(hspace=0.52, wspace=0.4)
     x = X
     _L(axs[0,0], df, x, "fuel_remaining", GRN, fill=True); _ax(axs[0,0], "Fuel Remaining",  yl="% (GT7)")
-    refuels = df[df["fuel_remaining"].diff() > 1]
-    if len(refuels):
-        axs[0,0].scatter(refuels[x], refuels["fuel_remaining"], c=YLW, s=20, zorder=5, label="Refuel")
+    _spans = _refuel_spans(df["fuel_remaining"].to_numpy(dtype=float))
+    if _spans:
+        _ii = [e for _, e in _spans]
+        axs[0,0].scatter(df[x].iloc[_ii], df["fuel_remaining"].iloc[_ii], c=YLW, s=20, zorder=5, label="Refuel")
         axs[0,0].legend(fontsize=6)
-    _L(axs[0,1], df, x, "fuel_burn",      ORG);            _ax(axs[0,1], "Fuel Burn Rate",   yl="L/s")
+    _L(axs[0,1], df, x, "fuel_burn",      ORG);            _ax(axs[0,1], "Fuel Burn Rate",   yl="% per s (GT7 gauge)")
     axs[0,2].fill_between(df[x], df["coasting"], alpha=0.6, color=DIM2, step="post")
     _ax(axs[0,2], "Coasting Zones", yl="1=coasting")
     axs[1,0].hist(df["throttle"]*100, bins=30, color=C["throttle"], alpha=0.85, edgecolor="none", label="A")
@@ -570,18 +626,17 @@ def draw_braking(fig, df, dfb=None):
         axs[1,2].scatter(brake_starts[x], brake_starts["speed_kmh"], c=ACC, s=10, alpha=0.6, zorder=3)
     _ax(axs[1,2], "Speed at Brake Points", yl="km/h")
 
-    zones = []
-    in_z = False; t0 = 0.0
-    for _, row in df.iterrows():
-        if row["brake"] > 0.1 and not in_z:
-            in_z = True; t0 = row["t"]
-        elif row["brake"] <= 0.1 and in_z:
-            in_z = False; zones.append(row["t"] - t0)
+    _on = (df["brake"].to_numpy() > 0.1)
+    _t  = df["t"].to_numpy(dtype=float)
+    _edges = np.diff(_on.astype(int), prepend=0, append=0)
+    _st = np.flatnonzero(_edges == 1)
+    _en = np.flatnonzero(_edges == -1)
+    zones = list((np.append(_t, _t[-1])[_en] - _t[_st])) if len(_t) else []
     if zones:
         axs[2,0].hist(zones, bins=min(25, len(zones)), color=ACC, alpha=0.85, edgecolor="none")
     _ax(axs[2,0], "Brake Zone Duration", xl="s", yl="Count"); axs[2,0].grid(False)
 
-    dt2 = df["t"].diff().replace(0, 0.01).fillna(0.01)
+    dt2 = _dt_series(df)
     release_rate = -(df["brake"].diff() / dt2)
     release_rate = release_rate[release_rate > 1.0]
     if len(release_rate):
@@ -1085,6 +1140,10 @@ class Replay:
         self._dual_mode = "synced"
         self._b_visible = False
         self._after_id  = None
+        self._cb        = None
+        self._in_update = False
+        self._cum_a     = None
+        self._cum_b     = None
         self._build(parent)
 
     @staticmethod
@@ -1102,12 +1161,20 @@ class Replay:
             return h
         dx = np.diff(df["world_x"].values, prepend=df["world_x"].values[0])
         dz = np.diff(df["world_z"].values, prepend=df["world_z"].values[0])
-        return np.arctan2(dx, dz)
+        ang = np.arctan2(dx, dz)
+        # Stationary samples would snap the arrow to 0 -- hold the last heading.
+        keep = np.where(np.hypot(dx, dz) > 0.05, np.arange(len(ang)), 0)
+        keep = np.maximum.accumulate(keep)
+        return ang[keep]
+
+    @staticmethod
+    def _cum_dist(df):
+        return (df["speed_kmh"] / 3.6 * _dt_series(df)).cumsum().to_numpy()
 
     def _car_verts(self, cx, cz, heading_rad, size):
         local = np.array([[0, size], [-size*0.55, -size*0.65], [size*0.55, -size*0.65]])
         cos_h, sin_h = math.cos(heading_rad), math.sin(heading_rad)
-        rot = np.array([[cos_h, -sin_h], [sin_h, cos_h]])
+        rot = np.array([[cos_h, sin_h], [-sin_h, cos_h]])
         w = (rot @ local.T).T
         w[:, 0] += cx; w[:, 1] += cz
         return w
@@ -1218,7 +1285,7 @@ class Replay:
         if self._df is None:
             messagebox.showinfo("Export CSV", "Load a race first.")
             return
-        default_name = (self._la_label or "race").replace(" ", "_").replace(":", "") + ".csv"
+        default_name = _safe_name(self._la_label) + ".csv"
         out_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[("CSV files", "*.csv")],
@@ -1235,6 +1302,7 @@ class Replay:
         self._df = df.reset_index(drop=True)
         self._la_label = label
         self._hdg_a = self._compute_headings(self._df)
+        self._cum_a = self._cum_dist(self._df)
         self._rate  = self._sample_rate(self._df)
         self._idx = 0; self._playing = False
         self._pbtn.config(text="▶  Play", fg=GRN)
@@ -1245,6 +1313,7 @@ class Replay:
         self._dfb = df.reset_index(drop=True)
         self._lb_label = label
         self._hdg_b = self._compute_headings(self._dfb)
+        self._cum_b = self._cum_dist(self._dfb)
         if not self._b_visible:
             self._info_b_frame.pack(side="left", fill="x", expand=True, padx=(1,0))
             self._mode_btn.pack(side="right", padx=8)
@@ -1255,6 +1324,10 @@ class Replay:
 
     def _draw_base(self):
         df = self._df
+        if self._cb is not None:
+            try: self._cb.remove()      # restores the map axes' size
+            except Exception: pass
+            self._cb = None
         for ax in list(self._fig.axes):
             if ax is not self._ax: self._fig.delaxes(ax)
         self._ax.cla(); self._ax.set_facecolor(BG); self._ax.axis("off")
@@ -1305,6 +1378,7 @@ class Replay:
             title += f"  vs  {self._lb_label}"
         self._ax.set_title(title, color=FG, fontsize=9)
         cb = self._fig.colorbar(lc, ax=self._ax, fraction=0.025, pad=0.01)
+        self._cb = cb
         cb.set_label("km/h", color=DIM, fontsize=7)
         cb.ax.tick_params(colors=DIM, labelsize=6)
         self._canvas.draw()
@@ -1335,7 +1409,11 @@ class Replay:
         self._iv["RPM"].set(f"{row.get('rpm',0):.0f}")
         self._iv["Lap"].set(str(int(row.get("lap_number", 0))))
         self._iv["Race %"].set(f"{idx/(max(1,len(df)-1))*100:.1f}%")
-        self._sv.set(int(idx/(max(1,len(df)-1))*1000))
+        self._in_update = True
+        try:
+            self._sv.set(int(idx/(max(1,len(df)-1))*1000))
+        finally:
+            self._in_update = False
         self._update_mini_bar(self._bars, "Throttle", thr)
         self._update_mini_bar(self._bars, "Brake", brk)
 
@@ -1356,8 +1434,14 @@ class Replay:
             t_b = float(row_b.get("t", 0))
             if self._dual_mode == "synced":
                 delta = t_b - t_a
+            elif self._cum_a is not None and self._cum_b is not None:
+                # Real-time: gap in distance covered at the same race time,
+                # converted to seconds at A's current speed.
+                gap_m = float(self._cum_a[idx] - self._cum_b[idx_b])
+                spd_ms = max(float(row.get("speed_kmh", 0)) / 3.6, 1.0)
+                delta = -gap_m / spd_ms
             else:
-                delta = t_b - t_a  # race replay has no track_position-anchored realtime mode
+                delta = t_b - t_a
 
             if abs(delta) < 0.01:
                 self._delta_var.set("  ══  DEAD HEAT  ══")
@@ -1398,7 +1482,12 @@ class Replay:
         self._play_pos = min(self._play_pos + self.SPEEDS[self._si] * self._rate * dt,
                              len(self._df) - 1)
         self._idx = int(self._play_pos)
-        self._update()
+        try:
+            self._update()
+        except Exception:
+            self._playing = False
+            self._pbtn.config(text="▶  Play", fg=GRN)
+            return
         if self._idx >= len(self._df)-1:
             self._playing = False
             self._pbtn.config(text="▶  Play", fg=GRN)
@@ -1428,7 +1517,7 @@ class Replay:
     def _spd(self, i): self._si = i
 
     def _scrub(self, val):
-        if self._df is None: return
+        if self._df is None or self._in_update: return
         self._idx = int(int(val)/1000*(len(self._df)-1))
         self._update()
 
@@ -1449,6 +1538,12 @@ class AnalystApp(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._quit)
 
     def _quit(self):
+        try:
+            self._replay._playing = False
+            if self._replay._after_id is not None:
+                self._replay._canvas.get_tk_widget().after_cancel(self._replay._after_id)
+        except Exception:
+            pass
         plt.close("all"); self.destroy()
 
     def _build(self):
@@ -1608,20 +1703,31 @@ class AnalystApp(tk.Tk):
             plt.close(self._cfigs[name])
         fig = plt.figure(figsize=fs, facecolor=BG)
         dfb = self._dfb if self._compare_mode else None
-        fn(fig, self._dfa, dfb)
+        try:
+            fn(fig, self._dfa, dfb)
+        except Exception as e:
+            plt.close(fig)
+            self._cfigs[name] = None
+            tk.Label(f, text=f"Couldn't draw this chart:\n{type(e).__name__}: {e}",
+                     fg=ACC, bg=BG, font=FONT, justify="left").pack(padx=20, pady=20)
+            return
         cv = FigureCanvasTkAgg(fig, master=f)
         cv.draw(); cv.get_tk_widget().pack(fill="both", expand=True)
         self._cfigs[name] = fig
 
     # ── load ──────────────────────────────────────────────────────────────────
     def _load(self, slot):
+        _start = str(runtime_config.LAPS_FOLDER)
         path = filedialog.askopenfilename(
             title=f"Load Race {slot.upper()}",
+            initialdir=_start if os.path.isdir(_start) else None,
             filetypes=[("JSON","*.json"),("All","*.*")])
         if not path: return
-        try: data, df = load_race(path)
-        except Exception as e: messagebox.showerror("Load Error", str(e)); return
-        lbl = race_label(data)
+        try:
+            data, df = load_race(path)
+            lbl = race_label(data)
+        except Exception as e:
+            messagebox.showerror("Load Error", f"{type(e).__name__}: {e}"); return
         if slot == "a":
             self._da, self._dfa = data, df
             self._la.config(text=lbl, fg=CYN)
@@ -1651,7 +1757,11 @@ class AnalystApp(tk.Tk):
         dlg = tk.Toplevel(self)
         dlg.title("Export CSV"); dlg.configure(bg=PNL2)
         dlg.geometry("265x155"); dlg.resizable(False, False)
-        dlg.transient(self); dlg.grab_set()
+        dlg.transient(self)
+        try:
+            dlg.wait_visibility(); dlg.grab_set()
+        except tk.TclError:
+            pass
 
         tk.Label(dlg, text="Export which race?", fg=FG, bg=PNL2, font=FONTB).pack(pady=(14,8))
         choice = tk.StringVar(value="a")
@@ -1667,16 +1777,22 @@ class AnalystApp(tk.Tk):
                 p = filedialog.asksaveasfilename(title="Save Race A CSV",
                     defaultextension=".csv", filetypes=[("CSV","*.csv"),("All","*.*")])
                 if p:
-                    self._dfa.to_csv(p, index=False)
-                    messagebox.showinfo("Exported", f"Race A  →  {Path(p).name}")
+                    try:
+                        _save_df_csv(self._dfa, p)
+                        messagebox.showinfo("Exported", f"Race A  →  {Path(p).name}")
+                    except Exception as e:
+                        messagebox.showerror("Export failed", f"Race A: {e}")
             if sel in ("b", "both"):
                 if self._dfb is None:
                     messagebox.showinfo("Export", "Race B not loaded."); return
                 p = filedialog.asksaveasfilename(title="Save Race B CSV",
                     defaultextension=".csv", filetypes=[("CSV","*.csv"),("All","*.*")])
                 if p:
-                    self._dfb.to_csv(p, index=False)
-                    messagebox.showinfo("Exported", f"Race B  →  {Path(p).name}")
+                    try:
+                        _save_df_csv(self._dfb, p)
+                        messagebox.showinfo("Exported", f"Race B  →  {Path(p).name}")
+                    except Exception as e:
+                        messagebox.showerror("Export failed", f"Race B: {e}")
 
         tk.Button(dlg, text="Export", command=_do,
                    bg=ACC, fg=BG, relief="flat", font=FONTB,
@@ -1699,9 +1815,12 @@ class AnalystApp(tk.Tk):
             defaultextension=".html",
             filetypes=[("HTML","*.html"),("All","*.*")])
         if not path: return
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=110, bbox_inches="tight", facecolor=BG)
-        b64 = base64.b64encode(buf.getvalue()).decode()
+        try:
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=110, bbox_inches="tight", facecolor=BG)
+            b64 = base64.b64encode(buf.getvalue()).decode()
+        except Exception as e:
+            messagebox.showerror("Export failed", str(e)); return
         html = (
             "<!DOCTYPE html><html><head>"
             # Written as UTF-8 below; without this meta a browser opening the
@@ -1716,7 +1835,10 @@ class AnalystApp(tk.Tk):
             f"<body><div><h3>TRACE Race Analyst — {name}</h3>"
             f"<img src='data:image/png;base64,{b64}'></div></body></html>"
         )
-        Path(path).write_text(html, encoding="utf-8")
+        try:
+            Path(path).write_text(html, encoding="utf-8")
+        except Exception as e:
+            messagebox.showerror("Export failed", f"Couldn't write {path}:\n{e}"); return
         messagebox.showinfo("Exported", f"Saved: {Path(path).name}")
 
     def _on_tab(self, e):

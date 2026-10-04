@@ -1,11 +1,11 @@
 # lap_analyst.py — GT7 Lap Analyst
 # pip install pandas matplotlib numpy
 import base64
-import csv
 import io
 import json
 import math
 import os
+import queue
 import threading
 import time
 import tkinter as tk
@@ -82,6 +82,32 @@ plt.rcParams.update({
 })
 
 # ── Data ──────────────────────────────────────────────────────────────────────
+_LAP_NUM_COLS = [
+    "world_x", "world_y", "world_z", "speed_kmh", "throttle", "brake", "steering",
+    "clutch", "clutch_engaged", "gear", "suggested_gear", "rpm", "max_rpm",
+    "rpm_warning", "rpm_limiter", "rpm_after_clutch", "boost",
+    "tyre_temp_fl", "tyre_temp_fr", "tyre_temp_rl", "tyre_temp_rr",
+    "tyre_slip_fl", "tyre_slip_fr", "tyre_slip_rl", "tyre_slip_rr",
+    "susp_fl", "susp_fr", "susp_rl", "susp_rr", "ride_height_mm",
+    "fuel_remaining", "fuel_capacity", "oil_temp", "water_temp", "oil_pressure",
+    "ang_x", "ang_y", "ang_z", "vel_x", "vel_y", "vel_z",
+    "heading", "track_position", "t",
+    "wheel_rotation", "steering_angular_velocity", "sway", "heave", "surge",
+    "energy_recovery", "current_lap_ms",
+    "wheel_steering_angle_l", "wheel_steering_angle_r", "wheel_base",
+]
+
+
+def _num(v, default=0.0):
+    """float(v) when it is a finite number, else `default` (None, text, NaN
+    and infinity all fall back instead of raising)."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
+
+
 def load_lap_data(data):
     """Build the analysis DataFrame from an already-parsed lap dict --
     shared by load_lap() (reads a local JSON file) and ghost-lap download
@@ -89,35 +115,64 @@ def load_lap_data(data):
     downloaded ghost's samples only carry the compact fields
     (track_position/speed_kmh/throttle/brake/steering/gear), so every other
     column below falls back to its 0.0/"" default -- meaning no GPS map or
-    replay for a ghost, but the input-trace charts and A/B diffs work fine."""
-    samples = data.get("samples", [])
-    if not samples: raise ValueError("No samples in file")
+    replay for a ghost, but the input-trace charts and A/B diffs work fine.
+
+    A ghost has no timestamps, so `t` is rebuilt from distance and speed and
+    scaled to the lap's real time; df.attrs["compact"] marks such a lap so
+    charts that need full telemetry can say so instead of inventing numbers."""
+    if not isinstance(data, dict):
+        raise ValueError("This file is not a TRACE lap")
+    samples = data.get("samples")
+    samples = [s for s in samples if isinstance(s, dict)] if isinstance(samples, list) else []
+    if not samples:
+        raise ValueError("No samples in file")
     df = pd.DataFrame(samples)
-    for col in ["world_x","world_y","world_z","speed_kmh","throttle","brake","steering",
-                "clutch","clutch_engaged","gear","suggested_gear","rpm","max_rpm",
-                "rpm_warning","rpm_limiter","rpm_after_clutch","boost",
-                "tyre_temp_fl","tyre_temp_fr","tyre_temp_rl","tyre_temp_rr",
-                "tyre_slip_fl","tyre_slip_fr","tyre_slip_rl","tyre_slip_rr",
-                "susp_fl","susp_fr","susp_rl","susp_rr","ride_height_mm",
-                "fuel_remaining","fuel_capacity","oil_temp","water_temp","oil_pressure",
-                "ang_x","ang_y","ang_z","vel_x","vel_y","vel_z",
-                "heading","track_position","t",
-                "wheel_rotation","steering_angular_velocity","sway","heave","surge",
-                "energy_recovery","current_lap_ms",
-                "wheel_steering_angle_l","wheel_steering_angle_r","wheel_base"]:
-        if col not in df: df[col] = 0.0
+    raw_cols = set(df.columns)
+    for col in _LAP_NUM_COLS:
+        if col not in df:
+            df[col] = 0.0
+        else:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    df[_LAP_NUM_COLS] = df[_LAP_NUM_COLS].replace([np.inf, -np.inf], np.nan)
     for col in ["surface_type", "car_category"]:
-        if col not in df: df[col] = ""
+        if col not in df:
+            df[col] = ""
     df = df.fillna(0)
+
+    # Timestamps / distance: older or downloaded laps may lack them.
+    compact = not ({"t", "rpm", "tyre_temp_fl"} & raw_cols)
+    lap_s = _num(data.get("lap_time_s"))
+    speed_ms = df["speed_kmh"] / 3.6
+    has_t = "t" in raw_cols and len(df) > 1 and float(df["t"].max() - df["t"].min()) > 0
+    has_pos = "track_position" in raw_cols and float(df["track_position"].max()) > 0
+    if not has_t:
+        if has_pos:
+            dpos = df["track_position"].diff().clip(lower=0).fillna(0)
+            tt = (dpos / speed_ms.clip(lower=1.0)).cumsum()
+        else:
+            tt = pd.Series(np.arange(len(df)) * 0.1, index=df.index)
+        if lap_s > 0 and float(tt.iloc[-1]) > 0:
+            tt = tt * (lap_s / float(tt.iloc[-1]))
+        df["t"] = tt.to_numpy(dtype=float)
+        df.attrs["t_derived"] = True
+    if not has_pos:
+        dtp = df["t"].diff().fillna(0).clip(lower=0)
+        df["track_position"] = (speed_ms * dtp).cumsum().to_numpy(dtype=float)
+        df.attrs["pos_derived"] = True
+    df.attrs["compact"] = bool(compact)
+
     # GT7 sends suspension height in metres; every chart labels it mm.
     for _c in ("susp_fl", "susp_fr", "susp_rl", "susp_rr"):
         df[_c] = df[_c] * 1000.0
-    dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
+    dt = df["t"].diff()
+    pos_dt = dt[dt > 1e-4]
+    fallback = float(pos_dt.median()) if len(pos_dt) else 0.1
+    dt = dt.where(dt > 1e-4, fallback).fillna(fallback)
     dv = df["speed_kmh"].diff().fillna(0) / 3.6
     df["long_g"]       = (dv / dt / 9.81).clip(-4, 4)
     df["lat_g"]        = (df["ang_y"] * df["speed_kmh"] / 3.6 / 9.81).clip(-4, 4)
     df["total_g"]      = np.sqrt(df["long_g"]**2 + df["lat_g"]**2)
-    df["fuel_burn"]    = (-df["fuel_remaining"].diff() / dt).clip(0, 10).fillna(0)
+    df["fuel_burn"]    = (-df["fuel_remaining"].diff() / dt).clip(0, 100).fillna(0)
     df["coasting"]     = ((df["throttle"] < 0.05) & (df["brake"] < 0.05)).astype(float)
     df["front_t_avg"]  = (df["tyre_temp_fl"] + df["tyre_temp_fr"]) / 2
     df["rear_t_avg"]   = (df["tyre_temp_rl"] + df["tyre_temp_rr"]) / 2
@@ -125,85 +180,198 @@ def load_lap_data(data):
                        - (df["tyre_temp_fr"] + df["tyre_temp_rr"]) / 2
     return data, df
 
+
+def is_compact(df):
+    """True for a leaderboard ghost (only the six uploaded input channels)."""
+    return df is not None and bool(getattr(df, "attrs", {}).get("compact"))
+
+
 def load_lap(path):
-    with open(path, encoding="utf-8") as f: data = json.load(f)
+    with open(path, encoding="utf-8-sig") as f:
+        data = json.load(f)
     return load_lap_data(data)
 
+
 def export_csv(df, out_path):
-    """Dump a lap's per-sample telemetry to CSV. distance_m is derived by
-    integrating speed_kmh over each frame's dt (same dt pattern used to
-    build long_g in load_lap_data), since GT7's telemetry has no raw
-    distance field of its own."""
-    dt = df["t"].diff().replace(0, 0.1).fillna(0.1)
-    distance_m = (df["speed_kmh"] / 3.6 * dt).cumsum()
-    cols = ["distance_m","speed_kmh","throttle","brake","rpm","gear","steering"]
-    with open(out_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(cols)
-        for i in range(len(df)):
-            row = df.iloc[i]
-            w.writerow([
-                round(float(distance_m.iloc[i]), 2),
-                round(float(row.get("speed_kmh", 0)), 2),
-                round(float(row.get("throttle", 0)), 4),
-                round(float(row.get("brake", 0)), 4),
-                round(float(row.get("rpm", 0)), 1),
-                int(row.get("gear", 0)),
-                round(float(row.get("steering", 0)), 4),
-            ])
+    """Dump a lap's per-sample telemetry to CSV. distance_m is the lap's own
+    track position (distance round the lap); laps without one fall back to
+    integrating speed over each frame's dt. Written to a temp file first so a
+    failure (file open in Excel, disk full) never truncates an existing file."""
+    n = len(df)
+    pos = df["track_position"].to_numpy(dtype=float) if "track_position" in df.columns else np.zeros(n)
+    if n and float(np.nanmax(pos) - np.nanmin(pos)) > 0:
+        dist = pos - pos[0]
+    else:
+        dt = df["t"].diff()
+        pos_dt = dt[dt > 1e-4]
+        fb = float(pos_dt.median()) if len(pos_dt) else 0.1
+        dt = dt.where(dt > 1e-4, fb).fillna(fb)
+        dist = (df["speed_kmh"] / 3.6 * dt).cumsum().to_numpy(dtype=float)
+    out = pd.DataFrame({
+        "distance_m": np.round(dist, 2),
+        "speed_kmh":  df["speed_kmh"].round(2),
+        "throttle":   df["throttle"].round(4),
+        "brake":      df["brake"].round(4),
+        "rpm":        df["rpm"].round(1),
+        "gear":       df["gear"].fillna(0).astype(int),
+        "steering":   df["steering"].round(4),
+    })
+    out_path = Path(out_path)
+    tmp = out_path.with_name(out_path.name + ".tmp")
+    try:
+        with open(tmp, "w", newline="", encoding="utf-8") as f:
+            out.to_csv(f, index=False, lineterminator="\r\n")
+        os.replace(tmp, out_path)
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def _safe_name(text, default="lap"):
+    """File-name-safe version of a label (no path separators or reserved characters)."""
+    s = "".join(ch if (ch.isalnum() or ch in "-_.") else "_" for ch in str(text or "").strip())
+    return s.strip("._") or default
+
+
+def _save_df_csv(df, path):
+    """DataFrame -> CSV via a temp file, so a failure never truncates an existing file."""
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        df.to_csv(tmp, index=False)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def _modal(win, parent):
+    """Make `win` modal. grab_set() on a window that isn't viewable yet raises
+    TclError on X11, so wait until it is -- and never let a failed grab break
+    the dialog (or the caller, e.g. the window-close path)."""
+    try:
+        win.transient(parent)
+        win.wait_visibility()
+        win.grab_set()
+    except tk.TclError:
+        pass
+
+
+_LAP_META_CACHE = {}
+
+
+def _scan_laps(folder, limit=300):
+    """Lap files under `folder` (the Dashboard saves them as <track>/<car>_<ts>.json),
+    newest first, as picker rows. Parsed rows are cached by (path, mtime) so
+    re-opening the picker is instant; non-lap JSON is skipped."""
+    entries = []
+    try:
+        if not folder.exists():
+            return entries
+        files = sorted(folder.rglob("*.json"), key=lambda q: q.stat().st_mtime, reverse=True)
+    except OSError:
+        return entries
+    for f in files[:limit]:
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        key = (str(f), st.st_mtime_ns)
+        e = _LAP_META_CACHE.get(key)
+        if e is None:
+            try:
+                with open(f, encoding="utf-8-sig") as fh:
+                    d = json.load(fh)
+                if not isinstance(d, dict) or not isinstance(d.get("samples"), list):
+                    continue
+                stamp = str(d.get("recorded_at") or "")
+                try:
+                    date_s = datetime.strptime(stamp[:15], "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M")
+                except ValueError:
+                    date_s = datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M")
+                lt = _num(d.get("lap_time_s"))
+                e = {"path": str(f),
+                     "car": str(d.get("car_display") or d.get("car") or "Unknown car"),
+                     "track": str(d.get("track_display") or d.get("track") or "Unknown track"),
+                     "date": date_s, "lap_time": _fmt_laptime(lt) if lt > 0 else ""}
+            except Exception:
+                continue
+            _LAP_META_CACHE[key] = e
+        entries.append(e)
+    return entries
+
+
+def _lap_xy(df):
+    """(position, time) arrays for a lap, both non-decreasing. Position is the
+    lap's own track_position (m); a stray post-finish sample that wrapped back
+    to ~0 is flattened rather than sorted to the start, and ties are harmless
+    to np.interp."""
+    pos = np.maximum.accumulate(np.nan_to_num(df["track_position"].to_numpy(dtype=float)))
+    t = np.maximum.accumulate(np.nan_to_num(df["t"].to_numpy(dtype=float)))
+    return pos, t
+
+
+def lap_sectors(df, n):
+    """Split a lap into `n` equal-distance sectors by TRACK POSITION (not by
+    sample count, which only matches distance when the car moves at constant
+    speed). Returns (segments, times): the sample slices per sector (an
+    empty slice if no sample fell in it) and each sector's time in seconds, read off the lap's
+    own position->time curve so the times always add up to the lap time."""
+    pos, t = _lap_xy(df)
+    length = float(pos[-1]) if len(pos) else 0.0
+    if len(df) < 2 or length <= 0:
+        return [], []
+    edges = np.linspace(0.0, length, n + 1)
+    t_edges = np.interp(edges, pos, t)
+    idx = np.clip(np.searchsorted(edges, pos, side="right") - 1, 0, n - 1)
+    segs, times = [], []
+    for k in range(n):
+        segs.append(df.iloc[np.where(idx == k)[0]])
+        times.append(float(t_edges[k + 1] - t_edges[k]))
+    return segs, times
+
 
 def compute_sector_deltas(df_a, df_b, sector_length_m=25):
-    """Per-point time-delta-to-reference, bucketed into fixed-distance
+    """Per-point time-delta-to-reference, bucketed into ~fixed-distance
     sectors, for coloring the race-line map as a micro-sector heatmap.
-    Alignment is by lap-percentage (same convention as the Replay tab's
-    'synced' dual mode) since GT7 laps rarely share identical sample
-    counts or timestamps. Returns an array the same length as df_a --
-    positive = slower than reference in that sector, negative = faster."""
-    dt_a = df_a["t"].diff().replace(0, 0.1).fillna(0.1)
-    dist_a = (df_a["speed_kmh"] / 3.6 * dt_a).cumsum().values
-    t_a = df_a["t"].values
-
-    t_b = df_b["t"].values
-
-    n = len(df_a)
-    total_dist = max(dist_a[-1], 1.0)
-    n_sectors = max(1, int(total_dist // sector_length_m) + 1)
-
-    deltas = np.zeros(n)
-    for s in range(n_sectors):
-        lo, hi = s * sector_length_m, (s + 1) * sector_length_m
-        mask_a = (dist_a >= lo) & (dist_a < hi)
-        if not mask_a.any(): continue
-        idx_a_in_sector = np.where(mask_a)[0]
-
-        pct_lo = idx_a_in_sector[0] / max(1, n - 1)
-        pct_hi = idx_a_in_sector[-1] / max(1, n - 1)
-        idx_b_lo = int(pct_lo * (len(df_b) - 1))
-        idx_b_hi = int(pct_hi * (len(df_b) - 1))
-        idx_b_hi = max(idx_b_hi, idx_b_lo)
-
-        sector_time_a = t_a[idx_a_in_sector[-1]] - t_a[idx_a_in_sector[0]]
-        sector_time_b = t_b[idx_b_hi] - t_b[idx_b_lo]
-        deltas[idx_a_in_sector] = sector_time_a - sector_time_b
-
-    return deltas
+    Both laps are cut by track position (B aligned by its fraction of the lap,
+    which absorbs the small length drift between recorded laps) and each
+    sector's time comes from that lap's position->time curve. Returns an
+    array the same length as df_a -- positive = slower than reference in that
+    sector, negative = faster."""
+    pa, ta = _lap_xy(df_a)
+    pb, tb = _lap_xy(df_b)
+    la = max(float(pa[-1]), 1.0)
+    lb = max(float(pb[-1]), 1.0)
+    n_sec = max(1, int(math.ceil(la / sector_length_m)))
+    edges_a = np.linspace(0.0, la, n_sec + 1)
+    edges_b = edges_a / la * lb
+    d_a = np.diff(np.interp(edges_a, pa, ta))
+    d_b = np.diff(np.interp(edges_b, pb, tb))
+    sec = np.clip(np.searchsorted(edges_a, pa, side="right") - 1, 0, n_sec - 1)
+    return (d_a - d_b)[sec]
 
 def lap_label(data, short=False):
-    t = data.get("lap_time_s", 0)
-    m = int(t//60); s = t % 60
-    car   = data.get("car","?")
-    track = data.get("track","?").replace("_"," ").title()
-    time_str = f"{m}:{s:06.3f}"
+    t = _num(data.get("lap_time_s"))
+    time_str = _fmt_laptime(t)
+    car   = str(data.get("car") or "?")
+    track = str(data.get("track") or "?").replace("_"," ").title()
     if not leaderboard.is_current_era(data):
         time_str += f" [pre-{leaderboard.PHYSICS_ERA}]"
     if short: return f"{car}  {time_str}"
     return f"{car} @ {track}  {time_str}"
 
 def build_stats(data, df):
-    t = data.get("lap_time_s", 0); m = int(t//60); s = t%60
+    t = _num(data.get("lap_time_s"))
     fuel_used = df["fuel_remaining"].iloc[0] - df["fuel_remaining"].iloc[-1]
     return {
-        "Lap Time":     f"{m}:{s:06.3f}",
+        "Lap Time":     _fmt_laptime(t),
         "Samples":      f"{len(df)}",
         "Top Speed":    f"{df['speed_kmh'].max():.1f} km/h",
         "Avg Speed":    f"{df['speed_kmh'].mean():.1f} km/h",
@@ -213,20 +381,18 @@ def build_stats(data, df):
         "Max Long G":   f"{df['long_g'].abs().max():.2f}g",
         "Fuel Used":    f"{fuel_used:.2f}",
         "Peak RPM":     f"{df['rpm'].max():.0f}",
-        "Gear Changes": f"{int((df['gear'].diff()!=0).sum())}",
+        "Gear Changes": f"{int((df['gear'].diff().fillna(0)!=0).sum())}",
         "Avg Tyre °C":  f"{df[['tyre_temp_fl','tyre_temp_fr','tyre_temp_rl','tyre_temp_rr']].mean().mean():.1f}",
     }
 
 def build_sector_stats(df):
-    n = len(df)
-    thirds = [df.iloc[:n//3], df.iloc[n//3:2*n//3], df.iloc[2*n//3:]]
+    """Thirds of the lap by track position: (name, time, avg speed, top speed)."""
+    segs, times = lap_sectors(df, 3)
     out = []
-    for i, seg in enumerate(thirds, 1):
-        if len(seg) == 0: continue
-        t_seg = seg["t"].iloc[-1] - seg["t"].iloc[0]
-        avg_s = seg["speed_kmh"].mean()
-        top_s = seg["speed_kmh"].max()
-        out.append((f"S{i}", f"{t_seg:.2f}s", f"{avg_s:.0f}", f"{top_s:.0f}"))
+    for i, (seg, t_seg) in enumerate(zip(segs, times), 1):
+        if len(seg) == 0:
+            continue
+        out.append((f"S{i}", f"{t_seg:.2f}s", f"{seg['speed_kmh'].mean():.0f}", f"{seg['speed_kmh'].max():.0f}"))
     return out
 
 # ── Shareable lap card (PNG) ──────────────────────────────────────────────────
@@ -237,8 +403,10 @@ _CARD = dict(bg="#07080f", panel="#0d0e1a", fg="#c8d3f5", dim="#6b7194",
              cyan="#00f0d4", green="#39ff85", red="#ff2255", yellow="#ffd500")
 
 def _fmt_laptime(t):
-    m = int(t // 60)
-    return f"{m}:{t - m * 60:06.3f}"
+    """m:ss.mmm, rounded to the millisecond first so 59.9996 s reads 1:00.000, not 0:60.000."""
+    total_ms = int(round(_num(t) * 1000))
+    m, ms = divmod(total_ms, 60000)
+    return f"{m}:{ms / 1000:06.3f}"
 
 def _card_stats(df):
     """The tiles on the lap card. Anything the lap file doesn't carry (a
@@ -618,7 +786,7 @@ def draw_fuel(fig, df, dfb=None):
     axs = fig.subplots(2, 3); fig.subplots_adjust(hspace=0.52, wspace=0.4)
     x = "track_position"
     _L(axs[0,0], df, x, "fuel_remaining", GRN, fill=True); _ax(axs[0,0], "Fuel Remaining",  yl="% (GT7)")
-    _L(axs[0,1], df, x, "fuel_burn",      ORG);            _ax(axs[0,1], "Fuel Burn Rate",   yl="L/s")
+    _L(axs[0,1], df, x, "fuel_burn",      ORG);            _ax(axs[0,1], "Fuel Burn Rate",   yl="% per s (GT7 gauge)")
     axs[0,2].fill_between(df[x], df["coasting"], alpha=0.6, color=DIM2, step="post")
     _ax(axs[0,2], "Coasting Zones", yl="1=coasting")
     axs[1,0].hist(df["throttle"]*100, bins=30, color=C["throttle"], alpha=0.85, edgecolor="none", label="A")
@@ -637,6 +805,18 @@ def draw_fuel(fig, df, dfb=None):
                       label="B", histtype="step", lw=1.5)
         axs[1,1].legend(fontsize=7)
         axs[1,2].scatter(dfb["brake"]*100, dfb["speed_kmh"], s=1.5, alpha=0.2, color=ACC)
+
+def _brake_zone_durations(df):
+    """Duration (s) of each braking zone (brake > 0.1). A zone still open at
+    the end of the lap is closed at the last sample instead of being dropped."""
+    b = (df["brake"].to_numpy(dtype=float) > 0.1).astype(int)
+    if not len(b):
+        return []
+    t = df["t"].to_numpy(dtype=float)
+    edges = np.diff(b, prepend=0, append=0)
+    starts = np.where(edges == 1)[0]
+    ends = np.minimum(np.where(edges == -1)[0], len(b) - 1)
+    return [float(t[e] - t[s]) for s, e in zip(starts, ends)]
 
 def draw_braking(fig, df, dfb=None):
     axs = fig.subplots(3, 3); fig.subplots_adjust(hspace=0.55, wspace=0.38)
@@ -674,13 +854,7 @@ def draw_braking(fig, df, dfb=None):
         axs[1,2].scatter(brake_starts[x], brake_starts["speed_kmh"], c=ACC, s=18, alpha=0.75, zorder=3)
     _ax(axs[1,2], "Speed at Brake Points", yl="km/h")
 
-    zones = []
-    in_z = False; t0 = 0.0
-    for _, row in df.iterrows():
-        if row["brake"] > 0.1 and not in_z:
-            in_z = True; t0 = row["t"]
-        elif row["brake"] <= 0.1 and in_z:
-            in_z = False; zones.append(row["t"] - t0)
+    zones = _brake_zone_durations(df)
     if zones:
         axs[2,0].hist(zones, bins=min(25, len(zones)), color=ACC, alpha=0.85, edgecolor="none")
     _ax(axs[2,0], "Brake Zone Duration", xl="s", yl="Count"); axs[2,0].grid(False)
@@ -714,33 +888,29 @@ def draw_braking(fig, df, dfb=None):
 # ── NEW: Sectors ───────────────────────────────────────────────────────────────
 def draw_sectors(fig, df, dfb=None):
     N = 10
-    def get_segs(d):
-        nn = len(d); sz = max(1, nn // N)
-        segs = [d.iloc[i*sz : (i+1)*sz] for i in range(N)]
-        # last sector absorbs remainder
-        if N * sz < nn:
-            segs[-1] = d.iloc[(N-1)*sz:]
-        return [s for s in segs if len(s) >= 2]
 
-    def sector_stats(segs):
-        times, avgs, tops, brks, thrs, latgs = [], [], [], [], [], []
-        for seg in segs:
-            times.append(seg["t"].iloc[-1] - seg["t"].iloc[0])
-            avgs.append(seg["speed_kmh"].mean())
-            tops.append(seg["speed_kmh"].max())
-            brks.append(seg["brake"].mean() * 100)
-            thrs.append(seg["throttle"].mean() * 100)
-            latgs.append(seg["lat_g"].abs().max())
-        return times, avgs, tops, brks, thrs, latgs
+    def sector_stats(d):
+        segs, times = lap_sectors(d, N)
+        def agg(col, fn, scale=1.0):
+            return [float(fn(s[col])) * scale if len(s) else float("nan") for s in segs]
+        return (segs, times, agg("speed_kmh", np.mean), agg("speed_kmh", np.max),
+                agg("brake", np.mean, 100), agg("throttle", np.mean, 100),
+                [float(s["lat_g"].abs().max()) if len(s) else float("nan") for s in segs])
 
-    segs_a = get_segs(df)
-    t_a, avg_a, top_a, brk_a, thr_a, latg_a = sector_stats(segs_a)
+    segs_a, t_a, avg_a, top_a, brk_a, thr_a, latg_a = sector_stats(df)
     na = len(t_a)
+    if sum(1 for s in segs_a if len(s)) < 2:
+        ax = fig.subplots(1, 1)
+        ax.text(0.5, 0.5, "This lap has too few samples to split into sectors",
+                ha="center", va="center", color=DIM, fontsize=11)
+        ax.axis("off")
+        return
 
     t_b = avg_b = top_b = brk_b = thr_b = latg_b = segs_b = None
     if dfb is not None:
-        segs_b = get_segs(dfb)
-        t_b, avg_b, top_b, brk_b, thr_b, latg_b = sector_stats(segs_b)
+        segs_b, t_b, avg_b, top_b, brk_b, thr_b, latg_b = sector_stats(dfb)
+        if sum(1 for s in segs_b if len(s)) < 2:
+            t_b = avg_b = top_b = brk_b = thr_b = latg_b = segs_b = None
 
     axs = fig.subplots(3, 3); fig.subplots_adjust(hspace=0.55, wspace=0.42)
 
@@ -924,7 +1094,7 @@ def draw_ratings(fig, df, dfb=None):
     ax4 = fig.add_subplot(gs[1, 1])
 
     def compute_scores(d):
-        steer_smooth = max(0.0, 1.0 - min(1.0, d["steering"].diff().fillna(0).std() * 5)) * 100
+        steer_smooth = max(0.0, 1.0 - min(1.0, _num(d["steering"].diff().fillna(0).std()) * 5)) * 100
         braking = d[d["brake"] > 0.1]
         brk_eff = (min(100.0, braking["speed_kmh"].mean() / max(1.0, d["speed_kmh"].mean()) * 100)
                    if len(braking) > 10 else 50.0)
@@ -935,9 +1105,9 @@ def draw_ratings(fig, df, dfb=None):
                    if len(cornering) > 10 else 50.0)
         has_sg = d["suggested_gear"].abs().max() > 0
         gear_m = float((d["gear"] == d["suggested_gear"]).mean() * 100) if has_sg else 60.0
-        nn = len(d); sz = max(1, nn // 10)
-        sec_avgs = [d.iloc[i*sz:(i+1)*sz]["speed_kmh"].mean() for i in range(10)]
-        consist = max(0.0, min(100.0, 100.0 - np.std(sec_avgs) / max(1.0, np.mean(sec_avgs)) * 100))
+        sec_avgs = [s["speed_kmh"].mean() for s in lap_sectors(d, 10)[0] if len(s)]
+        consist = (max(0.0, min(100.0, 100.0 - np.std(sec_avgs) / max(1.0, np.mean(sec_avgs)) * 100))
+                   if len(sec_avgs) >= 3 else 50.0)
         slip_var = float(d[["tyre_slip_rl", "tyre_slip_rr"]].std().mean())
         traction = max(0.0, 100.0 - slip_var * 20)
         return {
@@ -951,7 +1121,13 @@ def draw_ratings(fig, df, dfb=None):
         }
 
     sc_a = compute_scores(df)
-    sc_b = compute_scores(dfb) if dfb is not None else None
+    # A leaderboard ghost only carries pedal/steering/gear inputs: scoring it
+    # would mean inventing fallback numbers for everything else.
+    ghost_b = dfb is not None and is_compact(dfb)
+    sc_b = compute_scores(dfb) if (dfb is not None and not ghost_b) else None
+    if ghost_b:
+        fig.text(0.5, 0.01, "Lap B is a leaderboard ghost (inputs only), so it isn't rated.",
+                 ha="center", color=DIM, fontsize=7)
     labels = list(sc_a.keys())
     va = [sc_a[k] for k in labels]
     overall_a = float(np.mean(va))
@@ -1272,9 +1448,14 @@ def draw_style(fig, df, dfb=None):
     axs = fig.subplots(2, 2); fig.subplots_adjust(hspace=0.55, wspace=0.4)
 
     def style_metrics(d):
-        dt = d["steering"].diff().abs().fillna(0)
-        tt = d["throttle"].diff().abs().fillna(0)
-        bt = d["brake"].diff().abs().fillna(0)
+        # Per-sample changes shrink as the recording rate rises, so scale
+        # them to a 10 Hz equivalent -- the same lap scores the same at 10 or 60 Hz.
+        step = d["t"].diff()
+        step = step[step > 1e-4]
+        k = 0.1 / float(step.median()) if len(step) else 1.0
+        dt = d["steering"].diff().abs().fillna(0) * k
+        tt = d["throttle"].diff().abs().fillna(0) * k
+        bt = d["brake"].diff().abs().fillna(0) * k
         aggression = float(min(100.0, (dt.mean()*220 + tt.mean()*140 + bt.mean()*140)))
         corner = d[d["lat_g"].abs() > 0.5]
         slip_cols = {"tyre_slip_fl", "tyre_slip_fr", "tyre_slip_rl", "tyre_slip_rr"}
@@ -1309,9 +1490,10 @@ def draw_style(fig, df, dfb=None):
     ax1.set_facecolor(PNL2); ax1.tick_params(colors=DIM, labelsize=8); ax1.grid(axis="x", alpha=0.3)
 
     ax2 = axs[0, 1]
-    bvals = [bal_a] + ([bal_b] if dfb is not None else [])
+    show_b_bal = dfb is not None and not is_compact(dfb)   # a ghost carries no tyre-slip data
+    bvals = [bal_a] + ([bal_b] if show_b_bal else [])
     bcols = [ACC if b > 0.015 else CYN if b < -0.015 else DIM for b in bvals]
-    ax2.barh(labels_, bvals, color=bcols, height=0.5)
+    ax2.barh(labels_[:len(bvals)], bvals, color=bcols, height=0.5)
     ax2.axvline(0, color=FG, lw=0.8)
     for i, b in enumerate(bvals):
         ax2.text(b + (0.002 if b >= 0 else -0.002), i, balance_label(b),
@@ -1399,6 +1581,7 @@ class Replay:
         self._dual_mode = "synced"
         self._b_visible = False
         self._after_id  = None
+        self._cb        = None   # current colorbar, removed before each redraw (see _draw_base)
         self._heatmap_mode = False
         self._current_track = ""
         self._boundary  = None
@@ -1419,12 +1602,18 @@ class Replay:
             return h
         dx = np.diff(df["world_x"].values, prepend=df["world_x"].values[0])
         dz = np.diff(df["world_z"].values, prepend=df["world_z"].values[0])
-        return np.arctan2(dx, dz)
+        h = np.arctan2(dx, dz)
+        # At a standstill dx = dz = 0 and atan2 snaps to "north": hold the last
+        # real heading instead.
+        h = np.where((dx == 0) & (dz == 0), np.nan, h)
+        return pd.Series(h).ffill().bfill().fillna(0.0).to_numpy()
 
     def _car_verts(self, cx, cz, heading_rad, size):
         local = np.array([[0, size], [-size*0.55, -size*0.65], [size*0.55, -size*0.65]])
         cos_h, sin_h = math.cos(heading_rad), math.sin(heading_rad)
-        rot = np.array([[cos_h, -sin_h], [sin_h, cos_h]])
+        # Travel direction is (sin h, cos h) in (x, z); this rotation puts the
+        # nose of the (0, +size) triangle on exactly that vector.
+        rot = np.array([[cos_h, sin_h], [-sin_h, cos_h]])
         w = (rot @ local.T).T
         w[:, 0] += cx; w[:, 1] += cz
         return w
@@ -1552,7 +1741,7 @@ class Replay:
         if self._df is None:
             messagebox.showinfo("Export CSV", "Load a lap first.")
             return
-        default_name = (self._la_label or "lap").replace(" ", "_").replace(":", "") + ".csv"
+        default_name = _safe_name(self._la_label or "lap") + ".csv"
         out_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[("CSV files", "*.csv")],
@@ -1580,7 +1769,11 @@ class Replay:
         if not boundary["bins"]:
             messagebox.showinfo("Save Boundary", "Not enough GPS samples in this lap to extract a boundary.")
             return
-        tracks.save_boundary(self._current_track, boundary)
+        try:
+            tracks.save_boundary(self._current_track, boundary)
+        except Exception as e:
+            messagebox.showerror("Save Boundary", f"Couldn't save the track boundary:\n{e}")
+            return
         self._boundary = boundary
         self._boundary_btn.config(fg=CYN)
         self._draw_base(); self._update()
@@ -1617,6 +1810,14 @@ class Replay:
 
     def _draw_base(self):
         df = self._df
+        # Remove the old colorbar properly: delaxes() leaves the map axes
+        # squeezed, and it shrank a little more on every load.
+        if self._cb is not None:
+            try:
+                self._cb.remove()
+            except Exception:
+                pass
+            self._cb = None
         for ax in list(self._fig.axes):
             if ax is not self._ax: self._fig.delaxes(ax)
         self._ax.cla(); self._ax.set_facecolor(BG); self._ax.axis("off")
@@ -1682,7 +1883,7 @@ class Replay:
         if self._dfb is not None:
             title += f"  vs  {self._lb_label}"
         self._ax.set_title(title, color=FG, fontsize=9)
-        cb = self._fig.colorbar(lc, ax=self._ax, fraction=0.025, pad=0.01)
+        cb = self._cb = self._fig.colorbar(lc, ax=self._ax, fraction=0.025, pad=0.01)
         cb.set_label("Δs/sector (slower→red)" if use_heatmap else "km/h", color=DIM, fontsize=7)
         cb.ax.tick_params(colors=DIM, labelsize=6)
         self._canvas.draw()
@@ -1812,7 +2013,12 @@ class Replay:
 
     def _scrub(self, val):
         if self._df is None: return
-        self._idx = int(int(val)/1000*(len(self._df)-1))
+        n = len(self._df)
+        # _update() moves the slider itself, which fires this callback with the
+        # value it just set. Snapping _idx to the 1000-step grid on that echo made
+        # playback jitter and redrew every frame twice.
+        if int(float(val)) == int(self._idx / max(1, n - 1) * 1000): return
+        self._idx = int(int(float(val))/1000*(n-1))
         self._update()
 
 # ── Main App ──────────────────────────────────────────────────────────────────
@@ -1831,11 +2037,37 @@ class AnalystApp(tk.Tk):
         self._group_names  = []
         self._compare_mode = False
         self._extra = []  # 3rd+ overlay laps: [{"label","df","color"}, ...]
+        self._submitting = False
+        self._consensus_gen = 0
+        self._top10_gen = 0
+        self._closing = False
+        self._uiq = queue.Queue()
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._quit)
+        self.after(100, self._drain_uiq)
 
     def _quit(self):
+        self._closing = True
         plt.close("all"); self.destroy()
+
+    def _post(self, fn):
+        """Hand `fn` to the Tk thread. Worker threads must not call Tk themselves:
+        tkinter blocks the caller until the main loop answers and raises if the
+        window is already gone."""
+        self._uiq.put(fn)
+
+    def _drain_uiq(self):
+        try:
+            while True:
+                fn = self._uiq.get_nowait()
+                try:
+                    fn()
+                except Exception:
+                    pass    # e.g. a callback for a dialog that has since closed
+        except queue.Empty:
+            pass
+        if not self._closing:
+            self.after(100, self._drain_uiq)
 
     def _build(self):
         style = ttk.Style(); style.theme_use("clam")
@@ -1946,26 +2178,39 @@ class AnalystApp(tk.Tk):
                   bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
-    def _save_notes(self):
+    def _notes_dirty(self):
+        return (self._da is not None and bool(self._path_a)
+                and self._notes.get("1.0", "end").strip() != str(self._da.get("notes") or "").strip())
+
+    def _save_notes(self, quiet=False):
         """Notes used to live only in the text box and were lost on close.
         They're stored in Lap A's own JSON file under "notes" (written via a
         temp file so a failed write can't corrupt the lap)."""
         if self._da is None or not self._path_a:
-            messagebox.showinfo("Lap Notes", "Load Lap A from a file first."); return
+            if not quiet:
+                messagebox.showinfo("Lap Notes", "Load Lap A from a file first.")
+            return False
         notes = self._notes.get("1.0", "end").strip()
         path = Path(self._path_a)
+        tmp = path.with_name(path.name + ".tmp")
         try:
-            with open(path, encoding="utf-8") as f:
+            with open(path, encoding="utf-8-sig") as f:
                 data = json.load(f)
             data["notes"] = notes
-            tmp = path.with_name(path.name + ".tmp")
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             os.replace(tmp, path)
             self._da["notes"] = notes
-            messagebox.showinfo("Lap Notes", "Notes saved with this lap.")
+            if not quiet:
+                messagebox.showinfo("Lap Notes", "Notes saved with this lap.")
+            return True
         except Exception as e:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
             messagebox.showerror("Lap Notes", f"Couldn't save notes:\n{e}")
+            return False
 
     # ── overlay laps (3+ lap comparison) ────────────────────────────────────
     _OVERLAY_COLORS = [YLW, GRN, PRP, ORG, "#8899ff", "#ff9ecb"]
@@ -1992,7 +2237,9 @@ class AnalystApp(tk.Tk):
             data, df = load_lap(path)
         except Exception as e:
             messagebox.showerror("Load Error", str(e)); return
-        color = self._OVERLAY_COLORS[len(self._extra) % len(self._OVERLAY_COLORS)]
+        used = {ov["color"] for ov in self._extra}
+        color = next((c for c in self._OVERLAY_COLORS if c not in used),
+                     self._OVERLAY_COLORS[len(self._extra) % len(self._OVERLAY_COLORS)])
         self._extra.append({"label": lap_label(data), "df": df, "color": color})
         self._refresh_overlay_list()
         for k in list(self._cfigs):
@@ -2010,11 +2257,19 @@ class AnalystApp(tk.Tk):
         self._draw_active_chart()
 
     def _backup_all_laps(self):
-        path = runtime_config.backup_laps()
-        if path is None:
+        def worker():
+            path = runtime_config.backup_laps()
+            err = runtime_config.last_backup_error
+            self._post(lambda: self._after_backup(path, err))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _after_backup(self, path, err):
+        if path is not None:
+            messagebox.showinfo("Backup Laps", f"Saved to:\n{path}")
+        elif err:
+            messagebox.showerror("Backup Laps", f"Couldn't back up your laps:\n{err}")
+        else:
             messagebox.showinfo("Backup Laps", "No laps found to back up yet.")
-            return
-        messagebox.showinfo("Backup Laps", f"Saved to:\n{path}")
 
     # ── search/filter lap picker (replaces the bare native file dialog) ────
     def _browse_laps_dialog(self, slot_label):
@@ -2022,35 +2277,19 @@ class AnalystApp(tk.Tk):
         each lap's own JSON so laps can be filtered without guessing from
         filenames in a native file browser. Falls back to that native
         dialog if the folder is missing/empty or nothing parses."""
-        folder = Path(runtime_config.LAPS_FOLDER)
-        entries = []
-        if folder.exists():
-            for p in sorted(folder.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-                try:
-                    with open(p, encoding="utf-8") as f:
-                        d = json.load(f)
-                except Exception:
-                    continue
-                car = d.get("ui_car") or d.get("car") or "Unknown car"
-                track = d.get("track") or "Unknown track"
-                date_s = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-                lt = d.get("lap_time")
-                lt_s = ""
-                if lt:
-                    m, s = divmod(lt, 60)
-                    lt_s = f"{int(m)}:{s:06.3f}"
-                entries.append({"path": str(p), "car": str(car), "track": str(track),
-                                 "date": date_s, "lap_time": lt_s})
+        folder = Path(runtime_config.load().get("LAPS_FOLDER") or runtime_config.LAPS_FOLDER)
+        entries = _scan_laps(folder)
         if not entries:
+            kw = {"initialdir": str(folder)} if folder.exists() else {}
             return filedialog.askopenfilename(
-                title=f"Load {slot_label}", filetypes=[("JSON", "*.json"), ("All", "*.*")])
+                title=f"Load {slot_label}", filetypes=[("JSON", "*.json"), ("All", "*.*")], **kw)
 
         result = {"path": None}
         dlg = tk.Toplevel(self)
         dlg.title(f"Load {slot_label} — Search")
         dlg.configure(bg=PNL2)
         dlg.geometry("580x480")
-        dlg.transient(self); dlg.grab_set()
+        _modal(dlg, self)
 
         top = tk.Frame(dlg, bg=PNL2); top.pack(fill="x", padx=10, pady=8)
         car_var, track_var, date_var = tk.StringVar(), tk.StringVar(), tk.StringVar()
@@ -2153,6 +2392,8 @@ class AnalystApp(tk.Tk):
         if self._dfa is None: return
         idx  = self._snb.index("current")
         name = self._group_names[idx]
+        if self._cfigs.get(name) is not None:
+            return      # already drawn for the current laps; switching tabs shouldn't rebuild it
         self._draw_chart(name)
 
     def _draw_chart(self, name):
@@ -2161,15 +2402,22 @@ class AnalystApp(tk.Tk):
         for w in f.winfo_children(): w.destroy()
         if self._cfigs.get(name):
             plt.close(self._cfigs[name])
+        self._cfigs[name] = None
         fig = plt.figure(figsize=fs, facecolor=BG)
         dfb = self._dfb if self._compare_mode else None
-        if name == "Consensus":
-            fn(fig, self._dfa, dfb, self._consensus_line)
-        elif name == "Inputs" and self._extra:
-            extra = [(ov["label"], ov["df"], ov["color"]) for ov in self._extra]
-            fn(fig, self._dfa, dfb, extra)
-        else:
-            fn(fig, self._dfa, dfb)
+        try:
+            if name == "Consensus":
+                fn(fig, self._dfa, dfb, self._consensus_line)
+            elif name == "Inputs" and self._extra:
+                extra = [(ov["label"], ov["df"], ov["color"]) for ov in self._extra]
+                fn(fig, self._dfa, dfb, extra)
+            else:
+                fn(fig, self._dfa, dfb)
+        except Exception as e:
+            plt.close(fig)       # don't leak the half-drawn figure or keep it for HTML export
+            tk.Label(f, text=f"Couldn't draw this chart:\n{e}", fg=ACC, bg=BG, font=FONT,
+                     justify="center").pack(expand=True)
+            return
         cv = FigureCanvasTkAgg(fig, master=f)
         cv.draw(); cv.get_tk_widget().pack(fill="both", expand=True)
         self._cfigs[name] = fig
@@ -2182,6 +2430,13 @@ class AnalystApp(tk.Tk):
         except Exception as e: messagebox.showerror("Load Error", str(e)); return
         lbl = lap_label(data)
         if slot == "a":
+            if self._notes_dirty() and messagebox.askyesno(
+                    "Lap Notes", "The notes on the current Lap A haven't been saved.\nSave them before switching?"):
+                self._save_notes(quiet=True)
+            # The community line belongs to the previous car/track; drop it and
+            # ignore any download still in flight for it.
+            self._consensus_line = None
+            self._consensus_gen += 1
             self._da, self._dfa = data, df
             self._path_a = path
             self._notes.delete("1.0", "end")
@@ -2214,7 +2469,7 @@ class AnalystApp(tk.Tk):
         dlg = tk.Toplevel(self)
         dlg.title("Export CSV"); dlg.configure(bg=PNL2)
         dlg.geometry("265x155"); dlg.resizable(False, False)
-        dlg.transient(self); dlg.grab_set()
+        _modal(dlg, self)
 
         tk.Label(dlg, text="Export which lap?", fg=FG, bg=PNL2, font=FONTB).pack(pady=(14,8))
         choice = tk.StringVar(value="a")
@@ -2226,20 +2481,27 @@ class AnalystApp(tk.Tk):
 
         def _do():
             sel = choice.get(); dlg.destroy()
+            jobs = []
             if sel in ("a", "both"):
-                p = filedialog.asksaveasfilename(title="Save Lap A CSV",
-                    defaultextension=".csv", filetypes=[("CSV","*.csv"),("All","*.*")])
-                if p:
-                    self._dfa.to_csv(p, index=False)
-                    messagebox.showinfo("Exported", f"Lap A  →  {Path(p).name}")
+                jobs.append(("A", self._dfa, self._da))
             if sel in ("b", "both"):
                 if self._dfb is None:
-                    messagebox.showinfo("Export", "Lap B not loaded."); return
-                p = filedialog.asksaveasfilename(title="Save Lap B CSV",
-                    defaultextension=".csv", filetypes=[("CSV","*.csv"),("All","*.*")])
-                if p:
-                    self._dfb.to_csv(p, index=False)
-                    messagebox.showinfo("Exported", f"Lap B  →  {Path(p).name}")
+                    messagebox.showinfo("Export", "Lap B not loaded.")
+                else:
+                    jobs.append(("B", self._dfb, self._db))
+            for name, d, meta in jobs:
+                p = filedialog.asksaveasfilename(
+                    title=f"Save Lap {name} CSV", defaultextension=".csv",
+                    initialfile=_safe_name(lap_label(meta or {}, short=True)) + ".csv",
+                    filetypes=[("CSV","*.csv"),("All","*.*")])
+                if not p:
+                    continue
+                try:
+                    _save_df_csv(d, p)
+                except Exception as e:
+                    messagebox.showerror("Export CSV", f"Couldn't save Lap {name} (is the file open in another program?):\n{e}")
+                else:
+                    messagebox.showinfo("Exported", f"Lap {name}  →  {Path(p).name}")
 
         tk.Button(dlg, text="Export", command=_do,
                    bg=ACC, fg=BG, relief="flat", font=FONTB,
@@ -2262,9 +2524,12 @@ class AnalystApp(tk.Tk):
             defaultextension=".html",
             filetypes=[("HTML","*.html"),("All","*.*")])
         if not path: return
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=110, bbox_inches="tight", facecolor=BG)
-        b64 = base64.b64encode(buf.getvalue()).decode()
+        try:
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=110, bbox_inches="tight", facecolor=BG)
+            b64 = base64.b64encode(buf.getvalue()).decode()
+        except Exception as e:
+            messagebox.showerror("Export", f"Couldn't render the chart:\n{e}"); return
         html = (
             "<!DOCTYPE html><html><head>"
             # Written as UTF-8 below; without this a browser opening the file
@@ -2278,16 +2543,18 @@ class AnalystApp(tk.Tk):
             f"<body><div><h3>TRACE Lap Analyst — {name}</h3>"
             f"<img src='data:image/png;base64,{b64}'></div></body></html>"
         )
-        Path(path).write_text(html, encoding="utf-8")
+        try:
+            Path(path).write_text(html, encoding="utf-8")
+        except Exception as e:
+            messagebox.showerror("Export", f"Couldn't save the file (is it open in another program?):\n{e}"); return
         messagebox.showinfo("Exported", f"Saved: {Path(path).name}")
 
     def _export_card(self):
         if self._dfa is None:
             messagebox.showinfo("Export", "Load Lap A first."); return
         d = self._da or {}
-        lap_s = float(d.get("lap_time_s") or 0)
-        base = f"TRACE_{d.get('track', 'lap')}_{lap_s:.3f}s"
-        base = "".join(ch if (ch.isalnum() or ch in "-_.") else "_" for ch in base)
+        lap_s = _num(d.get("lap_time_s"))
+        base = _safe_name(f"TRACE_{d.get('track') or 'lap'}_{lap_s:.3f}s")
         path = filedialog.asksaveasfilename(
             title="Save Lap Card", defaultextension=".png", initialfile=f"{base}.png",
             filetypes=[("PNG image", "*.png"), ("All", "*.*")])
@@ -2311,27 +2578,33 @@ class AnalystApp(tk.Tk):
         for w in self._top10_f.winfo_children(): w.destroy()
         tk.Label(self._top10_f, text="loading top 10…", fg=DIM, bg=PNL,
                  font=FONTL).pack(anchor="w")
+        self._top10_gen += 1
+        gen = self._top10_gen
 
         def worker():
-            rows = leaderboard.get_top_laps(car, track, n=10)
-            self.after(0, lambda: self._render_top10(car, track, rows))
+            try:
+                rows = leaderboard.get_top_laps(car, track, n=10)
+            except Exception:
+                rows = []
+            self._post(lambda: self._render_top10(car, track, rows, gen))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _render_top10(self, car, track, rows):
+    def _render_top10(self, car, track, rows, gen=None):
+        if gen is not None and gen != self._top10_gen:
+            return      # a newer lap was loaded while this was downloading
         for w in self._top10_f.winfo_children(): w.destroy()
         tk.Label(self._top10_f, text=f"{car} @ {track}", fg=CYN, bg=PNL,
                  font=FONTL, wraplength=190, justify="left").pack(anchor="w")
+        rows = [r for r in (rows or []) if isinstance(r, dict)]
         if not rows:
             tk.Label(self._top10_f, text="no times yet — be the first!",
                      fg=DIM, bg=PNL, font=FONTL, wraplength=190,
                      justify="left").pack(anchor="w", pady=(2,0))
             return
         for i, row in enumerate(rows, 1):
-            ms = row.get("lap_time_ms", 0)
-            m, s = divmod(ms / 1000.0, 60)
-            time_str = f"{int(m)}:{s:06.3f}"
-            name = row.get("psn_name", "?")
+            time_str = _fmt_laptime(_num(row.get("lap_time_ms")) / 1000.0)
+            name = str(row.get("psn_name") or "?")
             r = tk.Frame(self._top10_f, bg=PNL); r.pack(fill="x", pady=1)
             col = YLW if i == 1 else (FG if i <= 3 else DIM)
             tk.Label(r, text=f"{i}.", fg=col, bg=PNL, font=FONTL, width=3, anchor="w").pack(side="left")
@@ -2346,14 +2619,20 @@ class AnalystApp(tk.Tk):
             messagebox.showinfo("Community Line", "Load Lap A first."); return
         car   = self._da.get("car_display")   or self._da.get("car", "?")
         track = self._da.get("track_display") or self._da.get("track", "?")
+        gen = self._consensus_gen
 
         def worker():
-            rows = leaderboard.get_consensus_line(car, track, n=10)
-            self.after(0, lambda: self._after_consensus(rows))
+            try:
+                rows = leaderboard.get_consensus_line(car, track, n=10)
+            except Exception:
+                rows = []
+            self._post(lambda: self._after_consensus(rows, gen))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _after_consensus(self, rows):
+    def _after_consensus(self, rows, gen=None):
+        if gen is not None and gen != self._consensus_gen:
+            return      # Lap A changed while this was downloading; it's for another car/track
         if not rows:
             messagebox.showinfo("Community Line",
                                  "No community data yet for this car+track (or couldn't reach the server).")
@@ -2375,27 +2654,30 @@ class AnalystApp(tk.Tk):
         threading.Thread(target=self._download_ghost_worker, args=(row,), daemon=True).start()
 
     def _download_ghost_worker(self, row):
-        samples = leaderboard.get_lap_samples(row["id"])
+        try:
+            samples = leaderboard.get_lap_samples(row["id"])
+        except Exception:
+            samples = []
         if not samples:
-            self.after(0, lambda: messagebox.showerror(
+            self._post(lambda: messagebox.showerror(
                 "Ghost Download", "Couldn't download that lap -- check your internet connection and try again."))
             return
         data = {
-            "car": row.get("car_name", "?"),
-            "track": row.get("track_name", "?"),
-            "lap_time_s": row.get("lap_time_ms", 0) / 1000.0,
+            "car": str(row.get("car_name") or "?"),
+            "track": str(row.get("track_name") or "?"),
+            "lap_time_s": _num(row.get("lap_time_ms")) / 1000.0,
             "samples": samples,
         }
         try:
             _, dfb = load_lap_data(data)
         except Exception as e:
             msg = str(e)
-            self.after(0, lambda: messagebox.showerror("Ghost Download", msg))
+            self._post(lambda: messagebox.showerror("Ghost Download", msg))
             return
-        self.after(0, lambda: self._load_ghost_result(data, dfb, row))
+        self._post(lambda: self._load_ghost_result(data, dfb, row))
 
     def _load_ghost_result(self, data, dfb, row):
-        lbl = f"{row.get('psn_name','?')} (ghost) -- {lap_label(data, short=True)}"
+        lbl = f"{str(row.get('psn_name') or '?')} (ghost) -- {lap_label(data, short=True)}"
         self._db, self._dfb = data, dfb
         self._lb.config(text=lbl, fg=ACC)
         self._replay.load_b(dfb, lbl)
@@ -2406,6 +2688,8 @@ class AnalystApp(tk.Tk):
             self._draw_active_chart()
 
     def _submit_leaderboard(self):
+        if self._submitting:
+            return      # a second click while one is in flight used to post the lap twice
         if self._da is None:
             messagebox.showinfo("Submit to Leaderboard", "Load Lap A first."); return
         car   = self._da.get("car_display")   or self._da.get("car", "?")
@@ -2413,7 +2697,7 @@ class AnalystApp(tk.Tk):
         problem = leaderboard.lap_submission_error(self._da)
         if problem:
             messagebox.showinfo("Submit to Leaderboard", problem); return
-        lap_time_ms = int(round(float(self._da["lap_time_s"]) * 1000))
+        lap_time_ms = int(round(_num(self._da.get("lap_time_s")) * 1000))
         samples = self._da["samples"]
 
         if not runtime_config.SUPABASE_ACCESS_TOKEN:
@@ -2430,30 +2714,41 @@ class AnalystApp(tk.Tk):
         runtime_config.PSN_NAME = psn
         runtime_config.save(PSN_NAME=psn)
 
+        self._submitting = True
+
         def worker():
-            ok, reason = leaderboard.submit_lap(
-                car, track, lap_time_ms, psn, samples,
-                access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
-                user_id=runtime_config.SUPABASE_USER_ID)
-            if not ok and reason == "server":
-                session = auth.refresh_session(runtime_config.SUPABASE_REFRESH_TOKEN)
-                if not session and auth.last_refresh_error == "invalid":
-                    # Refresh token rejected: the anonymous account is gone
-                    # (logged out elsewhere, or removed as an unused account).
-                    # A network failure keeps the session and says "server".
-                    reason = "session"
-                if session:
-                    runtime_config.SUPABASE_ACCESS_TOKEN = session["access_token"]
-                    runtime_config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
-                    runtime_config.save(
-                        SUPABASE_ACCESS_TOKEN=session["access_token"],
-                        SUPABASE_REFRESH_TOKEN=session["refresh_token"],
-                    )
-                    ok, reason = leaderboard.submit_lap(
-                        car, track, lap_time_ms, psn, samples,
-                        access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
-                        user_id=runtime_config.SUPABASE_USER_ID)
-            self.after(0, lambda: self._after_submit(ok, reason))
+            try:
+                ok, reason = leaderboard.submit_lap(
+                    car, track, lap_time_ms, psn, samples,
+                    access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
+                    user_id=runtime_config.SUPABASE_USER_ID)
+                if not ok and reason == "auth":
+                    # Expired/rejected access token: refresh once and retry.
+                    # Payload errors (400/422) and 5xx never come here, so they
+                    # no longer trigger a pointless refresh.
+                    session = auth.refresh_session(runtime_config.SUPABASE_REFRESH_TOKEN)
+                    if session:
+                        runtime_config.SUPABASE_ACCESS_TOKEN = session["access_token"]
+                        runtime_config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
+                        runtime_config.save(
+                            SUPABASE_ACCESS_TOKEN=session["access_token"],
+                            SUPABASE_REFRESH_TOKEN=session["refresh_token"],
+                        )
+                        ok, reason = leaderboard.submit_lap(
+                            car, track, lap_time_ms, psn, samples,
+                            access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
+                            user_id=runtime_config.SUPABASE_USER_ID)
+                    elif auth.last_refresh_error == "invalid":
+                        # Only a clear "this refresh token is bad" verdict ends the
+                        # account; a rate limit or outage must not delete it.
+                        reason = "session"
+                    else:
+                        reason = "network"
+                    if reason == "auth":
+                        reason = "server"
+            except Exception:
+                ok, reason = False, "network"
+            self._post(lambda: self._after_submit(ok, reason))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -2467,10 +2762,23 @@ class AnalystApp(tk.Tk):
         win.title("Create a Free Account")
         win.configure(bg=PNL)
         win.resizable(False, False)
-        win.transient(self)
-        win.grab_set()
+        _modal(win, self)
 
         result = {"ok": False}
+        busy = {"v": False}
+
+        def alive():
+            try:
+                return bool(win.winfo_exists())
+            except tk.TclError:
+                return False
+
+        def close():
+            # Closing mid sign-up would orphan the new account (tokens never saved).
+            if not busy["v"]:
+                win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", close)
 
         tk.Label(win, text="Create a free account to submit laps",
                  font=FONTB, fg=YLW, bg=PNL).pack(padx=24, pady=(18, 6))
@@ -2499,13 +2807,16 @@ class AnalystApp(tk.Tk):
                                 fg=FG, bd=0, padx=12, pady=6, cursor="hand2")
         cancel_btn.pack(side="left", padx=6)
 
-        def set_busy(busy):
-            state = "disabled" if busy else "normal"
+        def set_busy(b):
+            busy["v"] = b
+            if not alive():
+                return
+            state = "disabled" if b else "normal"
             create_btn.config(state=state)
             cancel_btn.config(state=state)
 
         def do_create():
-            name = name_var.get().strip()
+            name = " ".join(name_var.get().split())[:32]
             if not name:
                 status.config(text="Enter a display name first.")
                 return
@@ -2513,25 +2824,30 @@ class AnalystApp(tk.Tk):
             status.config(text="Creating account…", fg=DIM)
 
             def worker():
-                session = auth.sign_up_anonymous()
+                session = None
                 name_saved = False
-                if session:
-                    name_saved = auth.set_display_name(session["access_token"], session["user_id"], name)
-                win.after(0, lambda: after_create(session, name, name_saved))
+                try:
+                    session = auth.sign_up_anonymous()
+                    if session:
+                        name_saved = auth.set_display_name(session["access_token"], session["user_id"], name)
+                except Exception:
+                    pass
+                self._post(lambda: after_create(session, name, name_saved))
 
             threading.Thread(target=worker, daemon=True).start()
 
         def after_create(session, name, name_saved=True):
+            set_busy(False)
             if not session:
-                set_busy(False)
-                status.config(text="Couldn't reach the server -- try again.", fg=ACC)
+                if alive():
+                    status.config(text="Couldn't reach the server -- try again.", fg=ACC)
                 return
             runtime_config.SUPABASE_ACCESS_TOKEN = session["access_token"]
             runtime_config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
             runtime_config.SUPABASE_USER_ID = session["user_id"]
             runtime_config.PSN_NAME = name
             runtime_config.ONBOARDING_DONE = True
-            runtime_config.save(
+            saved = runtime_config.save(
                 SUPABASE_ACCESS_TOKEN=session["access_token"],
                 SUPABASE_REFRESH_TOKEN=session["refresh_token"],
                 SUPABASE_USER_ID=session["user_id"],
@@ -2539,26 +2855,34 @@ class AnalystApp(tk.Tk):
                 ONBOARDING_DONE=True,
             )
             result["ok"] = True
+            if not saved:
+                messagebox.showwarning(
+                    "Create a Free Account",
+                    "Your account was created, but this PC couldn't save the sign-in "
+                    "(is the settings file read-only or open in another program?). "
+                    "You may be asked to create an account again next time.")
+            if not alive():
+                return
             if name_saved:
                 win.destroy()
                 return
             # Same known Supabase issue as launcher.py's onboarding screen --
             # account/session is fine, just the display-name sync failed.
             # Say so briefly instead of closing as if nothing happened.
-            set_busy(False)
             status.config(
                 text="Account created — the display name didn't save. "
                      "Submissions use the name you type when submitting, so "
                      "this doesn't matter. Continuing...", fg=ACC)
-            win.after(1800, win.destroy)
+            win.after(1800, lambda: win.destroy() if alive() else None)
 
         create_btn.config(command=do_create)
-        cancel_btn.config(command=win.destroy)
+        cancel_btn.config(command=close)
 
         self.wait_window(win)
         return result["ok"]
 
     def _after_submit(self, ok, reason="network"):
+        self._submitting = False
         if ok:
             messagebox.showinfo("Submit to Leaderboard",
                                  "Submitted! If it's a new top time it'll appear on the leaderboard shortly.")
@@ -2573,6 +2897,9 @@ class AnalystApp(tk.Tk):
                                 "Create a new free account (just a display name) and submit again.")
             if self._prompt_create_account():
                 self._submit_leaderboard()
+        elif reason == "data":
+            messagebox.showerror("Submit to Leaderboard",
+                                  "This lap's data couldn't be prepared for upload (is the file damaged?).")
         elif reason == "server":
             messagebox.showerror("Submit to Leaderboard",
                                   "The server rejected the submission -- this is a server-side issue, "

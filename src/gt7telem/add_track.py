@@ -11,6 +11,7 @@ Usage (any install):  gt7telem-add-track
    or:              python -m gt7telem.add_track
 """
 import csv
+import os
 from pathlib import Path
 
 from . import tracks
@@ -28,7 +29,7 @@ FIELDNAMES = [
 def _read(path):
     if not path.exists():
         return []
-    with open(path, newline="", encoding="utf-8") as f:
+    with open(path, newline="", encoding="utf-8-sig") as f:
         return list(csv.DictReader(f))
 
 
@@ -47,10 +48,12 @@ def save_rows(rows):
     rows_sorted = sorted(rows, key=sort_key)
     path = tracks.local_csv_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
         writer.writeheader()
         writer.writerows(rows_sorted)
+    os.replace(tmp, path)   # atomic: a crash can't leave a truncated list
 
 
 def next_local_id(rows):

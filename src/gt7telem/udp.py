@@ -291,7 +291,9 @@ def register_event(name: str, fn: Callable[[dict], None]) -> None:
     """Register a callback for an event: 'race_start', 'race_end', 'pause', 'resume'.
     Callback receives the parsed telemetry dict for the packet that triggered it.
     Keep callbacks fast/non-blocking -- they run on the UDP receive thread."""
-    _event_callbacks.setdefault(name, []).append(fn)
+    cbs = _event_callbacks.setdefault(name, [])
+    if fn not in cbs:          # re-opening a tool must not double-fire its handlers
+        cbs.append(fn)
 
 def _fire_event(name, parsed):
     for fn in _event_callbacks.get(name, []):
@@ -421,7 +423,7 @@ def is_connected() -> bool:
 def get_ip() -> str:         return _ps4_ip
 
 def set_ip(new_ip: str) -> None:
-    global _ps4_ip, _connected, _source, _latest
+    global _ps4_ip, _connected, _source, _latest, _last_packet_mono
     new_ip  = new_ip.strip()
     changed = new_ip != _ps4_ip
     _ps4_ip = new_ip
@@ -429,6 +431,7 @@ def set_ip(new_ip: str) -> None:
         _connected = False
         _source    = None
         _latest    = {}
+        _last_packet_mono = None
     if changed:
         # Counters from the previous console would otherwise decide
         # get_last_error() for the new one -- e.g. packets_received > 0 left
@@ -470,9 +473,9 @@ def sanitize(name: str) -> str:
 
 def reset_lap() -> None:
     global _prev_x, _prev_z, _prev_heading, _cum_dist
-    _prev_x = _prev_z = _prev_heading = None
-    _cum_dist = 0.0
     with _lock:
+        _prev_x = _prev_z = _prev_heading = None
+        _cum_dist = 0.0
         _latest.pop("track_position", None)
 
 # ── Salsa20 decrypt — IV method from Bornhall/gt7telemetry ───────────────────
@@ -507,7 +510,7 @@ def _decrypt(data):
         if magic != 0x47375330:
             return None
         return ddata
-    except:
+    except Exception:
         return None
 
 # ── Pure Python Salsa20 fallback (no deps) ────────────────────────────────────
@@ -854,7 +857,7 @@ def _parse(data):
             "wheel_base":                wheel_base,
             "car_category":              car_category,
         }
-    except:
+    except Exception:
         return None
 
 def _normalise_steering(angle, source, heading_estimate, car_id, speed_kmh):
@@ -906,7 +909,7 @@ def _classify_send_error(e):
             return f"host unreachable — {_ps4_ip} isn't answering on the local network"
         if code == errno.ECONNREFUSED:
             return f"connection refused by {_ps4_ip} — is the game/console actually on and reachable?"
-        if code == errno.EACCES:
+        if code in (errno.EACCES, 10013):   # 10013 = WSAEACCES on Windows
             return "permission denied sending UDP (check OS firewall/antivirus rules)"
         return f"{e.strerror or e} (errno {code})"
     return str(e)
@@ -914,15 +917,19 @@ def _classify_send_error(e):
 def _heartbeat_thread():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     _log(f"[gt7udp] Heartbeat -> {_ps4_ip}:{SEND_PORT}")
+    last_msg = None
     while True:
         try:
             sock.sendto(HEARTBEAT_MSG, (_ps4_ip, SEND_PORT))
             _diag_incr("heartbeats_sent")
+            last_msg = None
         except Exception as e:
             msg = _classify_send_error(e)
             _diag_incr("heartbeat_errors")
             _diag_update(last_heartbeat_error=msg)
-            _log(f"[gt7udp] Heartbeat error: {msg}")
+            if msg != last_msg:   # a repeating error used to flood the 50-line log ring
+                _log(f"[gt7udp] Heartbeat error: {msg}")
+                last_msg = msg
         time.sleep(HEARTBEAT_EVERY)
 
 # ── Thread 2: receive ──────────────────────────────────────────────────────────
@@ -932,7 +939,7 @@ def _classify_bind_error(e):
             return (f"Port {RECV_PORT} is already in use — another copy of TRACE (or another "
                      "GT7 telemetry tool) is probably already running and listening on it. "
                      "Close it and relaunch.")
-        if e.errno == errno.EACCES:
+        if e.errno in (errno.EACCES, 10013):
             return f"Permission denied binding UDP port {RECV_PORT} (check firewall/OS permissions)."
         return f"Couldn't bind UDP port {RECV_PORT}: {e.strerror or e} (errno {e.errno})"
     return f"Couldn't bind UDP port {RECV_PORT}: {e}"
@@ -1013,13 +1020,33 @@ def _udp_thread():
 
 # ── Start ──────────────────────────────────────────────────────────────────────
 _started = False
+_start_lock = threading.Lock()
+
+def _disable_quickedit():
+    """Windows console QuickEdit: clicking in the console window freezes the
+    process (and with it every _log() write on the receive thread) until a
+    key is pressed. Turn it off; harmless when there is no console."""
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        h = k32.GetStdHandle(-10)          # STD_INPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if k32.GetConsoleMode(h, ctypes.byref(mode)):
+            k32.SetConsoleMode(h, (mode.value & ~0x0040) | 0x0080)   # -QUICK_EDIT +EXTENDED_FLAGS
+    except Exception:
+        pass
 
 def _ensure_started():
     global _started
     if _started: return
-    _started = True
-    threading.Thread(target=_heartbeat_thread, daemon=True).start()
-    threading.Thread(target=_udp_thread,       daemon=True).start()
+    with _start_lock:
+        if _started: return
+        _started = True
+        _disable_quickedit()
+        threading.Thread(target=_heartbeat_thread, daemon=True).start()
+        threading.Thread(target=_udp_thread,       daemon=True).start()
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 def get(key: str) -> Any:
@@ -1032,23 +1059,23 @@ def get_snapshot() -> dict:
 
 def get_int(key: str) -> int:
     try: return int(get(key) or 0)
-    except: return 0
+    except Exception: return 0
 
 def get_float(key: str) -> float:
     try: return float(get(key) or 0.0)
-    except: return 0.0
+    except Exception: return 0.0
 
 def wait_for_connection(timeout: int = 60) -> str | None:
     _ensure_started()
     _log(f"[gt7udp] Heartbeat -> {_ps4_ip}:{SEND_PORT}  |  Listening on :{RECV_PORT}")
-    deadline = time.time() + timeout
+    deadline = time.monotonic() + timeout
     dots = 0
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
+        ok = is_connected()   # fresh packets, not just "ever connected"
         with _lock:
-            ok  = _connected
             src = _source
-            spd = _latest.get("speed_kmh")
-            pos = (_latest.get("world_x", 0), _latest.get("world_z", 0))
+            spd = _latest.get("speed_kmh") or 0.0
+            pos = (_latest.get("world_x") or 0, _latest.get("world_z") or 0)
         if ok:
             _log(f"\n[gt7udp] Connected via {src}!  "
                   f"speed={spd:.1f} km/h  pos=({pos[0]:.0f}, {pos[1]:.0f})")
@@ -1108,7 +1135,12 @@ def discover_ps_ip(timeout: float = 2.0) -> str | None:
             if remaining <= 0:
                 return None
             sock.settimeout(remaining)
-            data, addr = sock.recvfrom(1024)
+            try:
+                data, addr = sock.recvfrom(1024)
+            except socket.timeout:
+                return None
+            except OSError:
+                continue   # e.g. Windows ICMP "connection reset" -- keep listening
             if data.startswith(b"HTTP/"):
                 return addr[0]
     except OSError:  # socket.timeout is an OSError subclass

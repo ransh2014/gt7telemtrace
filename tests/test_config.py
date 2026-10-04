@@ -105,6 +105,7 @@ def test_noop_when_default_cafile_exists(monkeypatch, tmp_path):
 
 @pytest.mark.usefixtures("ca_env")
 def test_noop_when_default_capath_exists(monkeypatch, tmp_path):
+    (tmp_path / "abcd1234.0").write_text("x")   # an empty capath doesn't count
     monkeypatch.setattr(ssl, "get_default_verify_paths", lambda: _Paths(None, str(tmp_path)))
     assert config.ensure_ca_bundle() is None
     assert "SSL_CERT_FILE" not in os.environ

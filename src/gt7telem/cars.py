@@ -9,6 +9,7 @@ survive upgrades -- handy for the gap between a GT7 update adding cars and
 a TRACE release shipping the refreshed CSV.
 """
 import csv
+import threading
 from pathlib import Path
 
 __all__ = ["get_car_name"]
@@ -24,11 +25,20 @@ _car_names: dict[int, str] = {}
 _loaded = False
 
 
+_load_lock = threading.Lock()
+
+
 def _load() -> None:
     global _loaded
     if _loaded:
         return
-    _loaded = True
+    with _load_lock:               # two threads must not half-fill the dict for each other
+        if not _loaded:
+            _read_all()
+            _loaded = True
+
+
+def _read_all() -> None:
     paths = [_CSV_PATH]
     try:
         paths.append(local_csv_path())
@@ -36,7 +46,7 @@ def _load() -> None:
         pass  # no usable settings folder -- shipped list only
     for path in paths:   # local entries override shipped ones
         try:
-            with open(path, newline="", encoding="utf-8") as f:
+            with open(path, newline="", encoding="utf-8-sig") as f:
                 for row in csv.DictReader(f):
                     try:
                         cid = int(row["ID"])

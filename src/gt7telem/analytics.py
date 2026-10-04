@@ -59,7 +59,8 @@ def _send(payload: dict) -> None:
                 "Prefer": "return=minimal",
             },
         )
-        urllib.request.urlopen(req, timeout=4)
+        with urllib.request.urlopen(req, timeout=4):
+            pass
     except Exception:
         pass  # analytics must never surface an error to the user
 
@@ -68,13 +69,16 @@ def track_launch(tool: str) -> None:
     """Fire-and-forget usage ping. Call once, right after a tool (dashboard /
     lap_analyst / race_analyst) finishes starting up. Instantly a no-op if
     the user has ANALYTICS_ENABLED off -- no thread even gets spawned."""
-    if not config.ANALYTICS_ENABLED:
-        return
-    payload = {
-        "event": "app_launch",
-        "tool": tool,
-        "version": _get_version(),
-        "os": _os_name(),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    threading.Thread(target=_send, args=(payload,), daemon=True).start()
+    try:
+        if not config.ANALYTICS_ENABLED:
+            return
+        payload = {
+            "event": "app_launch",
+            "tool": tool,
+            "version": _get_version(),
+            "os": _os_name(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        threading.Thread(target=_send, args=(payload,), daemon=True).start()
+    except Exception:
+        pass  # never raises, per the module contract

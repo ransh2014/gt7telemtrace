@@ -37,7 +37,7 @@ gt7telem/         The TRACE package itself (same source that ships on
   dashboard.py      Live telemetry dashboard (includes the Track Map panel
                     and the RECORD_RATE_OPTIONS list, if you want to add
                     your own recording sample rates)
-  lap_analyst.py    Lap analysis — 17 chart groups, A/B compare, replay,
+  lap_analyst.py    Lap analysis — 18 chart groups, A/B compare, replay,
                     CSV export, micro-sector heatmap, track boundary
                     overlay, leaderboard/ghost/consensus panel
   race_analyst.py   Race analysis — 15 chart groups, race-oriented
@@ -58,6 +58,9 @@ gt7telem/         The TRACE package itself (same source that ships on
                     for Grafana or any Prometheus-compatible scraper.
                     Binds to localhost only unless you tick "ALLOW
                     REMOTE" in the Live Dashboard header.
+  corners.py        Corner detection and per-corner analysis (the Corners chart
+                    group in Lap Analyst)
+  notify.py         Desktop toast + sound alerts (new PB, race end)
   cars.py           Car ID -> name lookup (car_ids.csv)
   tracks.py         Track ID -> name lookup (course_ids.csv), plus track
                     boundary extraction from a lap's GPS trace
@@ -94,3 +97,5 @@ PyPI:    https://pypi.org/project/gt7tracetelem/
 
 TRACE is free, open source (MIT), and not affiliated with Polyphony
 Digital or Sony Interactive Entertainment.
+
+Linux: if Tk is missing, install it first (Debian/Ubuntu: sudo apt install python3-tk).

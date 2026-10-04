@@ -77,6 +77,22 @@ def sign_up_anonymous(timeout: float = 8):
         return None
 
 
+def _token_rejected(err: "urllib.error.HTTPError") -> bool:
+    """True only when the server says the refresh token itself is bad (400/401
+    with an invalid_grant / refresh-token style body). Rate limits (429),
+    timeouts (408), 5xx and malformed-request errors are NOT a verdict on the
+    token -- treating them as one used to delete working accounts."""
+    if err.code not in (400, 401):
+        return False
+    try:
+        body = err.read().decode("utf-8", "replace").lower()
+    except Exception:
+        return False
+    return any(s in body for s in ("invalid_grant", "refresh_token_not_found", "refresh_token_already_used",
+                                   "invalid refresh token", "refresh token not found",
+                                   "already used", "session_not_found"))
+
+
 def refresh_session(refresh_token: str, timeout: float = 8):
     """Exchange a stored refresh_token for a fresh access_token once the
     old one expires (Supabase access tokens are short-lived, ~1h). Returns
@@ -99,11 +115,16 @@ def refresh_session(refresh_token: str, timeout: float = 8):
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             session = _parse_session(json.loads(resp.read().decode("utf-8")))
-            last_refresh_error = None if session["access_token"] else "network"
-            return session if session["access_token"] else None
+            if not session["access_token"]:
+                last_refresh_error = "network"
+                return None
+            if not session["refresh_token"]:
+                # Never replace a good stored refresh token with an empty one.
+                session["refresh_token"] = refresh_token
+            last_refresh_error = None
+            return session
     except urllib.error.HTTPError as e:
-        # 400/401/403 = token rejected; 5xx = server trouble, not the token.
-        last_refresh_error = "invalid" if 400 <= e.code < 500 else "network"
+        last_refresh_error = "invalid" if _token_rejected(e) else "network"
         return None
     except Exception:
         last_refresh_error = "network"

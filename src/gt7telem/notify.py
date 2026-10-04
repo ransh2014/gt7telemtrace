@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 
 from . import config
 
@@ -46,7 +47,11 @@ def _spawn(cmd):
             env["LD_LIBRARY_PATH"] = orig
         else:
             env.pop("LD_LIBRARY_PATH", None)
-    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+    # reap it, so finished players don't pile up as zombies
+    wait = getattr(proc, "wait", None)
+    if wait is not None:
+        threading.Thread(target=wait, daemon=True).start()
 
 
 def _beep(root=None):
@@ -83,12 +88,13 @@ def notify(title: str, message: str, sound: bool = True, root=None):
         return
     if sound:
         _beep(root)
+    if root is None:
+        return   # no Tk owner: sound only (a second Tk() root off the main thread is unsafe)
+    toast = None
     try:
         import tkinter as tk
         owner = root
-        toast = tk.Toplevel(owner) if owner is not None else tk.Tk()
-        if owner is None:
-            toast.withdraw()  # the Tk() we just made is only a host for Toplevel-less use
+        toast = tk.Toplevel(owner)
         toast.overrideredirect(True)
         toast.attributes("-topmost", True)
         try:
@@ -97,7 +103,15 @@ def notify(title: str, message: str, sound: bool = True, root=None):
             pass
         w, h = 300, 74
         sw = toast.winfo_screenwidth(); sh = toast.winfo_screenheight()
-        toast.geometry(f"{w}x{h}+{sw - w - 24}+{sh - h - 60}")
+        x0, y0 = sw - w - 24, sh - h - 60
+        try:
+            # bottom-right of the window's own monitor, not always the primary one
+            if owner.winfo_width() > 1:
+                x0 = max(0, owner.winfo_rootx() + owner.winfo_width() - w - 24)
+                y0 = max(0, owner.winfo_rooty() + owner.winfo_height() - h - 24)
+        except Exception:
+            pass
+        toast.geometry(f"{w}x{h}+{x0}+{y0}")
         frame = tk.Frame(toast, bg="#13141f", highlightthickness=1,
                           highlightbackground="#00f0d4")
         frame.pack(fill="both", expand=True)
@@ -109,4 +123,10 @@ def notify(title: str, message: str, sound: bool = True, root=None):
                  wraplength=280).pack(fill="x", padx=10)
         toast.after(4200, toast.destroy)
     except Exception:
-        pass  # headless / no display -- the beep already fired
+        # headless / no display -- the beep already fired. Don't leave a
+        # half-built, borderless, always-on-top window behind.
+        if toast is not None:
+            try:
+                toast.destroy()
+            except Exception:
+                pass

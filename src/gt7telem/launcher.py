@@ -21,6 +21,8 @@ if __name__ == "__main__" and (not __package__):
         sys.path.insert(0, str(_src_dir))
     __package__ = _pkg_dir.name                      # "gt7telem"
 
+import queue
+import re
 import threading
 import tkinter as tk
 import webbrowser
@@ -59,6 +61,44 @@ else:
 WIN_W, WIN_H = 900, 650
 
 _LATEST_RELEASE_URL = None  # set by _check_for_update() if a newer tag exists
+_UPDATE_TAG = None          # ... together with the tag name; the Tk thread shows the banner
+_banner = None
+_uiq = queue.SimpleQueue()  # worker threads -> Tk thread (root.after() isn't thread-safe)
+
+
+def _post(fn, *args):
+    _uiq.put((fn, args))
+
+
+def _poll_ui():
+    try:
+        while True:
+            try:
+                fn, args = _uiq.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                fn(*args)
+            except Exception:
+                pass
+        # (re)show the update banner: swapping screens destroys it
+        if _UPDATE_TAG and _content is not None and not (
+                _banner is not None and _banner.winfo_exists() and _banner.master is _content):
+            _show_update_banner(_UPDATE_TAG)
+    finally:
+        if root is not None:
+            try:
+                root.after(150, _poll_ui)
+            except tk.TclError:
+                pass
+
+
+def _ver_tuple(s):
+    """'v0.7.10' -> (0, 7, 10); ignores a '-rc1' / '+build' suffix. Compared
+    as ints (not strings), and padded so 0.8 == 0.8.0."""
+    core = re.split(r"[-+]", str(s).strip().lstrip("vV"), maxsplit=1)[0]
+    nums = [int(n) for n in re.findall(r"\d+", core)]
+    return tuple(nums + [0] * (4 - len(nums)))
 
 
 def _check_for_update():
@@ -70,7 +110,7 @@ def _check_for_update():
         return
 
     def worker():
-        global _LATEST_RELEASE_URL
+        global _LATEST_RELEASE_URL, _UPDATE_TAG
         try:
             import json as _json
             import urllib.request
@@ -82,13 +122,10 @@ def _check_for_update():
             tag = str(data.get("tag_name", "")).lstrip("vV")
             if not tag:
                 return
-            cur = tuple(int(p) for p in __version__.split(".") if p.isdigit())
-            new = tuple(int(p) for p in tag.split(".") if p.isdigit())
-            if new > cur:
+            if _ver_tuple(tag) > _ver_tuple(__version__):
                 _LATEST_RELEASE_URL = data.get("html_url") or \
                     "https://github.com/ransh2014/gt7telemtrace/releases/latest"
-                if root is not None:
-                    root.after(0, lambda: _show_update_banner(tag))
+                _UPDATE_TAG = tag      # picked up by _poll_ui on the Tk thread
         except Exception:
             pass  # offline / rate-limited / API changed -- fail silent
 
@@ -96,13 +133,16 @@ def _check_for_update():
 
 
 def _show_update_banner(new_version: str):
+    global _banner
     if _content is None:
         return
     bar = tk.Label(
         _content, text=f"  🔔  TRACE {new_version} is available — click to open the release  ",
         font=("Segoe UI", 9, "bold"), bg=PINK, fg="#ffffff", cursor="hand2")
     bar.place(relx=0.5, rely=0.0, anchor="n")
+    bar.lift()
     bar.bind("<Button-1>", lambda e: webbrowser.open(_LATEST_RELEASE_URL))
+    _banner = bar
 
 root = None
 _content = None   # the frame currently swapped into root (onboarding or menu)
@@ -114,25 +154,37 @@ def _center(win, w, h):
     win.geometry(f"{w}x{h}+{(sw - w) // 2}+{(sh - h) // 2}")
 
 
-def launch_dashboard():
-    analytics.track_launch("dashboard")
+def _launch(tool, app_cls):
+    analytics.track_launch(tool)
     root.destroy()
-    app = gt7telem.App()
+    try:
+        app = app_cls()
+    except Exception as e:
+        # The menu window is already gone -- say why, then come back to the menu
+        # instead of exiting silently.
+        from tkinter import messagebox
+        tmp = tk.Tk()
+        tmp.withdraw()
+        try:
+            messagebox.showerror("TRACE", f"Couldn't start {tool.replace('_', ' ')}:\n{type(e).__name__}: {e}",
+                                 parent=tmp)
+        finally:
+            tmp.destroy()
+        main()
+        return
     app.mainloop()
+
+
+def launch_dashboard():
+    _launch("dashboard", gt7telem.App)
 
 
 def launch_lap_analyst():
-    analytics.track_launch("lap_analyst")
-    root.destroy()
-    app = lap_analyst.AnalystApp()
-    app.mainloop()
+    _launch("lap_analyst", lap_analyst.AnalystApp)
 
 
 def launch_race_analyst():
-    analytics.track_launch("race_analyst")
-    root.destroy()
-    app = race_analyst.AnalystApp()
-    app.mainloop()
+    _launch("race_analyst", race_analyst.AnalystApp)
 
 
 def _swap_content() -> tk.Frame:
@@ -230,11 +282,15 @@ def _show_onboarding(from_menu: bool = False):
         status.config(text="Creating account…", fg=DIM)
 
         def worker():
-            session = auth.sign_up_anonymous()
+            session = None
             name_saved = False
-            if session:
-                name_saved = auth.set_display_name(session["access_token"], session["user_id"], name)
-            root.after(0, lambda: after_create(session, name, name_saved))
+            try:
+                session = auth.sign_up_anonymous()
+                if session:
+                    name_saved = auth.set_display_name(session["access_token"], session["user_id"], name)
+            except Exception:
+                session = None
+            _post(after_create, session, name, name_saved)
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -256,13 +312,22 @@ def _show_onboarding(from_menu: bool = False):
         config.SUPABASE_USER_ID = session["user_id"]
         config.PSN_NAME = name
         config.ONBOARDING_DONE = True
-        config.save(
+        persisted = config.save(
             SUPABASE_ACCESS_TOKEN=config.SUPABASE_ACCESS_TOKEN,
             SUPABASE_REFRESH_TOKEN=config.SUPABASE_REFRESH_TOKEN,
             SUPABASE_USER_ID=config.SUPABASE_USER_ID,
             PSN_NAME=config.PSN_NAME,
             ONBOARDING_DONE=True,
         )
+        if not persisted:
+            # Don't claim success: a locked / unwritable settings.json means the
+            # account is lost on the next launch (and can't be recovered).
+            status.config(
+                text="Account created, but TRACE couldn't write its settings file, so "
+                     "you'll be signed out next launch. Check that the settings folder "
+                     "isn't read-only or locked.", fg=PINK)
+            root.after(4500, _show_menu)
+            return
         if name_saved:
             _show_menu()
             return
@@ -358,11 +423,23 @@ def _toggle_theme():
 
 def _do_backup_laps():
     from tkinter import messagebox
-    path = config.backup_laps()
-    if path is None:
-        messagebox.showinfo("Backup Laps", "No laps found to back up yet.", parent=root)
-        return
-    messagebox.showinfo("Backup Laps", f"Saved to:\n{path}", parent=root)
+    def work():
+        try:
+            path = config.backup_laps()
+        except Exception as e:
+            path = None
+            config.last_backup_error = f"{type(e).__name__}: {e}"
+        _post(done, path, getattr(config, "last_backup_error", None))
+
+    def done(path, err):
+        if path is None and err:
+            messagebox.showerror("Backup Laps", f"Backup failed:\n{err}", parent=root)
+        elif path is None:
+            messagebox.showinfo("Backup Laps", "No laps found to back up yet.", parent=root)
+        else:
+            messagebox.showinfo("Backup Laps", f"Saved to:\n{path}", parent=root)
+
+    threading.Thread(target=work, daemon=True).start()
 
 
 def _do_logout():
@@ -385,11 +462,14 @@ def _do_logout():
     config.SUPABASE_ACCESS_TOKEN = ""
     config.SUPABASE_REFRESH_TOKEN = ""
     config.SUPABASE_USER_ID = ""
-    config.save(
+    if not config.save(
         SUPABASE_ACCESS_TOKEN="",
         SUPABASE_REFRESH_TOKEN="",
         SUPABASE_USER_ID="",
-    )
+    ):
+        messagebox.showwarning(
+            "Log out", "Logged out for this session, but TRACE couldn't update its "
+            "settings file -- you may be signed back in next launch.", parent=root)
     _show_menu()
 
 
@@ -441,6 +521,7 @@ def main():
     else:
         _show_onboarding()
 
+    root.after(150, _poll_ui)
     if config.UPDATE_CHECK_ENABLED:
         _check_for_update()
 

@@ -24,6 +24,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
+      - name: Install Tk and a virtual display (GUI modules import tkinter)
+        run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb
+
       - name: Install package (with dev extras)
         run: python -m pip install -e ".[dev]"
 
@@ -31,4 +34,4 @@ jobs:
         run: python -m ruff check .
 
       - name: Test (pytest)
-        run: python -m pytest tests/ -v
+        run: xvfb-run -a python -m pytest tests/ -v

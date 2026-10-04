@@ -12,6 +12,7 @@ import socket
 import ssl
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_RATE", "KNOWN_IPS", "DEBUG_LOG",
@@ -62,6 +63,10 @@ def _portable_dir() -> Path | None:
         return None
     if any(marker in p for p in parts for marker in _MANAGED_INSTALL_MARKERS):
         return None
+    # Scoop installs under ~/scoop/apps/<app>/<version>/ -- writable, but the
+    # versioned folder is replaced on upgrade, so settings/laps would be stranded.
+    if "scoop" in parts and "apps" in parts:
+        return None
     if (exe_dir / "settings.json").exists() or _is_writable_dir(exe_dir):
         return exe_dir
     return None
@@ -78,9 +83,19 @@ def _base_dir() -> Path:
     portable = _portable_dir()
     if portable is not None:
         return portable
-    d = Path.home() / ".gt7telem"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    try:
+        d = Path.home() / ".gt7telem"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    except (OSError, RuntimeError):
+        # No usable home folder: fall back to a temp folder rather than
+        # crashing `import gt7telem`.
+        d = Path(tempfile.gettempdir()) / "gt7telem"
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        return d
 
 
 def _default_laps_dir() -> Path:
@@ -104,17 +119,38 @@ def _get_or_create_key() -> bytes:
     of settings.json alone (bug report, backup, accidental share) doesn't
     hand over a usable session token in plain text."""
     try:
-        if _KEY_FILE.exists():
-            key = _KEY_FILE.read_bytes()
-            if len(key) == 32:
-                return key
-        key = os.urandom(32)
-        _KEY_FILE.write_bytes(key)
-        try:
-            os.chmod(_KEY_FILE, 0o600)
-        except OSError:
-            pass  # best-effort on platforms/filesystems without POSIX perms (e.g. Windows)
-        return key
+        for _ in range(3):
+            if _KEY_FILE.exists():
+                key = _KEY_FILE.read_bytes()
+                if len(key) == 32:
+                    return key
+                if len(key) != 0:
+                    # Damaged or foreign key file: don't silently replace it
+                    # (that would orphan every encrypted token).
+                    return b""
+            # Create atomically with owner-only permissions from the start;
+            # O_EXCL means two first-launch processes can't both write a key.
+            key = os.urandom(32)
+            try:
+                fd = os.open(str(_KEY_FILE), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            except FileExistsError:
+                if _KEY_FILE.exists() and _KEY_FILE.stat().st_size == 0:
+                    try:
+                        _KEY_FILE.unlink()  # crash left an empty file; safe to redo
+                    except OSError:
+                        pass
+                continue  # another process won the race (or we cleared a stub); re-read
+            try:
+                with os.fdopen(fd, "wb") as f:
+                    f.write(key)
+            except Exception:
+                try:
+                    _KEY_FILE.unlink()
+                except OSError:
+                    pass
+                raise
+            return key
+        return b""
     except Exception:
         return b""  # caller falls back to storing the value unencrypted
 
@@ -137,6 +173,8 @@ def _encrypt(value: str) -> str:
 
 
 def _decrypt(value: str) -> str:
+    if not isinstance(value, str):
+        return ""
     if not value or not value.startswith(_ENC_PREFIX):
         return value  # empty, or a pre-existing plaintext token from before this fix
     try:
@@ -212,31 +250,113 @@ def remember_good_ip(ip: str) -> list:
     return known
 
 
+def _coerce(key: str, value):
+    """Return `value` if it has the right type for `key`, else the default.
+    A hand-edited settings.json (string KNOWN_IPS, text SAMPLE_RATE...)
+    must not crash the apps that read these."""
+    default = _DEFAULTS.get(key)
+    if default is None:
+        return value
+    if key in _SUPABASE_SECRET_KEYS or isinstance(default, str):
+        return value if isinstance(value, str) else default
+    if isinstance(default, bool):
+        return value if isinstance(value, bool) else default
+    if isinstance(default, int):
+        if isinstance(value, bool):
+            return default
+        if isinstance(value, (int, float)) and value == value and abs(value) != float("inf"):
+            return int(value)
+        if isinstance(value, str):
+            try:
+                return int(value.strip())
+            except ValueError:
+                return default
+        return default
+    if isinstance(default, list):
+        if isinstance(value, list):
+            return [x for x in value if isinstance(x, str)]
+        return default
+    return value
+
+
+def _read_raw():
+    """settings.json exactly as stored (secrets still encrypted).
+
+    Returns (data, ok). ok is False only when the file exists but can't be
+    read right now (locked by antivirus, permissions): callers must NOT
+    write defaults over it in that case. A file that's corrupt is moved
+    aside to settings.json.bad (so it isn't lost) and treated as empty."""
+    try:
+        if not _SETTINGS_FILE.exists():
+            return {}, True
+        text = _SETTINGS_FILE.read_text(encoding="utf-8-sig")
+    except OSError:
+        return {}, False
+    except ValueError:  # UnicodeDecodeError
+        text = ""
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data, True
+    except ValueError:
+        pass
+    try:
+        os.replace(_SETTINGS_FILE, _SETTINGS_FILE.with_name(_SETTINGS_FILE.name + ".bad"))
+    except OSError:
+        return {}, False
+    return {}, True
+
+
 def load() -> dict:
-    if _SETTINGS_FILE.exists():
-        try:
-            data = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
-            merged = dict(_DEFAULTS)
-            merged.update(data)
-        except Exception:
-            merged = dict(_DEFAULTS)
-    else:
-        merged = dict(_DEFAULTS)
+    data, _ok = _read_raw()
+    merged = dict(_DEFAULTS)
+    merged.update(data)
+    for k in list(merged):
+        merged[k] = _coerce(k, merged[k])
     for k in _SUPABASE_SECRET_KEYS:
         merged[k] = _decrypt(merged.get(k, ""))
     return merged
 
 
-def save(**kwargs) -> None:
-    data = load()
-    data.update(kwargs)
+def _atomic_write(path: Path, text: str) -> bool:
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        for attempt in range(4):
+            try:
+                os.replace(tmp, path)
+                return True
+            except PermissionError:
+                if attempt == 3:
+                    raise
+                time.sleep(0.05 * (attempt + 1))  # antivirus/indexer briefly holding the file
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+    return False
+
+
+def save(**kwargs) -> bool:
+    """Persist the given settings. Returns True if they were written.
+
+    Only keys already on disk plus the ones passed in are written -- derived
+    defaults (like the absolute laps folder) are not frozen into the file.
+    Secrets not passed in keep their stored ciphertext untouched, so a
+    failed decrypt can never turn into an empty value written back."""
+    data, ok = _read_raw()
+    if not ok:
+        return False
     out = dict(data)
     for k in _SUPABASE_SECRET_KEYS:
-        out[k] = _encrypt(out.get(k, ""))
-    try:
-        _SETTINGS_FILE.write_text(json.dumps(out, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+        if k in out and not isinstance(out[k], str):
+            out[k] = ""
+        elif k in out and out[k] and not out[k].startswith(_ENC_PREFIX):
+            out[k] = _encrypt(out[k])  # migrate an old plaintext token
+    for k, v in kwargs.items():
+        out[k] = _encrypt(v) if k in _SUPABASE_SECRET_KEYS else v
+    return _atomic_write(_SETTINGS_FILE, json.dumps(out, indent=2))
 
 
 _cfg = load()
@@ -264,20 +384,40 @@ def backup_laps() -> "Path | None":
     return the path, or None if there's nothing to back up / it fails.
     Local-only, no network -- a simple safety net against a deleted laps
     folder, disk wipe, or moving to a new machine by hand."""
-    import shutil
+    import zipfile
     from datetime import datetime
-    src = Path(LAPS_FOLDER)
-    if not src.exists() or not any(src.iterdir()):
-        return None
-    backups_dir = Path.home() / "TRACE" / "backups"
-    backups_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    dest_base = backups_dir / f"laps_backup_{ts}"
+    global last_backup_error
+    last_backup_error = None
     try:
-        archive = shutil.make_archive(str(dest_base), "zip", root_dir=str(src))
-        return Path(archive)
-    except Exception:
+        # Read the setting now, not the value frozen at import, so a folder
+        # changed since launch is the one that gets backed up.
+        src = Path(load().get("LAPS_FOLDER") or LAPS_FOLDER)
+        if not src.exists() or not any(src.iterdir()):
+            return None
+        backups_dir = Path.home() / "TRACE" / "backups"
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        dest = backups_dir / f"laps_backup_{ts}.zip"
+        src_r, backups_r = src.resolve(), backups_dir.resolve()
+        tmp = dest.with_name(dest.name + ".part")
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in src.rglob("*"):
+                if not f.is_file():
+                    continue
+                fr = f.resolve()
+                # If the laps folder is at/above the backups folder, never
+                # archive the backups (or the archive being written).
+                if backups_r == fr or backups_r in fr.parents:
+                    continue
+                zf.write(f, fr.relative_to(src_r))
+        os.replace(tmp, dest)
+        return dest
+    except Exception as e:
+        last_backup_error = str(e) or e.__class__.__name__
         return None
+
+
+last_backup_error = None  # why the last backup_laps() failed; None = ok / nothing to back up
 
 
 # ---------------------------------------------------------------------------
@@ -354,7 +494,7 @@ def ensure_ca_bundle() -> str | None:
             return None
         paths = ssl.get_default_verify_paths()
         if (paths.cafile and os.path.isfile(paths.cafile)) or (
-            paths.capath and os.path.isdir(paths.capath)
+            paths.capath and _usable_dir(paths.capath)
         ):
             return None
         for cand in CA_CANDIDATES:
@@ -387,9 +527,11 @@ def explain_error(exc: BaseException) -> str:
         if isinstance(exc, urllib.error.HTTPError):
             return f"http:{exc.code}"
         reason = getattr(exc, "reason", exc)
-        if isinstance(reason, ssl.SSLError) or isinstance(exc, ssl.SSLError):
+        # Only a failed certificate check means "install CA certificates";
+        # a handshake timeout / captive portal is just a network problem.
+        if isinstance(reason, ssl.SSLCertVerificationError) or isinstance(exc, ssl.SSLCertVerificationError):
             return "certs"
-        if "CERTIFICATE_VERIFY_FAILED" in str(exc):
+        if "CERTIFICATE_VERIFY_FAILED" in str(exc) or "CERTIFICATE_VERIFY_FAILED" in str(reason):
             return "certs"
         if isinstance(reason, socket.gaierror):
             return "dns"

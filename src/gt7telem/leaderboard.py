@@ -17,6 +17,7 @@ the caller, and every function has a short network timeout so a submit
 button never hangs the UI waiting on a bad connection.
 """
 import json
+import math
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -108,15 +109,26 @@ def _compact_samples(samples):
     dict per sample with 40+ fields) down to just what the leaderboard and
     future ghost/heatmap features need, keyed by each sample's own
     track_position -- keeps the uploaded payload small."""
+    def num(v):
+        # JSON has no NaN/Infinity (the server rejects them with a 400), and
+        # numpy scalars aren't serialisable -- coerce to a plain finite float.
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return 0
+        return f if math.isfinite(f) else 0
+
     out = []
     for s in samples:
+        if not isinstance(s, dict):
+            continue
         out.append({
-            "track_position": s.get("track_position", 0),
-            "speed_kmh":      s.get("speed_kmh", 0),
-            "throttle":       s.get("throttle", 0),
-            "brake":          s.get("brake", 0),
-            "steering":       s.get("steering", 0),
-            "gear":           s.get("gear", 0),
+            "track_position": num(s.get("track_position", 0)),
+            "speed_kmh":      num(s.get("speed_kmh", 0)),
+            "throttle":       num(s.get("throttle", 0)),
+            "brake":          num(s.get("brake", 0)),
+            "steering":       num(s.get("steering", 0)),
+            "gear":           num(s.get("gear", 0)),
         })
     return out
 
@@ -158,8 +170,11 @@ def submit_lap(car_name: str, track_name: str, lap_time_ms: int,
 
     On failure, returns (False, reason) with reason one of:
       "network" -- couldn't reach Supabase at all (offline, DNS, timeout)
-      "server"  -- reached Supabase but it rejected the request (bad/expired
-                   token, RLS policy rejection, malformed payload, etc.)
+      "auth"    -- Supabase answered 401/403: the access token expired or was
+                   rejected (refresh the session and retry once)
+      "server"  -- reached Supabase but it rejected the request (malformed
+                   payload, 5xx, etc.)
+      "data"    -- the lap data itself couldn't be turned into a request
     The distinction matters because "server" failures aren't fixed by
     checking your internet connection -- callers should say so rather than
     pointing the user at their network for a server-side problem.
@@ -170,26 +185,35 @@ def submit_lap(car_name: str, track_name: str, lap_time_ms: int,
     rejected by RLS unless the anon key alone is still permitted. Both
     default to "" so existing callers (anon-key-only) keep working
     unchanged."""
-    payload = {
-        "car_name": car_name,
-        "track_name": track_name,
-        "lap_time_ms": int(lap_time_ms),
-        "psn_name": psn_name,
-        "samples": _compact_samples(samples),
-    }
-    if user_id:
-        payload["user_id"] = user_id
     try:
-        data = json.dumps(payload).encode("utf-8")
+        payload = {
+            "car_name": car_name,
+            "track_name": track_name,
+            "lap_time_ms": int(lap_time_ms),
+            "psn_name": psn_name,
+            "samples": _compact_samples(samples),
+        }
+        if user_id:
+            payload["user_id"] = user_id
+        data = json.dumps(payload, allow_nan=False).encode("utf-8")
+    except Exception:
+        # Bad local data (unparseable time, unserialisable sample): nothing
+        # was sent, so it's neither a network nor a server problem.
+        return False, "data"
+    try:
         req = urllib.request.Request(
             f"{_SUPABASE_URL}/rest/v1/laps",
             data=data, method="POST",
             headers=_headers(prefer="return=minimal", access_token=access_token or None),
         )
-        urllib.request.urlopen(req, timeout=timeout)
+        with urllib.request.urlopen(req, timeout=timeout):
+            pass
         return True, "ok"
-    except urllib.error.HTTPError:
-        return False, "server"
+    except urllib.error.HTTPError as e:
+        # 401/403 = the access token expired or was rejected: the caller can
+        # try refreshing the session. Anything else (400/422 payload errors,
+        # 5xx) is the server's problem and a new token won't fix it.
+        return False, "auth" if e.code in (401, 403) else "server"
     except Exception:
         return False, "network"
 
@@ -234,12 +258,12 @@ def get_lap_samples(lap_id: int, timeout: float = 8) -> list:
     without world_x/world_z/t there's no GPS track map or replay for a
     downloaded ghost. Returns [] on any failure or if the lap doesn't
     exist."""
-    params = urllib.parse.urlencode({
-        "id": f"eq.{int(lap_id)}",
-        "select": "samples",
-        "limit": "1",
-    })
     try:
+        params = urllib.parse.urlencode({
+            "id": f"eq.{int(lap_id)}",
+            "select": "samples",
+            "limit": "1",
+        })
         req = urllib.request.Request(
             f"{_SUPABASE_URL}/rest/v1/laps?{params}",
             method="GET", headers=_headers(),
@@ -295,7 +319,8 @@ def _submit_id(payload: dict, timeout: float) -> bool:
             data=data, method="POST",
             headers=_headers(prefer="return=minimal"),
         )
-        urllib.request.urlopen(req, timeout=timeout)
+        with urllib.request.urlopen(req, timeout=timeout):
+            pass
         return True
     except Exception:
         return False

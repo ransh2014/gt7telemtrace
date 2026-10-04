@@ -91,12 +91,16 @@ jobs:
           zip ../gt7telem-linux.zip TRACE README.txt LICENSE.txt
 
       - name: Import GPG signing key
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: echo "$GPG_PRIVATE_KEY" | gpg --batch --import
 
       - name: Sign the release zip
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           gpg --batch --yes --pinentry-mode loopback \
-            --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            --passphrase "$GPG_PASSPHRASE" \
             --detach-sign --armor gt7telem-linux.zip
 
       - name: Upload build artifact

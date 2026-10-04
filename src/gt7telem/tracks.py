@@ -16,6 +16,8 @@ splitting one track's laps across three folders).
 """
 import csv
 import json
+import os
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -34,11 +36,20 @@ _track_names: dict[int, str] = {}
 _loaded = False
 
 
+_load_lock = threading.Lock()
+
+
 def _load() -> None:
     global _loaded
     if _loaded:
         return
-    _loaded = True
+    with _load_lock:               # two threads must not half-fill the dict for each other
+        if not _loaded:
+            _read_all()
+            _loaded = True
+
+
+def _read_all() -> None:
     paths = [_CSV_PATH]
     try:
         paths.append(local_csv_path())
@@ -46,7 +57,7 @@ def _load() -> None:
         pass
     for path in paths:
         try:
-            with open(path, newline="", encoding="utf-8") as f:
+            with open(path, newline="", encoding="utf-8-sig") as f:
                 for row in csv.DictReader(f):
                     try:
                         tid = int(row["ID"])
@@ -88,9 +99,11 @@ def _load_boundaries_file() -> dict:
     if _boundaries_cache is not None:
         return _boundaries_cache
     try:
-        with open(_BOUNDARIES_PATH, encoding="utf-8") as f:
+        with open(_BOUNDARIES_PATH, encoding="utf-8-sig") as f:
             _boundaries_cache = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+        if not isinstance(_boundaries_cache, dict):
+            _boundaries_cache = {}
+    except (OSError, ValueError):
         _boundaries_cache = {}
     return _boundaries_cache
 
@@ -120,9 +133,9 @@ def extract_boundary(lap_samples, bin_size_m: float = 25.0, smooth_window: int =
     if len(pts) < smooth_window * 2:
         return {"bins": []}
 
-    xs = np.array([p.get("world_x", 0.0) for p in pts], dtype=float)
-    zs = np.array([p.get("world_z", 0.0) for p in pts], dtype=float)
-    tp = np.array([p.get("track_position", 0.0) for p in pts], dtype=float)
+    xs = np.array([p.get("world_x") or 0.0 for p in pts], dtype=float)
+    zs = np.array([p.get("world_z") or 0.0 for p in pts], dtype=float)
+    tp = np.array([p.get("track_position") or 0.0 for p in pts], dtype=float)
 
     k = max(3, smooth_window | 1)  # odd window, so padding is symmetric
     pad = k // 2
@@ -168,12 +181,21 @@ def extract_boundary(lap_samples, bin_size_m: float = 25.0, smooth_window: int =
 def save_boundary(track_id, boundary: dict) -> None:
     """Cache a track's boundary (from extract_boundary) to
     track_boundaries.json, keyed by track_id (the lap's "track" name string)."""
-    data = _load_boundaries_file()
+    global _boundaries_cache
+    data = dict(_load_boundaries_file())
     data[str(track_id)] = boundary
     _BOUNDARIES_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(_BOUNDARIES_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f)
-    global _boundaries_cache
+    tmp = _BOUNDARIES_PATH.with_name(_BOUNDARIES_PATH.name + ".tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.replace(tmp, _BOUNDARIES_PATH)     # a crash mid-write can't corrupt the cache file
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
     _boundaries_cache = data
 
 

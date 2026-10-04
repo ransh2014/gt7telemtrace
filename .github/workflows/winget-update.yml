@@ -54,9 +54,13 @@ jobs:
     steps:
       - name: Resolve target tag
         shell: pwsh
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          $tag = "${{ github.event.inputs.tag }}"
-          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          $tag = $env:INPUT_TAG
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = $env:REF_NAME }
+          if ($tag -notmatch '^v?\d+\.\d+\.\d+$') { Write-Error "Unexpected tag '$tag'"; exit 1 }
           echo "TARGET_TAG=$tag" >> $env:GITHUB_ENV
 
       - name: Check the package is published in winget-pkgs

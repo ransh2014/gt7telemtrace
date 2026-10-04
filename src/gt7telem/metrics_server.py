@@ -12,8 +12,6 @@ and curl localhost:<port>/metrics to see the gauges move.
 """
 import threading
 
-from prometheus_client import Gauge, start_http_server
-
 __all__ = ["start", "stop", "update", "is_running", "DEFAULT_PORT"]
 
 DEFAULT_PORT = 9109
@@ -23,14 +21,25 @@ _httpd = None
 _thread = None
 _started = False
 
-_GAUGES = {
-    "speed_kmh":      Gauge("gt7_speed_kmh", "Vehicle speed, km/h"),
-    "rpm":            Gauge("gt7_rpm", "Engine RPM"),
-    "throttle":       Gauge("gt7_throttle", "Throttle input, 0-1"),
-    "brake":          Gauge("gt7_brake", "Brake input, 0-1"),
-    "fuel_remaining": Gauge("gt7_fuel_remaining", "Fuel remaining (percent or litres, depending on car)"),
-    "current_lap_ms": Gauge("gt7_current_lap_ms", "Current in-progress lap time, milliseconds"),
-}
+_GAUGES = {}
+
+
+def _ensure_gauges():
+    """prometheus_client is imported lazily: it's only needed when the
+    exporter is switched on, and a missing/broken install must not stop the
+    dashboard from importing at all."""
+    if _GAUGES:
+        return
+    from prometheus_client import Gauge
+    _GAUGES.update({
+        "speed_kmh":      Gauge("gt7_speed_kmh", "Vehicle speed, km/h"),
+        "rpm":            Gauge("gt7_rpm", "Engine RPM"),
+        "throttle":       Gauge("gt7_throttle", "Throttle input, 0-1"),
+        "brake":          Gauge("gt7_brake", "Brake input, 0-1"),
+        "fuel_remaining": Gauge("gt7_fuel_remaining", "Fuel remaining (percent or litres, depending on car)"),
+        "current_lap_ms": Gauge("gt7_current_lap_ms", "Current in-progress lap time, milliseconds"),
+        "connected":      Gauge("gt7_connected", "1 while telemetry packets are arriving, else 0"),
+    })
 
 
 def is_running() -> bool:
@@ -53,13 +62,18 @@ def start(port: int = DEFAULT_PORT, addr: str = "127.0.0.1") -> bool:
         if _started:
             return True
         try:
+            from prometheus_client import start_http_server
+            _ensure_gauges()
             # Needs prometheus_client >= 0.20 -- that's the release where
             # start_http_server began returning (server, thread). On 0.19.x
             # it returns None and this unpack raises TypeError, which the
             # OSError handler below would NOT catch. Don't lower the pin in
             # pyproject.toml without changing this too.
             _httpd, _thread = start_http_server(port, addr=addr)
-        except OSError:
+        except Exception:
+            # bind failure, missing/old prometheus_client, anything else:
+            # the exporter is optional and must never take the app down
+            _httpd = _thread = None
             return False
         _started = True
         return True
@@ -72,8 +86,11 @@ def stop() -> None:
     global _httpd, _thread, _started
     with _lock:
         if _httpd is not None:
-            _httpd.shutdown()
-            _httpd.server_close()
+            try:
+                _httpd.shutdown()
+                _httpd.server_close()
+            except Exception:
+                pass
         _httpd = None
         _thread = None
         _started = False
@@ -89,7 +106,10 @@ def update(d: dict) -> None:
     to check is_running() themselves before every call."""
     if not _started:
         return
-    for key, gauge in _GAUGES.items():
+    for key, gauge in list(_GAUGES.items()):
+        if key == "connected":
+            gauge.set(1)   # update() is only called while packets are flowing
+            continue
         try:
             gauge.set(float(d.get(key) or 0))
         except (TypeError, ValueError):

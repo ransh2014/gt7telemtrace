@@ -6,7 +6,7 @@
 [![PyPI](https://img.shields.io/pypi/v/gt7tracetelem?color=00e5ff&label=PyPI&cacheSeconds=300)](https://pypi.org/project/gt7tracetelem/)
 [![Python versions](https://img.shields.io/pypi/pyversions/gt7tracetelem?color=7c5cff&cacheSeconds=300)](https://pypi.org/project/gt7tracetelem/)
 [![Downloads](https://img.shields.io/pypi/dm/gt7tracetelem?color=ff5c8a&cacheSeconds=300)](https://pypi.org/project/gt7tracetelem/)
-[![License: MIT](https://img.shields.io/github/license/ransh2014/gt7telemtrace?cacheSeconds=300)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/ransh2014/gt7telemtrace?cacheSeconds=300)](https://github.com/ransh2014/gt7telemtrace/blob/main/LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/ransh2014/gt7telemtrace?cacheSeconds=300)](https://github.com/ransh2014/gt7telemtrace/commits/main)
 
 A live telemetry dashboard, lap analyst, and race analyst for **Gran Turismo 7** — reads the UDP telemetry stream straight off your PS4/PS5 over your local network. No mods, no jailbreak, just the game's own broadcast data, wrapped in three desktop tools you can install with one `pip install`.
@@ -15,7 +15,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 > Community tool — not affiliated with, endorsed by, or connected to Polyphony Digital or Sony Interactive Entertainment.
 
-> **Project status:** feature-complete as of this release. From here on it's maintenance only — bug fixes, and car/track database refreshes as [ddm999's gt7info](https://github.com/ddm999/gt7info) updates. No further new features are planned.
+> **Project status:** maintenance mode. Development is now bug fixes and car/track database refreshes (as [ddm999's gt7info](https://github.com/ddm999/gt7info) updates); no big new features are planned.
 
 ---
 
@@ -62,7 +62,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Lap history table with alerts
 
 ### Lap Analyst
-- **17 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus, Style
+- **18 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus, Style, Corners
 - A/B lap comparison across every chart group
 - Dual replay — synced and realtime
 - Driver ratings radar
@@ -105,7 +105,7 @@ Or just run `gt7telem` from a terminal to launch the GUI menu.
 > If you already have an unrelated package that installs a top-level `gt7telem` module, the two will conflict. Check first with `pip show gt7telem`.
 
 ### Option 2 — from source
-Works on Windows, macOS, or Linux with Python 3.10+.
+Works on Windows, macOS, or Linux with Python 3.10+. On Debian/Ubuntu you may also need Tk: `sudo apt install python3-tk`.
 ```bash
 git clone https://github.com/ransh2014/gt7telemtrace.git
 cd gt7telemtrace
@@ -114,7 +114,7 @@ gt7telem
 ```
 
 ### Option 3 — standalone binaries
-No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.app` from **[gt7trace.netlify.app/setup.html](https://gt7trace.netlify.app/setup.html)**. The macOS build is produced automatically on a GitHub-hosted Apple Silicon runner (see [`build-macos.yml`](.github/workflows/build-macos.yml)) — on an older Intel Mac, use Option 1 or 2 instead.
+No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.app` from **[gt7trace.netlify.app/setup.html](https://gt7trace.netlify.app/setup.html)**. The macOS build is produced automatically on a GitHub-hosted Apple Silicon runner (see [`build-macos.yml`](https://github.com/ransh2014/gt7telemtrace/blob/main/github/workflows/build-macos.yml)) — on an older Intel Mac, use Option 1 or 2 instead.
 
 ### Option 4 — package managers
 On Windows:
@@ -148,7 +148,7 @@ TRACE's binaries are unsigned on Windows today. If your browser or Windows Smart
   gpg --import trace-public-key.asc
   gpg --verify gt7telem-linux.zip.asc gt7telem-linux.zip
   ```
-  The public key is available in the repo at [`gpg-signing-key/trace-public-key.asc`](gpg-signing-key/trace-public-key.asc).
+  The public key is available in the repo at [`gpg-signing-key/trace-public-key.asc`](https://github.com/ransh2014/gt7telemtrace/blob/main/gpg-signing-key/trace-public-key.asc).
 
 ---
 
@@ -229,7 +229,7 @@ Live connection diagnostics (heartbeat count, packet loss, last error) are alway
 
 ## Contributing
 
-Issues and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the quick version (dev setup, where the GUI code lives, and how the car/track databases get refreshed).
+Issues and PRs are welcome — see [CONTRIBUTING.md](https://github.com/ransh2014/gt7telemtrace/blob/main/CONTRIBUTING.md) for the quick version (dev setup, where the GUI code lives, and how the car/track databases get refreshed).
 
 ---
 
@@ -245,7 +245,7 @@ Full writeup and credits: **[gt7trace.netlify.app/about.html](https://gt7trace.n
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/ransh2014/gt7telemtrace/blob/main/LICENSE).
 
 ## Support
 
