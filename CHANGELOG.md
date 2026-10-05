@@ -1,11 +1,11 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-10-15
+## [0.8.0] - 2026-10-05
 Nine new features across the Dashboard, Lap Analyst, Race Analyst and Launcher.
 
 New
