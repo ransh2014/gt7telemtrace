@@ -27,7 +27,7 @@ import threading
 import tkinter as tk
 import webbrowser
 
-from . import __version__, analytics, auth, config, lap_analyst, race_analyst
+from . import __version__, analytics, auth, config, lap_analyst, race_analyst, records
 
 # Static imports so PyInstaller's analysis bundles these (and their deps:
 # numpy, pandas, matplotlib, pycryptodome) -- do NOT switch these back to
@@ -385,6 +385,12 @@ def _show_menu():
     theme_lbl.pack(side="right", padx=(0, 24))
     theme_lbl.bind("<Button-1>", lambda e: _toggle_theme())
 
+    records_lbl = tk.Label(foot, text="🏁  Records",
+                           font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG,
+                           cursor="hand2")
+    records_lbl.pack(side="right", padx=(0, 24))
+    records_lbl.bind("<Button-1>", lambda e: _show_records())
+
     backup_lbl = tk.Label(foot, text="🗄  Backup Laps",
                            font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG,
                            cursor="hand2")
@@ -419,6 +425,11 @@ def _toggle_theme():
         "Theme",
         f"Switched to {new_theme} mode. Close and reopen TRACE (or just "
         f"the tool you launch next) to see it.", parent=root)
+
+
+def _show_records():
+    """Best lap per car and track, from the saved lap files (see records.py)."""
+    records.show_records(root, dict(bg=BG, panel=PANEL, fg=FG, dim=DIM, accent=CYN))
 
 
 def _do_backup_laps():

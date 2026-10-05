@@ -174,9 +174,10 @@ def test_headings_hold_the_last_value_at_a_standstill():
 
 
 def test_too_short_a_lap_does_not_crash_the_sector_chart():
-    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
     pos = np.linspace(0, 20, 5)
     _, df = _lap(pos, np.linspace(0, 1, 5))
-    fig = plt.figure()
+    fig = Figure()           # a bare Figure: pyplot would open a Tk window, which flakes on some machines
+    FigureCanvasAgg(fig)
     la.draw_sectors(fig, df, None)
-    plt.close(fig)

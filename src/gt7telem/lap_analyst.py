@@ -17,7 +17,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import __version__, auth, corners, leaderboard, share_card, tracks
+from . import __version__, auth, corners, leaderboard, records, share_card, theoretical, tracks
 from . import config as runtime_config
 
 matplotlib.use("TkAgg")
@@ -501,6 +501,19 @@ def lap_card_png(data, df, width=1200, height=630):
     headline stats, the speed trace by sector, a speed-coloured track map and
     the fuel used on the lap. See share_card.py."""
     return share_card.render_card(lap_card_spec(data, df), width, height)
+def theory_candidates(rows, lap_data, path_a, limit):
+    """The saved laps worth stitching into the theoretical best: same car and
+    track as Lap A, complete, from the same physics era, fastest first, and not
+    Lap A's own file (it is added separately). `rows` come from records.scan_laps."""
+    car = str(lap_data.get("car_display") or lap_data.get("car") or "").casefold()
+    track = str(lap_data.get("track_display") or lap_data.get("track") or "").casefold()
+    current = leaderboard.is_current_era(lap_data)
+    keep = [r for r in rows
+            if r["car"].casefold() == car and r["track"].casefold() == track
+            and not r["incomplete"] and r["current_era"] == current
+            and os.path.normcase(r["path"]) != os.path.normcase(str(path_a or ""))]
+    return sorted(keep, key=lambda r: r["time_s"])[:limit]
+
 # ── Chart helpers ─────────────────────────────────────────────────────────────
 def _ax(ax, title, xl="Track Pos (m)", yl=""):
     ax.set_title(title, color=FG, fontsize=9)
@@ -1481,6 +1494,70 @@ def draw_style(fig, df, dfb=None):
     ax4.text(0.5, 0.18, "Lap A summary", ha="center", color=DIM, fontsize=8, transform=ax4.transAxes)
     ax4.set_title("Style Summary", color=FG, fontsize=9)
 
+def draw_theoretical(fig, df, dfb=None, pool=None):
+    """Theoretical best lap: the fastest micro-sector from each lap on this car and
+    track, stitched into the lap you could drive, and the zones where your best
+    real lap is held back. `pool` is a list of (label, frame); without one it
+    uses Lap A and Lap B. It is a ceiling: sectors interact, so fixing a weak
+    zone usually gains less than shown."""
+    laps = pool if pool is not None else [("Lap A", df)] + ([("Lap B", dfb)] if dfb is not None else [])
+    r = theoretical.theoretical_best(laps)
+    if r is None:
+        ax = fig.add_subplot(1, 1, 1)
+        ax.set_facecolor(PNL2); ax.set_xticks([]); ax.set_yticks([])
+        for s in ax.spines.values(): s.set_visible(False)
+        ax.text(0.5, 0.5, "Needs at least two complete laps of this car on this track.\n"
+                          "Drive more laps in the Live Dashboard, or load a second lap as Lap B.",
+                ha="center", va="center", color=DIM, fontsize=10, transform=ax.transAxes)
+        return
+    palette = [CYN, ACC, YLW, GRN, PRP, ORG, "#8899ff", "#ff9ecb"]
+    axs = fig.subplots(2, 2)
+    fig.subplots_adjust(hspace=0.45, wspace=0.28, left=0.07, right=0.97, top=0.92, bottom=0.07)
+    centers = r["centers"]
+
+    ax = axs[0, 0]
+    ax.fill_between(centers, r["cum_gap"], color=ACC, alpha=0.25, step="mid")
+    ax.step(centers, r["cum_gap"], color=ACC, lw=1.4, where="mid")
+    _ax(ax, "Time left on the table along the lap (s)", yl="s")
+
+    ax = axs[0, 1]
+    zones = r["zones"]
+    if zones:
+        top3 = {id(z) for z in zones[:3]}
+        ax.bar([(z["start"] + z["end"]) / 2 for z in zones], [z["loss"] for z in zones],
+               width=[(z["end"] - z["start"]) * 0.9 for z in zones],
+               color=[ACC if id(z) in top3 else DIM for z in zones])
+    _ax(ax, "Where your best lap loses time (per ~100 m zone, s)", yl="s")
+
+    ax = axs[1, 0]
+    step = float(centers[1] - centers[0]) if len(centers) > 1 else 1.0
+    ax.bar(centers, 1, width=step, color=[palette[d % len(palette)] for d in r["donor"]])
+    ax.set_yticks([])
+    for i, lab in enumerate(r["labels"]):
+        ax.bar([], [], color=palette[i % len(palette)], label=lab[:28])
+    ax.legend(fontsize=6, ncol=2, loc="upper center", bbox_to_anchor=(0.5, -0.2))
+    _ax(ax, "Which lap holds the fastest time in each part of the track")
+
+    ax = axs[1, 1]
+    ax.axis("off")
+    best_label = r["labels"][r["best_idx"]]
+    lines = [f"Best real lap   {_fmt_laptime(r['actual'])}   ({best_label[:30]})",
+             f"Theoretical     {_fmt_laptime(r['theoretical'])}",
+             f"On the table    {r['gap']:.3f} s", f"Laps used       {len(r['labels'])}"]
+    if r["skipped"]:
+        lines.append(f"Left out        {r['skipped']} (incomplete or a different length)")
+    lines.append("")
+    if zones:
+        lines.append("Held back most at:")
+        for z in zones[:3]:
+            lines.append(f"  {z['start']:>5.0f}-{z['end']:<5.0f} m   +{z['loss']:.3f} s   "
+                         f"({r['labels'][z['donor']][:22]} is quicker)")
+    else:
+        lines.append("Your best lap is already the quickest everywhere.")
+    ax.text(0.0, 1.0, "\n".join(lines), ha="left", va="top", color=FG, fontsize=8, family="monospace",
+            transform=ax.transAxes)
+    ax.set_title("Theoretical best lap", color=FG, fontsize=9)
+
 # ── Groups registry ────────────────────────────────────────────────────────────
 GROUPS = [
     ("Inputs",    draw_inputs,          (3,3), (13,10)),
@@ -1501,6 +1578,7 @@ GROUPS = [
     ("Consensus", draw_consensus,       (2,2), (12, 8)),
     ("Style",     draw_style,           (2,2), (12, 8)),
     ("Corners",   draw_corners,         (2,1), (12, 9)),
+    ("Theoretical", draw_theoretical,   (2,2), (12, 9)),
 ]
 
 # ── Replay ────────────────────────────────────────────────────────────────────
@@ -1990,6 +2068,7 @@ class AnalystApp(tk.Tk):
         self._submitting = False
         self._consensus_gen = 0
         self._top10_gen = 0
+        self._theory = {"disk": None, "loading": False, "gen": 0}   # other laps for the Theoretical tab
         self._closing = False
         self._uiq = queue.Queue()
         self._build()
@@ -2353,11 +2432,18 @@ class AnalystApp(tk.Tk):
         if self._cfigs.get(name):
             plt.close(self._cfigs[name])
         self._cfigs[name] = None
+        if name == "Theoretical" and self._theory["disk"] is None:
+            self._theory_start()
+            tk.Label(f, text="Looking through your saved laps for this car and track...", fg=DIM, bg=BG,
+                     font=FONT).pack(expand=True)
+            return
         fig = plt.figure(figsize=fs, facecolor=BG)
         dfb = self._dfb if self._compare_mode else None
         try:
             if name == "Consensus":
                 fn(fig, self._dfa, dfb, self._consensus_line)
+            elif name == "Theoretical":
+                fn(fig, self._dfa, dfb, self._theory_pool())
             elif name == "Inputs" and self._extra:
                 extra = [(ov["label"], ov["df"], ov["color"]) for ov in self._extra]
                 fn(fig, self._dfa, dfb, extra)
@@ -2371,6 +2457,57 @@ class AnalystApp(tk.Tk):
         cv = FigureCanvasTkAgg(fig, master=f)
         cv.draw(); cv.get_tk_widget().pack(fill="both", expand=True)
         self._cfigs[name] = fig
+
+    # ── theoretical best: the other laps on this car and track ────────────────
+    THEORY_MAX_LAPS = 10
+
+    def _theory_reset(self):
+        """Lap A changed: forget the laps found for the old one (a worker still
+        running for it is told so by the generation number)."""
+        self._theory = {"disk": None, "loading": False, "gen": self._theory["gen"] + 1}
+
+    def _theory_start(self):
+        """Find this car+track's fastest saved laps on a worker thread (each file
+        is a full parse), then redraw the tab."""
+        if self._theory["loading"] or self._da is None:
+            return
+        self._theory["loading"] = True
+        gen, da, path_a = self._theory["gen"], dict(self._da), self._path_a
+        folder = runtime_config.load().get("LAPS_FOLDER")
+
+        def work():
+            found = []
+            try:
+                for row in theory_candidates(records.scan_laps(folder), da, path_a, self.THEORY_MAX_LAPS):
+                    try:
+                        _d, frame = load_lap(row["path"])
+                    except Exception:
+                        continue
+                    found.append((f"{row['recorded_at'][:8]} {_fmt_laptime(row['time_s'])}", frame))
+            except Exception:
+                found = []
+            self._post(lambda: self._theory_done(gen, found))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _theory_done(self, gen, found):
+        if gen != self._theory["gen"]:
+            return        # a different Lap A was loaded meanwhile
+        self._theory.update(disk=found, loading=False)
+        self._cfigs["Theoretical"] = None
+        try:
+            if self._group_names[self._snb.index("current")] == "Theoretical":
+                self._draw_chart("Theoretical")
+        except Exception:
+            pass
+
+    def _theory_pool(self):
+        """Lap A, Lap B, the overlays and the saved laps found on disk."""
+        pool = [("Lap A", self._dfa)]
+        if self._dfb is not None:
+            pool.append(("Lap B", self._dfb))
+        pool += [(ov["label"], ov["df"]) for ov in self._extra]
+        return pool + list(self._theory["disk"] or [])
 
     # ── load ──────────────────────────────────────────────────────────────────
     def _load(self, slot):
@@ -2387,6 +2524,7 @@ class AnalystApp(tk.Tk):
             # ignore any download still in flight for it.
             self._consensus_line = None
             self._consensus_gen += 1
+            self._theory_reset()
             self._da, self._dfa = data, df
             self._path_a = path
             self._notes.delete("1.0", "end")
@@ -2409,6 +2547,10 @@ class AnalystApp(tk.Tk):
                 for k in list(self._cfigs):
                     if self._cfigs[k]: plt.close(self._cfigs[k])
                     self._cfigs[k] = None
+                self._draw_active_chart()
+            elif self._cfigs.get("Theoretical"):     # Lap B is one of the laps it stitches
+                plt.close(self._cfigs["Theoretical"])
+                self._cfigs["Theoretical"] = None
                 self._draw_active_chart()
 
     # ── exports ───────────────────────────────────────────────────────────────

@@ -37,7 +37,7 @@ gt7telem/         The TRACE package itself (same source that ships on
   dashboard.py      Live telemetry dashboard (includes the Track Map panel
                     and the RECORD_RATE_OPTIONS list, if you want to add
                     your own recording sample rates)
-  lap_analyst.py    Lap analysis — 18 chart groups, A/B compare, replay,
+  lap_analyst.py    Lap analysis — 19 chart groups, A/B compare, replay,
                     CSV export, micro-sector heatmap, track boundary
                     overlay, leaderboard/ghost/consensus panel
   race_analyst.py   Race analysis — 17 chart groups, race-oriented (incl. per-lap
@@ -64,6 +64,10 @@ gt7telem/         The TRACE package itself (same source that ships on
   consistency.py    Lap-time spread, trend and 0-100 consistency score (Race
                     Analyst Consistency tab and race card)
   share_card.py     Shared 1200x630 PNG renderer behind the lap card and race card
+  theoretical.py    Theoretical best lap: stitches the fastest micro-sectors of
+                    your laps (Theoretical chart group in Lap Analyst)
+  records.py        Records table (best lap per car and track from your saved
+                    laps) -- the Records link on the launcher menu
   notify.py         Desktop toast + sound alerts (new PB, race end)
   voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS
                     voice (Windows SAPI, macOS say, Linux spd-say/espeak);
