@@ -15,7 +15,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 > Community tool — not affiliated with, endorsed by, or connected to Polyphony Digital or Sony Interactive Entertainment.
 
-> **Project status:** maintenance mode. Development is now bug fixes and car/track database refreshes (as [ddm999's gt7info](https://github.com/ddm999/gt7info) updates); no big new features are planned.
+> **Project status:** actively maintained. Regular releases with bug fixes, car/track database refreshes (as [ddm999's gt7info](https://github.com/ddm999/gt7info) updates) and the occasional new feature.
 
 ---
 
@@ -64,6 +64,11 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 ### Lap Analyst
 - **18 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus, Style, Corners
 - A/B lap comparison across every chart group
+- **Corners tab** — finds every corner on the lap and, with your PB loaded as lap B, scores each one against the same corner on the PB: brake point, minimum speed, throttle-on point and time gained or lost
+- **Style tab** — classifies the lap as Smooth / Balanced / Aggressive and reads cornering balance (understeer- vs oversteer-leaning) from front vs rear tyre slip
+- **3+ lap overlay** — add any number of extra saved laps on top of A/B as dotted lines on the Inputs tab
+- **Searchable lap picker** — filter your saved laps by car, track or date
+- **Backup All Laps** — zips your laps folder to `~/TRACE/backups/`
 - Dual replay — synced and realtime
 - Driver ratings radar
 - Track-map heatmaps across 9 metrics (speed, throttle, brake, lateral/longitudinal/total G, tyre temp, RPM, steering)
@@ -75,6 +80,11 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Race timeline, minimap heatmap, replay with speed control up to 32×
 - Per-lap splits (a partial final lap is shown but never counts as best/average), starting grid slot, and pit stops worked out from refuelling — GT7 sends no pit flag or live race position
 - Fuel per lap and laps per full tank, measured from the clean laps of the recording
+
+### All tools
+- Desktop notifications (with a sound where the system supports one) on a new personal best and when a race recording ends automatically
+- Dark / light theme toggle in the Launcher footer (applies the next time you open a tool)
+- Update check — the Launcher quietly looks for a newer GitHub release on startup and shows a small banner (see [Privacy & analytics](#privacy--analytics) to turn it off)
 
 ### Tooling
 - `gt7telem-add-car` / `gt7telem-add-track` — add a missing car/track ID to the local database from the terminal (also runnable as `python -m gt7telem.add_car` / `python -m gt7telem.add_track`). Additions are saved beside `settings.json` (`car_ids_local.csv` / `course_ids_local.csv`), so they survive upgrades
@@ -114,7 +124,7 @@ gt7telem
 ```
 
 ### Option 3 — standalone binaries
-No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.app` from **[gt7trace.netlify.app/setup.html](https://gt7trace.netlify.app/setup.html)**. The macOS build is produced automatically on a GitHub-hosted Apple Silicon runner (see [`build-macos.yml`](https://github.com/ransh2014/gt7telemtrace/blob/main/github/workflows/build-macos.yml)) — on an older Intel Mac, use Option 1 or 2 instead.
+No Python required — grab a prebuilt Windows `.exe`, Linux binary, or macOS `.app` from **[gt7trace.netlify.app/setup.html](https://gt7trace.netlify.app/setup.html)**. The macOS build is produced automatically on a GitHub-hosted Apple Silicon runner (see [`build-macos.yml`](https://github.com/ransh2014/gt7telemtrace/blob/main/.github/workflows/build-macos.yml)) — on an older Intel Mac, use Option 1 or 2 instead.
 
 ### Option 4 — package managers
 On Windows:
@@ -183,6 +193,8 @@ The one exception is the optional leaderboard: submitting, browsing the Top-10, 
 TRACE sends a small anonymous usage ping (which tool launched, TRACE version, OS, a timestamp — five fields, nothing else) each time you open Live Dashboard, Lap Analyst, or Race Analyst. It's **on by default** and helps decide where to spend limited development time; it never includes telemetry content, lap data, PSN name, or IP.
 
 Turn it off any time: **Live Dashboard → `SHARE USAGE DATA` checkbox** (next to `DEBUG LOG` in the header) — the setting applies to all three tools since they share the same `settings.json`.
+
+The Launcher also checks GitHub's public releases API for a newer version on startup, so it can show an update banner. That request goes to GitHub, not to this project's database, and carries no version, ID or usage data (just a fixed `TRACE-updater` label) — though GitHub can see your IP, as with any web request. It's **on by default**; set `UPDATE_CHECK_ENABLED` to `false` in `settings.json` to turn it off.
 
 Submitting a lap to the leaderboard is a separate, always-explicit opt-in (a button you press), and the optional free account only ever stores a display name and an anonymous ID — no email, no password.
 
