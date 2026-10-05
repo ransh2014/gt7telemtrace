@@ -65,6 +65,9 @@ gt7telem/         The TRACE package itself (same source that ships on
                     Analyst Consistency tab and race card)
   share_card.py     Shared 1200x630 PNG renderer behind the lap card and race card
   notify.py         Desktop toast + sound alerts (new PB, race end)
+  voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS
+                    voice (Windows SAPI, macOS say, Linux spd-say/espeak);
+                    falls back to the notify.py sound. Mute with VOICE ALERTS.
   cars.py           Car ID -> name lookup (car_ids.csv)
   tracks.py         Track ID -> name lookup (course_ids.csv), plus track
                     boundary extraction from a lap's GPS trace

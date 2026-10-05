@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from . import __version__, leaderboard, metrics_server, notify
+from . import __version__, leaderboard, metrics_server, notify, voice
 from . import cars as car_db
 from . import config as runtime_config
 from . import tracks as track_db
@@ -143,6 +143,7 @@ class App(tk.Tk):
         self._fuel_at_lap_start = 0.0
         self._strategy          = telem.StintTracker()   # live fuel / tyre-stint estimates
         self._strat_car_id      = None
+        self._announcer         = voice.AlertAnnouncer()   # spoken fuel / tyre alerts
         self._track_pts  = deque(maxlen=3000)
         self._flash_tick = 0
         self._flash_on   = False
@@ -301,6 +302,12 @@ class App(tk.Tk):
         self.analytics_var = tk.BooleanVar(value=bool(runtime_config.ANALYTICS_ENABLED))
         tk.Checkbutton(hdr2, text="SHARE USAGE DATA", variable=self.analytics_var,
                        command=self._on_analytics_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+
+        self.voice_var = tk.BooleanVar(value=bool(runtime_config.VOICE_ENABLED))
+        tk.Checkbutton(hdr2, text="VOICE ALERTS", variable=self.voice_var,
+                       command=self._on_voice_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
@@ -934,6 +941,26 @@ class App(tk.Tk):
         state = "enabled" if runtime_config.ANALYTICS_ENABLED else "disabled"
         self.log_msg(f"Anonymous usage analytics {state} (see gt7trace.netlify.app/privacy.html)")
 
+    def _on_voice_toggle(self):
+        runtime_config.VOICE_ENABLED = self.voice_var.get()
+        runtime_config.save(VOICE_ENABLED=runtime_config.VOICE_ENABLED)
+        if runtime_config.VOICE_ENABLED:
+            how = "the system voice" if voice.available() else "the alert sound (no system voice found)"
+            self.log_msg(f"Voice alerts on -- fuel and tyre alerts will use {how}")
+            self._announcer.reset()
+        else:
+            self.log_msg("Voice alerts muted")
+
+    def _speak_alerts(self, has_fuel, has_hot, has_cold, fuel_laps):
+        """Say the fuel / tyre alerts that just turned on (or are due a repeat).
+        voice.speak() hands the work to a background thread, so this never
+        blocks the 10 Hz display refresh."""
+        if not runtime_config.VOICE_ENABLED or session.paused:
+            return
+        active = {k for k, on in (("fuel", has_fuel), ("hot", has_hot), ("cold", has_cold)) if on}
+        for line in self._announcer.update(active, time.monotonic(), fuel_laps=fuel_laps):
+            voice.speak(line)
+
     def _on_update_check_toggle(self):
         # launcher.py reads config.UPDATE_CHECK_ENABLED at startup, so this
         # takes effect the next time TRACE is opened.
@@ -1309,6 +1336,8 @@ class App(tk.Tk):
             self.alert_fuel.grid()
         else:
             self.alert_fuel.grid_remove()
+
+        self._speak_alerts(has_fuel, has_hot, has_cold, _fuel_laps_num)
 
         # ── Track map update ──────────────────────────────────────────────────
         wx = float(d.get("world_x") or 0)
