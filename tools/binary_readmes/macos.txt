@@ -25,6 +25,11 @@ CONNECT TO GT7
     receives telemetry on UDP port 33740. If nothing shows up, allow
     incoming connections for TRACE in the macOS firewall.
 
+SPOKEN ALERTS
+  The Live Dashboard can read fuel and tyre alerts aloud using the
+  built-in macOS voice - nothing to install. Mute it with the VOICE
+  ALERTS checkbox in the Dashboard header.
+
 YOUR DATA
   Laps are saved to ~/TRACE/laps, settings to ~/.gt7telem.
 

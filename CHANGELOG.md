@@ -39,7 +39,9 @@ Changed
 - Lap Analyst now has 19 chart groups (added Theoretical) and Race Analyst 17 (added Corners and Consistency); README, the source
   README and the site are updated to match.
 - New settings in `settings.json`: `VOICE_ENABLED` and `GHOST_ENABLED` (both default on). `UPDATE_CHECK_ENABLED` is unchanged.
-- Privacy page: documents the Dashboard's one-off top-lap request, and that the update check is now switched off in the app.
+- Privacy page: documents the Dashboard's one-off top-lap request, that the update check is now switched off in the app, that a signed-in
+  lap submission carries your anonymous account ID, and that an expired login is renewed with your stored refresh token during a submission.
+- Docs: spoken alerts need `speech-dispatcher` or `espeak-ng` on Linux (Windows and macOS are built in); noted in the READMEs and the setup FAQ.
 
 Tests
 - Around 90 new tests covering each feature's logic (consistency maths, corner baselines, card specs and PNG output, voice commands

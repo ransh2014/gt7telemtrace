@@ -112,3 +112,5 @@ TRACE is free, open source (MIT), and not affiliated with Polyphony
 Digital or Sony Interactive Entertainment.
 
 Linux: if Tk is missing, install it first (Debian/Ubuntu: sudo apt install python3-tk).
+Linux: for spoken Dashboard alerts install a speech tool (sudo apt install speech-dispatcher
+or espeak-ng); without one TRACE plays the alert sound instead. Windows and macOS need nothing.

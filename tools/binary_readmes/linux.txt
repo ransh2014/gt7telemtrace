@@ -27,6 +27,13 @@ CONNECT TO GT7
     receives telemetry on UDP port 33740. If nothing shows up, allow
     UDP 33740 through your firewall.
 
+SPOKEN ALERTS
+  The Live Dashboard can read fuel and tyre alerts aloud. On Linux it
+  needs a speech tool: sudo apt install speech-dispatcher (spd-say)
+  or espeak-ng (Fedora: dnf install speech-dispatcher or espeak-ng).
+  With none installed it plays the alert sound instead. Mute it with
+  the VOICE ALERTS checkbox in the Dashboard header.
+
 YOUR DATA
   Laps are saved to ~/TRACE/laps, settings to ~/.gt7telem. If you run
   TRACE from a folder you can write to, it stays portable and keeps

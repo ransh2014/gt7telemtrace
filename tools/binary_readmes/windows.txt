@@ -20,6 +20,11 @@ CONNECT TO GT7
     receives telemetry on UDP port 33740. If nothing shows up, allow
     UDP 33740 through Windows Firewall.
 
+SPOKEN ALERTS
+  The Live Dashboard can read fuel and tyre alerts aloud using the
+  built-in Windows voice - nothing to install. Mute it with the VOICE
+  ALERTS checkbox in the Dashboard header.
+
 YOUR DATA
   Laps are saved to ~/TRACE/laps. If you run TRACE from a folder you
   can write to, it stays portable and keeps laps and settings.json
