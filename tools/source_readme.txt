@@ -66,6 +66,8 @@ gt7telem/         The TRACE package itself (same source that ships on
   share_card.py     Shared 1200x630 PNG renderer behind the lap card and race card
   theoretical.py    Theoretical best lap: stitches the fastest micro-sectors of
                     your laps (Theoretical chart group in Lap Analyst)
+  ghost.py          Live gap to the leaderboard's fastest lap in the Live Dashboard
+                    (one read-only request per car and track; TOP-LAP GHOST switch)
   records.py        Records table (best lap per car and track from your saved
                     laps) -- the Records link on the launcher menu
   notify.py         Desktop toast + sound alerts (new PB, race end)

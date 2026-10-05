@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from . import __version__, leaderboard, metrics_server, notify, voice
+from . import __version__, ghost, leaderboard, metrics_server, notify, voice
 from . import cars as car_db
 from . import config as runtime_config
 from . import tracks as track_db
@@ -144,6 +144,8 @@ class App(tk.Tk):
         self._strategy          = telem.StintTracker()   # live fuel / tyre-stint estimates
         self._strat_car_id      = None
         self._announcer         = voice.AlertAnnouncer()   # spoken fuel / tyre alerts
+        self._ghosts            = {}      # (car, track) -> ghost.Ghost, or None when there is none to show
+        self._ghost_fetching    = set()   # (car, track) pairs already asked about this run
         self._track_pts  = deque(maxlen=3000)
         self._flash_tick = 0
         self._flash_on   = False
@@ -305,6 +307,12 @@ class App(tk.Tk):
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
+        self.ghost_var = tk.BooleanVar(value=bool(runtime_config.GHOST_ENABLED))
+        tk.Checkbutton(hdr2, text="TOP-LAP GHOST", variable=self.ghost_var,
+                       command=self._on_ghost_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+
         self.voice_var = tk.BooleanVar(value=bool(runtime_config.VOICE_ENABLED))
         tk.Checkbutton(hdr2, text="VOICE ALERTS", variable=self.voice_var,
                        command=self._on_voice_toggle, bg="#0f3460", fg=DIM,
@@ -409,7 +417,7 @@ class App(tk.Tk):
             ("lap_lbl", "LAP", FG), ("cur_lbl", "CURRENT", HI),
             ("best_lbl", "BEST", "#2ecc71"), ("last_lbl", "LAST", FG),
             ("pos_lbl", "GRID", FG), ("topspd_lbl", "TOP SPD", HI),
-            ("delta_lbl", "DELTA", FG),
+            ("delta_lbl", "DELTA", FG), ("ghost_lbl", "VS TOP", FG),
         ]:
             col_f = tk.Frame(lap_f, bg=PNL)
             col_f.pack(side="left", expand=True)
@@ -941,6 +949,43 @@ class App(tk.Tk):
         state = "enabled" if runtime_config.ANALYTICS_ENABLED else "disabled"
         self.log_msg(f"Anonymous usage analytics {state} (see gt7trace.netlify.app/privacy.html)")
 
+    def _on_ghost_toggle(self):
+        runtime_config.GHOST_ENABLED = self.ghost_var.get()
+        runtime_config.save(GHOST_ENABLED=runtime_config.GHOST_ENABLED)
+        if runtime_config.GHOST_ENABLED:
+            self.log_msg("Top-lap ghost on -- fetches the leaderboard's fastest lap for your car and track")
+        else:
+            self.log_msg("Top-lap ghost off -- no leaderboard requests from the Dashboard")
+            self.ghost_lbl.config(text="--", fg="#c0c0e0")
+
+    def _ghost_key(self):
+        car, track = self.car_var.get().strip(), self.track_var.get().strip()
+        return (car, track) if car and track else None
+
+    def _maybe_fetch_ghost(self):
+        """Once per car+track per run, ask the leaderboard for its fastest lap on
+        a worker thread. Stays quiet if it's switched off, offline, or nobody has
+        set a lap yet."""
+        key = self._ghost_key()
+        if key is None or not runtime_config.GHOST_ENABLED or key in self._ghost_fetching:
+            return
+        self._ghost_fetching.add(key)
+
+        def work():
+            g = None
+            try:
+                row = leaderboard.get_top_lap_ghost(*key)
+                if row:
+                    g = ghost.build_ghost(row.get("samples"), row.get("lap_time_ms"))
+                    if g is not None:
+                        by = f" by {row['psn_name']}" if row.get("psn_name") else ""
+                        self.log_msg(f"Top-lap ghost loaded: {ms_to_laptime(int(row['lap_time_ms']))}{by}")
+            except Exception:
+                g = None
+            self._post(self._ghosts.__setitem__, key, g)
+
+        threading.Thread(target=work, daemon=True).start()
+
     def _on_voice_toggle(self):
         runtime_config.VOICE_ENABLED = self.voice_var.get()
         runtime_config.save(VOICE_ENABLED=runtime_config.VOICE_ENABLED)
@@ -1277,6 +1322,7 @@ class App(tk.Tk):
                     daemon=True,
                 ).start()
                 self.log_msg(f"Unrecognized car ID {_car_id_val} -- submitted to community inbox")
+        self._maybe_fetch_ghost()
         self.f8e_lbl.config(text=f"0x{int(d.get('flags_8e') or 0):02X}")
         self.f8f_lbl.config(text=f"0x{int(d.get('flags_8f') or 0):02X}")
         self.f93_lbl.config(text=f"0x{int(d.get('flags_93') or 0):02X}")
@@ -1395,6 +1441,11 @@ class App(tk.Tk):
                     delta_text  = f"{delta:+.2f}s"
                     delta_color = "#e74c3c" if delta > 0 else "#2ecc71"
         self.delta_lbl.config(text=delta_text, fg=delta_color)
+
+        # ── Live gap to the leaderboard's fastest lap ────────────────────────
+        top = self._ghosts.get(self._ghost_key()) if runtime_config.GHOST_ENABLED else None
+        gap = top.gap(cur_track_pos, cur_elapsed) if top is not None and cur_elapsed > 0.5 else None
+        self.ghost_lbl.config(text=ghost.format_gap(gap)[0], fg=ghost.format_gap(gap)[1])
 
     # ─────────────────────────────────────────────────────────────────────────
     # Shutdown

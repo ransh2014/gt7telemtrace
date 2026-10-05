@@ -19,7 +19,7 @@ __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_R
            "ANALYTICS_ENABLED", "PSN_NAME",
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL",
-           "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "UPDATE_CHECK_ENABLED", "backup_laps",
+           "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "GHOST_ENABLED", "UPDATE_CHECK_ENABLED", "backup_laps",
            "ensure_ca_bundle", "explain_error", "MONO", "install_mac_buttons"]
 
 _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
@@ -233,6 +233,10 @@ _DEFAULTS = {
     # Spoken Dashboard alerts (fuel low, tyres hot/cold) through the OS voice.
     # Mute with the VOICE ALERTS checkbox in the Dashboard header.
     "VOICE_ENABLED": True,
+    # Live gap to the leaderboard's fastest lap for the current car+track in the
+    # Dashboard: one read-only request per car+track per run (see ghost.py and the
+    # privacy page). Off = no leaderboard request from the Dashboard at all.
+    "GHOST_ENABLED": True,
     # Check GitHub for a newer release on launcher startup. Read-only HEAD
     # request-equivalent to the public releases API -- no data sent.
     "UPDATE_CHECK_ENABLED": True,
@@ -380,6 +384,7 @@ METRICS_BIND_ALL = _cfg["METRICS_BIND_ALL"]
 THEME = _cfg["THEME"]
 NOTIFY_ENABLED = _cfg["NOTIFY_ENABLED"]
 VOICE_ENABLED = _cfg["VOICE_ENABLED"]
+GHOST_ENABLED = _cfg["GHOST_ENABLED"]
 UPDATE_CHECK_ENABLED = _cfg["UPDATE_CHECK_ENABLED"]
 
 

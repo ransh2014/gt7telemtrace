@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-__all__ = ["submit_lap", "get_top_laps", "get_lap_samples", "get_consensus_line", "submit_car_id", "submit_track_name",
+__all__ = ["submit_lap", "get_top_laps", "get_top_lap_ghost", "get_lap_samples", "get_consensus_line", "submit_car_id", "submit_track_name",
            "lap_submission_error", "PHYSICS_ERA", "PHYSICS_EPOCH", "physics_era_of", "is_current_era"]
 
 _SUPABASE_URL = "https://hignsvyojdqsjoidgkud.supabase.co"
@@ -247,6 +247,33 @@ def get_top_laps(car_name: str, track_name: str, n: int = 10, timeout: float = 8
             return json.loads(resp.read().decode("utf-8"))
     except Exception:
         return []
+
+
+def get_top_lap_ghost(car_name: str, track_name: str, timeout: float = 8) -> dict | None:
+    """The single fastest public lap for this exact car+track, samples included,
+    in one read-only request -- what the Dashboard's live "vs top lap" gap needs
+    (it fetches this once per car+track per run). Same era filter as
+    get_top_laps. Returns {id, car_name, track_name, lap_time_ms, psn_name,
+    created_at, samples} or None on any failure or when nobody has set a lap."""
+    params = urllib.parse.urlencode({
+        "car_name": _eq(car_name),
+        "track_name": _eq(track_name),
+        "created_at": f"gte.{PHYSICS_EPOCH_ISO}",
+        "select": "id,car_name,track_name,lap_time_ms,psn_name,created_at,samples",
+        "order": "lap_time_ms.asc",
+        "limit": "1",
+    })
+    try:
+        req = urllib.request.Request(
+            f"{_SUPABASE_URL}/rest/v1/laps?{params}",
+            method="GET", headers=_headers(),
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+        row = rows[0] if isinstance(rows, list) and rows else None
+        return row if isinstance(row, dict) and row.get("samples") else None
+    except Exception:
+        return None
 
 
 def get_lap_samples(lap_id: int, timeout: float = 8) -> list:
