@@ -5,6 +5,47 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-15
+Nine new features across the Dashboard, Lap Analyst, Race Analyst and Launcher.
+
+New
+- **Update-check switch.** A `CHECK FOR UPDATES` checkbox in the Live Dashboard header, right beside `SHARE USAGE DATA`, turns the
+  Launcher's startup update check on or off and saves it to `settings.json` (the setting already existed; it just had no control).
+  The header's switches now live on their own Preferences row so the console / track / car row can't be squeezed.
+- **Lap card upgrade and new Race card.** Both are 1200x630 PNGs drawn by one shared renderer (new `share_card.py`) with the same
+  four blocks: headline stats, a chart (lap card: speed trace cut into sectors with their times; race card: every lap time with the
+  best highlighted), a speed-coloured track map, and pit stops + fuel (lap card: fuel used and the fuel curve; race card: stop laps
+  and fuel burned per lap). Race Analyst gets an **Export Race Card (PNG)** button.
+- **Race Analyst: Corners tab.** Scores every lap of a race corner by corner (a lap x corner heat-map plus the average per corner),
+  reusing `corners.py`. A **Corner baseline** button switches between the best lap of the race and your saved PB lap file for that
+  car and track (`reference_<car>.json`).
+- **Spoken alerts.** Fuel-low and tyre hot/cold alerts on the Dashboard are read out through the OS voice (Windows SAPI via
+  PowerShell, macOS `say`, Linux `spd-say` / `espeak-ng` / `espeak`), falling back to the existing alert sound if none is installed.
+  A `VOICE ALERTS` checkbox mutes it. The voice runs as a separate process started from a background thread, so the display never
+  waits for it. New module `voice.py`.
+- **Race Analyst: Consistency tab.** Lap-time spread, trend, a 0-100 consistency score, and the most and least consistent corners
+  over a race. Pit laps and spins (more than 7 % off your best) are left out of the numbers. New module `consistency.py`.
+- **Records table.** A *Records* link in the Launcher footer opens your best lap for every car and track, built from your saved
+  laps. Only the summary at the start of each lap file is read, so a large laps folder opens quickly. New module `records.py`.
+- **Lap Analyst: Theoretical tab.** Stitches the fastest micro-sector from each of your laps on a car and track into the lap you could
+  drive, and shows which zones hold your best real lap back. New module `theoretical.py`.
+- **Time-loss summary.** After each lap the Dashboard log names the three corners that cost the most time against your reference lap;
+  the Lap Analyst Corners tab shows the same line.
+- **Live gap to the leaderboard's top lap.** The Dashboard fetches the fastest public lap for the current car and track once per car
+  and track per run (a single read-only request) and shows the live gap as `VS TOP`. Skipped silently when offline or when nobody has
+  set a lap. A `TOP-LAP GHOST` checkbox turns the request off. New module `ghost.py`, plus `leaderboard.get_top_lap_ghost()`.
+
+Changed
+- Lap Analyst now has 19 chart groups (added Theoretical) and Race Analyst 17 (added Corners and Consistency); README, the source
+  README and the site are updated to match.
+- New settings in `settings.json`: `VOICE_ENABLED` and `GHOST_ENABLED` (both default on). `UPDATE_CHECK_ENABLED` is unchanged.
+- Privacy page: documents the Dashboard's one-off top-lap request, and that the update check is now switched off in the app.
+
+Tests
+- Around 90 new tests covering each feature's logic (consistency maths, corner baselines, card specs and PNG output, voice commands
+  and the alert announcer, records scanning, theoretical-best stitching, the ghost clock and its fetch rules). A test that opened a
+  real Tk window through pyplot now runs on the Agg backend, which removed an intermittent failure.
+
 ## [0.7.1] - 2026-10-04
 Bug-fix release. No new features.
 

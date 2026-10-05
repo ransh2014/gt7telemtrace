@@ -173,12 +173,18 @@ def test_headings_hold_the_last_value_at_a_standstill():
     assert h[3] == pytest.approx(h[2]) and h[5] == pytest.approx(math.pi / 2)
 
 
-@pytest.mark.filterwarnings("ignore:Adding colorbar to a different Figure")
 def test_too_short_a_lap_does_not_crash_the_sector_chart():
-    from matplotlib.backends.backend_agg import FigureCanvasAgg
-    from matplotlib.figure import Figure
+    import matplotlib
+    import matplotlib.pyplot as plt
     pos = np.linspace(0, 20, 5)
     _, df = _lap(pos, np.linspace(0, 1, 5))
-    fig = Figure()           # a bare Figure: pyplot would open a Tk window, which flakes on some machines
-    FigureCanvasAgg(fig)
-    la.draw_sectors(fig, df, None)
+    # draw_sectors calls plt.colorbar, which makes pyplot open a figure of its own; on the
+    # app's TkAgg backend that is a real Tk window, which fails intermittently on some machines
+    previous = matplotlib.get_backend()
+    plt.switch_backend("Agg")
+    try:
+        fig = plt.figure()
+        la.draw_sectors(fig, df, None)
+        plt.close("all")
+    finally:
+        plt.switch_backend(previous)

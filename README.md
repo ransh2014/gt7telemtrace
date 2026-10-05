@@ -58,13 +58,18 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Remembers every PS4/PS5 IP you've connected to (most recent first), plus an Auto-Detect button that finds the console on your network
 - Automatic race recording — starts on a detected race start (race sessions only, not time trial/practice), stops at the flag or when you quit
 - **Fuel & tyre strategy (estimates)** — median fuel burn per lap, laps of fuel left, a finish check and a suggested pit-by lap, plus a tyre-stint readout (pace loss, trend, last-lap temperatures). GT7 sends no tyre wear, so the tyre figures are estimates and are labelled that way
+- **Spoken alerts** — fuel-low and tyre hot/cold warnings are read out through your system's voice (Windows speech, macOS `say`, Linux `spd-say`/`espeak` if installed), falling back to the alert sound if no voice is available. Each alert is spoken when it turns on; fuel and hot-tyre warnings repeat every minute while they last. Untick **`VOICE ALERTS`** in the header's Preferences row to mute. It never blocks the display
+- **Live gap to the leaderboard's top lap** — the `VS TOP` readout shows how far ahead or behind the fastest public lap for your car and track you are, at the same spot on the track. It makes one read-only request per car and track per run, and stays silent if you're offline or nobody has set a lap yet. Untick **`TOP-LAP GHOST`** to turn the request off (see [Privacy & analytics](#privacy--analytics))
+- **Time-loss summary** — after each lap, the log names the three corners that cost the most time against your reference lap (once you have one), e.g. `Time lost: T4 +0.21s, T9 +0.12s, T2 +0.08s`
+- **Preferences row** — `SHARE USAGE DATA`, **`CHECK FOR UPDATES`**, `TOP-LAP GHOST`, `VOICE ALERTS` and `DEBUG LOG` checkboxes, saved to `settings.json`
 - Incident timeline
 - Lap history table with alerts
 
 ### Lap Analyst
-- **18 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus, Style, Corners
+- **19 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus, Style, Corners, Theoretical
 - A/B lap comparison across every chart group
-- **Corners tab** — finds every corner on the lap and, with your PB loaded as lap B, scores each one against the same corner on the PB: brake point, minimum speed, throttle-on point and time gained or lost
+- **Theoretical tab** — stitches the fastest ~25 m micro-sector from each lap you've driven in this car on this track (Lap A, Lap B, any overlays, and your other saved laps) into the lap you *could* drive, and shows the zones where your best real lap is held back, and by whom. It's an optimistic ceiling: a faster exit carries into the next sector, so the real gain from fixing a weak zone is usually smaller
+- **Corners tab** — finds every corner on the lap and, with your PB loaded as lap B, scores each one against the same corner on the PB: brake point, minimum speed, throttle-on point and time gained or lost, and a line naming the three corners that cost the most time
 - **Style tab** — classifies the lap as Smooth / Balanced / Aggressive and reads cornering balance (understeer- vs oversteer-leaning) from front vs rear tyre slip
 - **3+ lap overlay** — add any number of extra saved laps on top of A/B as dotted lines on the Inputs tab
 - **Searchable lap picker** — filter your saved laps by car, track or date
@@ -73,18 +78,22 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Driver ratings radar
 - Track-map heatmaps across 9 metrics (speed, throttle, brake, lateral/longitudinal/total G, tyre temp, RPM, steering)
 - CSV and HTML chart export
-- **Lap card** — one click turns a lap into a shareable 1200x630 PNG (car, track, time, thirds, headline stats, speed-coloured track map, speed/pedal traces)
+- **Lap card** — one click turns a lap into a shareable 1200x630 PNG with four blocks: headline stats (car, track, lap time, top/average speed, full-throttle share, max lateral G, tyre temperature, driving style), the speed trace cut into sectors with their times, a speed-coloured track map, and the fuel used on the lap
 
 ### Race Analyst
-- Same chart-group depth as Lap Analyst (15 groups, race-oriented: Race overview + Laps in place of Sectors + Extended)
+- Same chart-group depth as Lap Analyst (17 groups, race-oriented: Race overview + Laps in place of Sectors + Extended, plus Corners and Consistency)
 - Race timeline, minimap heatmap, replay with speed control up to 32×
 - Per-lap splits (a partial final lap is shown but never counts as best/average), starting grid slot, and pit stops worked out from refuelling — GT7 sends no pit flag or live race position
 - Fuel per lap and laps per full tank, measured from the clean laps of the recording
+- **Corners tab** — scores *every* lap of the race corner by corner (time gained or lost per corner, as a lap × corner heat-map plus the average per corner). Switch the baseline with the **Corner baseline** button: the best lap of the race, or your saved PB lap for that car and track (`reference_<car>.json`, the file the Dashboard keeps)
+- **Consistency tab** — lap-time spread, trend (speeding up or slowing down per lap), a 0–100 consistency score, and the most and least consistent corners over the race. Laps more than 7 % slower than your best (pit laps, spins) are left out of the numbers and shown dimmed. The score is 100 minus the standard deviation of your clean laps as a share of the average lap, scaled so a 2 % standard deviation scores 0
+- **Race card** — a shareable 1200x630 PNG built the same way as the lap card: headline stats (race time, best/average lap, consistency, laps, top speed, fuel used), every lap time with the best highlighted, a speed-coloured map of the best lap, and pit-stop laps with fuel burned per lap
 
 ### All tools
+- **Records** — the *Records* link in the Launcher footer opens a table of your best lap for every car and track, built from your saved laps (incomplete laps and laps from before GT7 update 1.71 are left out unless you tick the box). It reads only the summary at the start of each lap file, so even a big laps folder opens quickly
 - Desktop notifications (with a sound where the system supports one) on a new personal best and when a race recording ends automatically
 - Dark / light theme toggle in the Launcher footer (applies the next time you open a tool)
-- Update check — the Launcher quietly looks for a newer GitHub release on startup and shows a small banner (see [Privacy & analytics](#privacy--analytics) to turn it off)
+- Update check — the Launcher quietly looks for a newer GitHub release on startup and shows a small banner. Turn it off with the **`CHECK FOR UPDATES`** checkbox in the Live Dashboard header (see [Privacy & analytics](#privacy--analytics))
 
 ### Tooling
 - `gt7telem-add-car` / `gt7telem-add-track` — add a missing car/track ID to the local database from the terminal (also runnable as `python -m gt7telem.add_car` / `python -m gt7telem.add_track`). Additions are saved beside `settings.json` (`car_ids_local.csv` / `course_ids_local.csv`), so they survive upgrades
@@ -184,7 +193,7 @@ TRACE talks directly to the console for all core telemetry — no server, no bro
 - Because TRACE always requests the extended packet, you get motion/sway/heave/surge and filtered-input data automatically — there's no separate "heartbeat type" setting to configure.
 - Settings (last-used IP, sample rate, known-good IPs, analytics opt-out) persist to a `settings.json`, so there's nothing to reconfigure between sessions. It lives in `~/.gt7telem/`, which survives `pip install --upgrade` and package-manager upgrades — except for a standalone .exe/binary unzipped into a folder you can write to, which keeps it next to the executable so it stays portable.
 
-The one exception is the optional leaderboard: submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS. Nothing about your live session is ever sent unless you press "Submit to Leaderboard."
+The exceptions are the optional leaderboard and the Dashboard's top-lap ghost: submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS, and so does the Dashboard's one-off top-lap fetch (see below). Nothing about your live session is ever sent unless you press "Submit to Leaderboard."
 
 ---
 
@@ -192,9 +201,11 @@ The one exception is the optional leaderboard: submitting, browsing the Top-10, 
 
 TRACE sends a small anonymous usage ping (which tool launched, TRACE version, OS, a timestamp — five fields, nothing else) each time you open Live Dashboard, Lap Analyst, or Race Analyst. It's **on by default** and helps decide where to spend limited development time; it never includes telemetry content, lap data, PSN name, or IP.
 
-Turn it off any time: **Live Dashboard → `SHARE USAGE DATA` checkbox** (next to `DEBUG LOG` in the header) — the setting applies to all three tools since they share the same `settings.json`.
+Turn it off any time: **Live Dashboard → `SHARE USAGE DATA` checkbox** (in the header's Preferences row) — the setting applies to all three tools since they share the same `settings.json`.
 
-The Launcher also checks GitHub's public releases API for a newer version on startup, so it can show an update banner. That request goes to GitHub, not to this project's database, and carries no version, ID or usage data (just a fixed `TRACE-updater` label) — though GitHub can see your IP, as with any web request. It's **on by default**; set `UPDATE_CHECK_ENABLED` to `false` in `settings.json` to turn it off.
+The Launcher also checks GitHub's public releases API for a newer version on startup, so it can show an update banner. That request goes to GitHub, not to this project's database, and carries no version, ID or usage data (just a fixed `TRACE-updater` label) — though GitHub can see your IP, as with any web request. It's **on by default**; untick **Live Dashboard → `CHECK FOR UPDATES`** (right beside `SHARE USAGE DATA`) to turn it off from then on — no need to edit `settings.json`.
+
+The Live Dashboard's **top-lap ghost** makes one read-only request to the leaderboard database the first time it knows both your car and track in a run (and once more for each new car/track you switch to): it asks for the single fastest public lap for that exact car and track so it can show your live gap. The request carries only the car and track names — no account, PSN name, lap or telemetry data — and stays silent if you're offline or no lap exists. Untick **`TOP-LAP GHOST`** and the Dashboard makes no leaderboard requests at all.
 
 Submitting a lap to the leaderboard is a separate, always-explicit opt-in (a button you press), and the optional free account only ever stores a display name and an anonymous ID — no email, no password.
 

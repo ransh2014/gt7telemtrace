@@ -44,8 +44,8 @@ gt7telem/         The TRACE package itself (same source that ships on
                     Corners and a Consistency report), race card PNG
   udp.py            UDP capture, Salsa20 decrypt, packet parsing
   config.py         Settings persistence (IP, laps folder, sample rate,
-                    analytics opt-out, Prometheus metrics opt-in and
-                    remote-access opt-in)
+                    analytics opt-out, update-check, voice-alert and top-lap-ghost
+                    switches, Prometheus metrics opt-in and remote-access opt-in)
   auth.py           Optional free account — Supabase anonymous sign-in,
                     display name only, no email or password
   leaderboard.py    Global lap leaderboard, ghost-lap download, and
