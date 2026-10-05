@@ -43,6 +43,7 @@ Changed
 - New settings in `settings.json`: `VOICE_ENABLED` and `GHOST_ENABLED` (both default on). `UPDATE_CHECK_ENABLED` and `NOTIFY_ENABLED` are unchanged but now have in-app checkboxes.
 - Privacy page: documents the Dashboard's one-off top-lap request, that the update check is now switched off in the app, that a signed-in
   lap submission carries your anonymous account ID, and that an expired login is renewed with your stored refresh token during a submission.
+- Docs: the README and the privacy page now cover the optional Prometheus metrics export and the `ALLOW REMOTE` switch (local-only by default; `ALLOW REMOTE` makes it readable by anyone on your LAN, with no password).
 - Docs: spoken alerts need `speech-dispatcher` or `espeak-ng` on Linux (Windows and macOS are built in); noted in the READMEs and the setup FAQ.
 
 Tests
