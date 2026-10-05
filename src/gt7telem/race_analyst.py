@@ -26,7 +26,7 @@ from matplotlib.patches import Polygon as MplPolygon
 
 warnings.filterwarnings("ignore")
 
-from . import __version__, leaderboard  # noqa: E402  (kept with the other package imports)
+from . import __version__, consistency, corners, leaderboard, share_card  # noqa: E402
 from . import config as runtime_config  # noqa: E402
 
 runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
@@ -341,6 +341,188 @@ def build_stats(data, df):
         "Grid Pos":     f"P{int(df['current_position'][df['current_position']>0].iloc[0])}"
                         if (df['current_position']>0).any() else "--",
     }
+
+# ── Per-lap helpers (race card, Corners, Consistency) ─────────────────────────
+def _num(v, default=0.0):
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
+
+def _lap_segments(df):
+    """Lap segments as lap_split_stats counts them (the grid roll is not a lap),
+    so the two lists line up one-to-one."""
+    segs = get_lap_segments(df)
+    if len(segs) > 1:
+        segs = [s for s in segs if int(s["lap_number"].iloc[0]) != 0] or segs
+    return segs
+
+def pit_stop_laps(df):
+    """Lap number of every pit stop, in race order (one entry per stop)."""
+    if "pit_flag" not in df.columns or len(df) == 0:
+        return []
+    flag = df["pit_flag"].to_numpy(dtype=float)
+    laps = df["lap_number"].to_numpy()
+    out = [int(laps[i]) for i in np.flatnonzero(np.diff(flag) > 0) + 1]
+    if flag[0] > 0:
+        out.insert(0, int(laps[0]))
+    return out
+
+def lap_fuel_burn(df):
+    """[(lap, fuel burned, had a pit stop)] for each lap that has a lap after it.
+    Burn is the sum of the drops, so a refuel inside the lap does not cancel it."""
+    segs = _lap_segments(df)
+    out = []
+    for i, (seg, nxt) in enumerate(zip(segs, segs[1:]), 1):
+        fuel = np.append(seg["fuel_remaining"].to_numpy(dtype=float), float(nxt["fuel_remaining"].iloc[0]))
+        burn = float(-np.minimum(np.diff(fuel), 0).sum())
+        pit = bool(_refuel_spans(fuel)) or (float(seg["pit_flag"].max()) > 0 if "pit_flag" in seg.columns else False)
+        out.append((int(seg["lap_number"].iloc[0]) or i, burn, pit))
+    return out
+
+def race_lap_frames(df):
+    """[(lap number, time_s, frame)] for each complete lap long enough to analyse
+    corner by corner. Each frame's track_position restarts at the line."""
+    segs, splits = _lap_segments(df), lap_split_stats(df)
+    out = []
+    for seg, sp in zip(segs, splits):
+        if sp["complete"] and sp["time_s"] > 1 and len(seg) >= 20:
+            out.append((sp["lap"], sp["time_s"], seg.reset_index(drop=True)))
+    return out
+
+def _fuel_is_percent(df):
+    cap = float(df["fuel_capacity"].max()) if "fuel_capacity" in df.columns else 0.0
+    return cap in (0.0, 100.0)
+
+def race_card_spec(data, df):
+    """Everything share_card.render_card needs for a race card, as a plain dict."""
+    from datetime import datetime
+    splits = lap_split_stats(df)
+    done = [sp for sp in splits if sp["complete"] and sp["time_s"] > 1]
+    times = [sp["time_s"] for sp in done]
+    stats = consistency.lap_time_stats(times)
+    span = float(df["t"].iloc[-1] - df["t"].iloc[0]) if len(df) > 1 else 0.0
+    dur = _num(data.get("race_duration_s")) or span
+    when = ""
+    try:
+        when = datetime.strptime(str(data.get("recorded_at"))[:15], "%Y%m%d_%H%M%S").strftime("%d %b %Y")
+    except (TypeError, ValueError):
+        pass
+    if stats is None:
+        cons = "--"
+    elif stats["score"] is None:
+        cons = f"±{stats['std']:.2f}s"
+    else:
+        cons = f"±{stats['std']:.2f}s  {stats['score']}/100"
+    pct = _fuel_is_percent(df)
+    unit = "%" if pct else ""
+    fuel_used = float(-np.minimum(np.diff(df["fuel_remaining"].to_numpy(dtype=float)), 0).sum()) if len(df) > 1 else 0.0
+    spec = {
+        "kind": "RACE",
+        "when": when,
+        "car": str(data.get("car") or "Unknown car"),
+        "track": str(data.get("track") or "unknown track").replace("_", " ").title(),
+        "era": "" if leaderboard.is_current_era(data) else f"pre-{leaderboard.PHYSICS_ERA} physics",
+        "headline": {
+            "big_label": "RACE TIME",
+            "big_value": share_card.fmt_time(dur) if dur > 0 else "--:--.---",
+            "tiles": [
+                ("BEST LAP", share_card.fmt_time(stats["best"]) if stats else "--"),
+                ("AVG LAP", share_card.fmt_time(stats["avg"]) if stats else "--"),
+                ("CONSISTENCY", cons),
+                ("LAPS", f"{len(done)}"),
+                ("TOP SPEED", f"{float(df['speed_kmh'].max()):.0f} km/h"),
+                ("FUEL USED", f"{fuel_used:.1f}{unit}" if fuel_used > 0 else "--"),
+            ],
+        },
+        "chart": {"title": "lap times  -  best lap highlighted", "kind": "bars",
+                  "x": [sp["lap"] for sp in done], "y": times,
+                  "best": int(np.argmin(times)) if times else None, "dim": []},
+        "map": None,
+        "fuel": {"title": "pit stops + fuel", "headline": "no pit stops", "empty": "no fuel data"},
+    }
+    if stats:
+        clean = set(stats["clean_idx"])
+        spec["chart"]["dim"] = [i not in clean for i in range(len(times))]
+    # the line on the map: the best lap (one clean lap reads better than the whole race overdrawn)
+    if times:
+        best_lap_no = done[int(np.argmin(times))]["lap"]
+        for seg, sp in zip(_lap_segments(df), splits):
+            if (sp["lap"] == best_lap_no and "world_x" in seg.columns and len(seg) > 2
+                    and float(seg["world_x"].std()) > 1 and float(seg["world_z"].std()) > 1):
+                spec["map"] = {"x": seg["world_x"].tolist(), "z": seg["world_z"].tolist(),
+                               "v": seg["speed_kmh"].tolist()}
+                break
+    stops = pit_stop_laps(df)
+    fuel = spec["fuel"]
+    if stops:
+        shown = ", ".join(str(n) for n in stops[:6]) + ("..." if len(stops) > 6 else "")
+        fuel["headline"] = f"{len(stops)} stop{'s' if len(stops) != 1 else ''}: lap {shown}"
+    burn = lap_fuel_burn(df)
+    if burn:
+        fuel["bars"] = {"x": [b[0] for b in burn], "y": [b[1] for b in burn], "pit": [b[2] for b in burn],
+                        "ylabel": "burn" + (" %" if pct else "")}
+    fpl, laps_tank, _n = fuel_per_lap_stats(df)
+    if fpl:
+        fuel["foot"] = f"avg {fpl:.1f}{unit}/lap, full tank ~{laps_tank:.0f} laps"
+    return spec
+
+def race_card_png(data, df, width=1200, height=630):
+    """Render a shareable race summary card and return it as PNG bytes: headline
+    stats, every lap time, a speed-coloured map of the best lap, and pit stops
+    with fuel per lap. See share_card.py."""
+    return share_card.render_card(race_card_spec(data, df), width, height)
+
+# ── Corner baselines ──────────────────────────────────────────────────────────
+def pb_reference_path(data, laps_folder=None):
+    """Where the Dashboard keeps the saved PB lap for this race's track and car:
+    <laps>/<track>/reference_<car>.json. The path is returned whether or not the file exists."""
+    from .udp import sanitize
+    folder = Path(laps_folder if laps_folder is not None else runtime_config.LAPS_FOLDER)
+    track = str(data.get("track") or "")
+    car = str(data.get("car") or "unknown")
+    return folder / track / f"reference_{sanitize(car)}.json"
+
+def best_lap_baseline(df):
+    """(label, frame, note) with the fastest complete lap of this race as the baseline."""
+    laps = race_lap_frames(df)
+    if not laps:
+        return "best lap in this race", None, "No complete lap long enough to analyse in this race."
+    n, t, frame = min(laps, key=lambda x: x[1])
+    return f"best lap in this race (lap {n}, {fmt_dur(t)})", frame, ""
+
+def pb_file_baseline(data, laps_folder=None):
+    """(label, frame, note) with your saved PB lap for this track and car as the baseline."""
+    label = "your saved PB lap"
+    path = pb_reference_path(data, laps_folder)
+    if not path.exists():
+        return label, None, f"No saved PB lap for this car at this track yet ({path.name} not found)."
+    try:
+        from .lap_analyst import load_lap
+        lap_data, frame = load_lap(path)
+    except Exception as e:
+        return label, None, f"Couldn't read the saved PB lap: {e}"
+    if not leaderboard.is_current_era(lap_data):
+        return label, None, "Your saved PB lap was driven before GT7 update 1.71 and isn't comparable."
+    lt = _num(lap_data.get("lap_time_s"))
+    return f"your saved PB lap ({fmt_dur(lt)})", frame, ""
+
+def corner_baseline(data, df, mode="best", laps_folder=None):
+    """Resolve the Corners baseline: mode "best" or "pb"."""
+    return pb_file_baseline(data, laps_folder) if mode == "pb" else best_lap_baseline(df)
+
+_SCORE_CACHE = {}
+
+def score_race_corners(df, ref):
+    """corners.score_laps over every analysable lap of the race, cached for the
+    last (race, baseline) pair so switching tabs doesn't recompute it."""
+    key = (id(df), len(df), id(ref))
+    if _SCORE_CACHE.get("key") != key:
+        laps = race_lap_frames(df)
+        ref_corners, scored = corners.score_laps([(n, f) for n, _t, f in laps], ref)
+        _SCORE_CACHE.update(key=key, value=(laps, ref_corners, scored))
+    return _SCORE_CACHE["value"]
 
 # ── Chart helpers ─────────────────────────────────────────────────────────────
 def _ax(ax, title, xl="Race Time (s)", yl=""):
@@ -1093,6 +1275,133 @@ def draw_timeline(fig, df, dfb=None):
         ax1 = fig.add_subplot(2, 1, 1); make_band(ax1, df,  "A", CYN)
         ax2 = fig.add_subplot(2, 1, 2); make_band(ax2, dfb, "B", ACC)
 
+def _no_data(ax, msg):
+    ax.set_facecolor(PNL2); ax.set_xticks([]); ax.set_yticks([])
+    for s in ax.spines.values(): s.set_visible(False)
+    ax.text(0.5, 0.5, msg, ha="center", va="center", color=DIM, fontsize=10, transform=ax.transAxes)
+
+def draw_corners(fig, df, dfb=None, baseline=None):
+    """Every lap of the race scored corner by corner against one baseline: the
+    best lap of the race, or your saved PB lap (switch it with the Baseline
+    button). Each cell is the time that lap lost (red) or gained (green) in that
+    corner, in seconds. `baseline` is (label, frame, note) from corner_baseline()."""
+    label, ref, note = baseline if baseline is not None else best_lap_baseline(df)
+    if ref is None:
+        ax = fig.add_subplot(1, 1, 1)
+        _no_data(ax, note or "No baseline lap available.")
+        return
+    laps, ref_corners, scored = score_race_corners(df, ref)
+    nums = [c.number for c in ref_corners]
+    if not laps or not nums:
+        ax = fig.add_subplot(1, 1, 1)
+        _no_data(ax, "No corners found to compare." if laps else "No complete laps in this race.")
+        return
+    mat = np.full((len(laps), len(nums)), np.nan)
+    for i, (_lap_id, deltas) in enumerate(scored):
+        for j, n in enumerate(nums):
+            d = deltas.get(n)
+            if d is not None and d.time_s is not None:
+                mat[i, j] = d.time_s
+    ax1, ax2 = fig.subplots(2, 1, gridspec_kw={"height_ratios": [2.4, 1]})
+    fig.subplots_adjust(hspace=0.35, left=0.08, right=0.97, top=0.9, bottom=0.07)
+    fig.suptitle(f"Corners — every lap vs {label}", color=FG, fontsize=11)
+    finite = mat[np.isfinite(mat)]
+    lim = max(0.3, float(np.percentile(np.abs(finite), 90))) if finite.size else 0.3
+    im = ax1.imshow(np.ma.masked_invalid(mat), cmap="RdYlGn_r", vmin=-lim, vmax=lim, aspect="auto")
+    ax1.set_xticks(range(len(nums))); ax1.set_xticklabels([f"T{n}" for n in nums], fontsize=7)
+    ax1.set_yticks(range(len(laps)))
+    ax1.set_yticklabels([f"L{n}  {fmt_dur(t)}" for n, t, _f in laps], fontsize=7)
+    if mat.size <= 400:
+        for i in range(mat.shape[0]):
+            for j in range(mat.shape[1]):
+                if np.isfinite(mat[i, j]):
+                    ax1.text(j, i, f"{mat[i, j]:+.2f}", ha="center", va="center", fontsize=6, color="#101010")
+    ax1.set_title("Time lost (red) / gained (green) per corner, s", color=FG, fontsize=9)
+    cb = fig.colorbar(im, ax=ax1, pad=0.01, fraction=0.025)
+    cb.ax.tick_params(labelsize=6, colors=DIM)
+    with np.errstate(all="ignore"):
+        mean = np.nanmean(mat, axis=0)
+    mean = np.where(np.isfinite(mean), mean, 0.0)
+    ax2.bar([f"T{n}" for n in nums], mean, color=[GRN if v <= 0 else ACC for v in mean])
+    ax2.axhline(0, color=FG, lw=0.8)
+    ax2.set_title("Average per corner over the race (above 0 = slower than the baseline, s)", color=FG, fontsize=9)
+    ax2.set_facecolor(PNL2); ax2.tick_params(colors=DIM, labelsize=7); ax2.grid(axis="y", alpha=0.3)
+
+def draw_consistency(fig, df, dfb=None):
+    """How steady the race was: lap-time spread and trend, and which corners you
+    nail every lap versus the ones that vary. Laps more than 7 % off the best
+    (pit laps, spins) are left out of the numbers and shown dimmed."""
+    laps = race_lap_frames(df)
+    times = [t for _n, t, _f in laps]
+    stats = consistency.lap_time_stats(times)
+    if stats is None:
+        ax = fig.add_subplot(1, 1, 1)
+        _no_data(ax, "No complete laps in this race.")
+        return
+    axs = fig.subplots(2, 2); fig.subplots_adjust(hspace=0.45, wspace=0.3, left=0.08, right=0.97, top=0.92, bottom=0.07)
+    nos = np.array([n for n, _t, _f in laps], dtype=float)
+    ts = np.array(times)
+    clean = np.zeros(len(ts), dtype=bool); clean[stats["clean_idx"]] = True
+
+    ax = axs[0, 0]
+    ax.axhspan(stats["avg"] - stats["std"], stats["avg"] + stats["std"], color=CYN, alpha=0.12)
+    ax.axhline(stats["avg"], color=CYN, lw=0.8, ls="--")
+    ax.plot(nos, ts, color=DIM, lw=1)
+    ax.scatter(nos[clean], ts[clean], color=CYN, s=22, zorder=3)
+    ax.scatter(nos[~clean], ts[~clean], color=DIM, s=22, zorder=3)
+    if stats["trend"] is not None and clean.sum() >= 2:
+        fit = np.polyfit(nos[clean], ts[clean], 1)
+        ax.plot(nos[clean], np.polyval(fit, nos[clean]), color=ORG, lw=1.4)
+    ax.set_ylim(stats["best"] - 0.5, stats["best"] * consistency.CLEAN_LAP_FACTOR + 0.5)
+    _ax(ax, "Lap time by lap (band = ±1 std)", xl="Lap", yl="s")
+
+    ax = axs[0, 1]
+    dev = ts - stats["avg"]
+    ax.bar(nos, np.where(clean, dev, 0), color=[GRN if v <= 0 else ACC for v in dev])
+    ax.axhline(0, color=FG, lw=0.8)
+    lim = max(1.0, 3 * stats["std"])
+    ax.set_ylim(-lim, lim)
+    _ax(ax, "Lap vs your average (clean laps, s)", xl="Lap", yl="s")
+
+    ax = axs[1, 0]
+    ref_label, ref, _note = best_lap_baseline(df)
+    spreads = []
+    if ref is not None:
+        _l, _rc, scored = score_race_corners(df, ref)
+        spreads = corners.corner_spreads(scored)
+    if spreads:
+        ordered = sorted(spreads, key=lambda c: c.ref_number)
+        stds = [c.std_time_s for c in ordered]
+        lo, hi = min(stds), max(stds)
+        ax.bar([f"T{c.ref_number}" for c in ordered], stds,
+               color=[GRN if v == lo else ACC if v == hi else CYN for v in stds])
+        _ax(ax, "Corner time spread across laps (lower = more consistent)", xl="", yl="std, s")
+        ax.tick_params(axis="x", labelsize=7)
+    else:
+        _no_data(ax, "Needs at least 3 laps with matching corners.")
+
+    ax = axs[1, 1]
+    ax.axis("off")
+    score = f"{stats['score']}/100" if stats["score"] is not None else "--"
+    lines = [f"Consistency score   {score}",
+             f"Clean laps          {stats['n_clean']} of {stats['n']}",
+             f"Best / average      {fmt_dur(stats['best'])} / {fmt_dur(stats['avg'])}",
+             f"Spread (max-min)    {stats['spread']:.2f} s",
+             f"Std deviation       ±{stats['std']:.2f} s",
+             f"Trend               {consistency.trend_label(stats['trend'])}"]
+    if spreads:
+        best_c, worst_c = spreads[0], spreads[-1]
+        lines += ["",
+                  f"Most consistent corner   T{best_c.ref_number}  (±{best_c.std_time_s:.2f} s)",
+                  f"Least consistent corner  T{worst_c.ref_number}  (±{worst_c.std_time_s:.2f} s)"]
+        wb = [c for c in spreads if c.std_brake_m is not None]
+        loose = max(wb, key=lambda c: c.std_brake_m) if wb else None
+        if loose is not None and loose.std_brake_m >= 1:
+            lines.append(f"Brake point varies most  T{loose.ref_number}  (±{loose.std_brake_m:.0f} m)")
+    ax.text(0.0, 1.0, "\n".join(lines), ha="left", va="top", color=FG, fontsize=8, family="monospace",
+            transform=ax.transAxes)
+    ax.set_title("Consistency report", color=FG, fontsize=9)
+
 # ── Groups registry ────────────────────────────────────────────────────────────
 GROUPS = [
     ("Race",      draw_race,            (2,2), (12, 8)),
@@ -1110,6 +1419,8 @@ GROUPS = [
     ("Ratings",   draw_ratings,         (2,2), (12, 9)),
     ("Heat Maps", draw_minimap_heatmap, (3,3), (13,10)),
     ("Timeline",  draw_timeline,        (3,1), (13, 9)),
+    ("Corners",   draw_corners,         (2,1), (13, 9)),
+    ("Consistency", draw_consistency,   (2,2), (13, 9)),
 ]
 
 # ── Replay ────────────────────────────────────────────────────────────────────
@@ -1534,6 +1845,7 @@ class AnalystApp(tk.Tk):
         self._cfigs        = {}
         self._group_names  = []
         self._compare_mode = False
+        self._baseline_mode = "best"     # Corners tab: "best" lap of the race, or the saved "pb" lap
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._quit)
 
@@ -1610,6 +1922,9 @@ class AnalystApp(tk.Tk):
         tk.Button(fe, text="🌐  Export Chart HTML", command=self._export_html,
                   bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
+        tk.Button(fe, text="🖼  Export Race Card (PNG)", command=self._export_card,
+                  bg=DIM2, fg=PRP, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
         tk.Label(p, text="LAP SPLITS — RACE A", fg=DIM, bg=PNL2,
                  font=FONTL).pack(anchor="w", padx=12, pady=(6,2))
@@ -1666,6 +1981,11 @@ class AnalystApp(tk.Tk):
                                    bg=DIM2, fg=DIM, relief="flat", font=FONTB,
                                    padx=10, pady=2, cursor="hand2")
         self._cmp_btn.pack(side="right", padx=10)
+        self._base_btn = tk.Button(hdr, text="Corner baseline: best lap in race",
+                                   command=self._toggle_baseline,
+                                   bg=DIM2, fg=CYN, relief="flat", font=FONTB,
+                                   padx=10, pady=2, cursor="hand2")
+        self._base_btn.pack(side="right", padx=4)
 
         snb = ttk.Notebook(parent); snb.pack(fill="both", expand=True)
         self._snb = snb
@@ -1689,6 +2009,18 @@ class AnalystApp(tk.Tk):
             self._cfigs[k] = None
         self._draw_active_chart()
 
+    def _toggle_baseline(self):
+        """Corners tab: score every lap against the race's best lap, or against
+        your saved PB lap for this track and car."""
+        self._baseline_mode = "pb" if self._baseline_mode == "best" else "best"
+        self._base_btn.config(text="Corner baseline: " + ("saved PB lap" if self._baseline_mode == "pb"
+                                                          else "best lap in race"))
+        if self._cfigs.get("Corners"):
+            plt.close(self._cfigs["Corners"])
+        self._cfigs["Corners"] = None
+        if self._dfa is not None and self._group_names[self._snb.index("current")] == "Corners":
+            self._draw_chart("Corners")
+
     def _draw_active_chart(self):
         if self._dfa is None: return
         idx  = self._snb.index("current")
@@ -1704,7 +2036,10 @@ class AnalystApp(tk.Tk):
         fig = plt.figure(figsize=fs, facecolor=BG)
         dfb = self._dfb if self._compare_mode else None
         try:
-            fn(fig, self._dfa, dfb)
+            if name == "Corners":
+                fn(fig, self._dfa, dfb, corner_baseline(self._da or {}, self._dfa, self._baseline_mode))
+            else:
+                fn(fig, self._dfa, dfb)
         except Exception as e:
             plt.close(fig)
             self._cfigs[name] = None
@@ -1840,6 +2175,24 @@ class AnalystApp(tk.Tk):
         except Exception as e:
             messagebox.showerror("Export failed", f"Couldn't write {path}:\n{e}"); return
         messagebox.showinfo("Exported", f"Saved: {Path(path).name}")
+
+    def _export_card(self):
+        if self._dfa is None:
+            messagebox.showinfo("Export", "Load Race A first."); return
+        d = self._da or {}
+        base = _safe_name(f"TRACE_race_{d.get('track') or 'race'}_{fmt_dur(d.get('race_duration_s'))}")
+        path = filedialog.asksaveasfilename(
+            title="Save Race Card", defaultextension=".png", initialfile=f"{base}.png",
+            filetypes=[("PNG image", "*.png"), ("All", "*.*")])
+        if not path: return
+        try:
+            data = race_card_png(d, self._dfa)
+            tmp = str(path) + ".part"
+            with open(tmp, "wb") as f: f.write(data)
+            os.replace(tmp, path)
+        except Exception as e:
+            messagebox.showerror("Race Card", f"Couldn't create the race card:\n{e}"); return
+        messagebox.showinfo("Exported", f"Race card saved: {Path(path).name}")
 
     def _on_tab(self, e):
         try:

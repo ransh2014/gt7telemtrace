@@ -213,3 +213,78 @@ def session_label(df: pd.DataFrame, corners: list[Corner], deltas: list[CornerDe
         parts.append(smooth.lower())
     s = ", ".join(parts)
     return s[:1].upper() + s[1:]
+
+
+# ── time-loss summary (any lap vs a reference) ───────────────────────────────
+TIME_LOSS_MIN_S = 0.005  # a corner must cost at least this to be named
+
+
+def time_loss_summary(deltas: list[CornerDelta], n: int = 3) -> list[CornerDelta]:
+    """The `n` corners that cost the most time against the reference, worst
+    first. Corners that were not slower (or lost under 5 ms) are left out, so a
+    lap that matches its reference returns an empty list."""
+    lost = [d for d in deltas if d.time_s is not None and d.time_s > TIME_LOSS_MIN_S]
+    return sorted(lost, key=lambda d: d.time_s, reverse=True)[:n]
+
+
+def describe_time_loss(deltas: list[CornerDelta], n: int = 3) -> str:
+    """One line for the log / a caption, e.g. "Time lost: T4 +0.21s, T9 +0.12s, T2 +0.08s"."""
+    worst = time_loss_summary(deltas, n)
+    if not worst:
+        return "No corner lost time against the reference"
+    return "Time lost: " + ", ".join(f"T{d.number} +{d.time_s:.2f}s" for d in worst)
+
+
+# ── every lap of a race against one baseline ─────────────────────────────────
+@dataclass
+class CornerSpread:
+    ref_number: int  # corner number on the baseline lap
+    n: int  # laps in which the corner was matched
+    mean_time_s: float  # average time vs the baseline across those laps (+ = slower)
+    std_time_s: float  # lap-to-lap spread of that time
+    std_brake_m: float | None  # lap-to-lap spread of the brake point
+
+
+def score_laps(
+    laps: list[tuple[int, pd.DataFrame]], ref: pd.DataFrame
+) -> tuple[list[Corner], list[tuple[int, dict[int, CornerDelta]]]]:
+    """Score each (lap id, lap frame) against `ref`. Returns the reference
+    lap's corners and, per lap, its deltas keyed by the *reference* corner
+    number so every lap lines up in the same columns. Laps that cannot be read
+    come back with no deltas rather than raising."""
+    ref_corners = detect_corners(ref)
+    out: list[tuple[int, dict[int, CornerDelta]]] = []
+    for lap_id, df in laps:
+        try:
+            _, _, deltas = match_corners(df, ref)
+        except Exception:
+            deltas = []
+        out.append((lap_id, {d.ref_number: d for d in deltas}))
+    return ref_corners, out
+
+
+def corner_spreads(scored: list[tuple[int, dict[int, CornerDelta]]], min_laps: int = 3) -> list[CornerSpread]:
+    """Per-corner consistency over a set of scored laps, most consistent
+    (smallest time spread) first. Corners matched on fewer than `min_laps`
+    laps are skipped -- two laps say nothing about consistency."""
+    by_corner: dict[int, list[CornerDelta]] = {}
+    for _lap_id, deltas in scored:
+        for ref_no, d in deltas.items():
+            if d.time_s is not None:
+                by_corner.setdefault(ref_no, []).append(d)
+    out: list[CornerSpread] = []
+    for ref_no, ds in by_corner.items():
+        if len(ds) < min_laps:
+            continue
+        times = np.array([d.time_s for d in ds], dtype=float)
+        brakes = np.array([d.brake_m for d in ds if d.brake_m is not None], dtype=float)
+        out.append(
+            CornerSpread(
+                ref_number=ref_no,
+                n=len(ds),
+                mean_time_s=float(times.mean()),
+                std_time_s=float(times.std(ddof=1)),
+                std_brake_m=float(brakes.std(ddof=1)) if len(brakes) >= min_laps else None,
+            )
+        )
+    return sorted(out, key=lambda c: c.std_time_s)

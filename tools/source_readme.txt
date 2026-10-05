@@ -40,7 +40,8 @@ gt7telem/         The TRACE package itself (same source that ships on
   lap_analyst.py    Lap analysis — 18 chart groups, A/B compare, replay,
                     CSV export, micro-sector heatmap, track boundary
                     overlay, leaderboard/ghost/consensus panel
-  race_analyst.py   Race analysis — 15 chart groups, race-oriented
+  race_analyst.py   Race analysis — 17 chart groups, race-oriented (incl. per-lap
+                    Corners and a Consistency report), race card PNG
   udp.py            UDP capture, Salsa20 decrypt, packet parsing
   config.py         Settings persistence (IP, laps folder, sample rate,
                     analytics opt-out, Prometheus metrics opt-in and
@@ -60,6 +61,9 @@ gt7telem/         The TRACE package itself (same source that ships on
                     REMOTE" in the Live Dashboard header.
   corners.py        Corner detection and per-corner analysis (the Corners chart
                     group in Lap Analyst)
+  consistency.py    Lap-time spread, trend and 0-100 consistency score (Race
+                    Analyst Consistency tab and race card)
+  share_card.py     Shared 1200x630 PNG renderer behind the lap card and race card
   notify.py         Desktop toast + sound alerts (new PB, race end)
   cars.py           Car ID -> name lookup (car_ids.csv)
   tracks.py         Track ID -> name lookup (course_ids.csv), plus track

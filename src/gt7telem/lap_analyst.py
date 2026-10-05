@@ -17,7 +17,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import __version__, auth, corners, leaderboard, tracks
+from . import __version__, auth, corners, leaderboard, share_card, tracks
 from . import config as runtime_config
 
 matplotlib.use("TkAgg")
@@ -396,20 +396,15 @@ def build_sector_stats(df):
     return out
 
 # ── Shareable lap card (PNG) ──────────────────────────────────────────────────
-# A fixed dark palette, so the image looks the same for everyone whatever
-# theme the app is set to. Drawn on a bare Figure + Agg canvas: no pyplot and
-# no Tk, so it works headless (and is unit-tested that way).
-_CARD = dict(bg="#07080f", panel="#0d0e1a", fg="#c8d3f5", dim="#6b7194",
-             cyan="#00f0d4", green="#39ff85", red="#ff2255", yellow="#ffd500")
-
+# The drawing lives in share_card.py (shared with the Race Analyst's race card);
+# this builds the lap's side of the spec: speed trace cut into sectors, the
+# speed-coloured track map, fuel used, and the headline numbers.
 def _fmt_laptime(t):
     """m:ss.mmm, rounded to the millisecond first so 59.9996 s reads 1:00.000, not 0:60.000."""
-    total_ms = int(round(_num(t) * 1000))
-    m, ms = divmod(total_ms, 60000)
-    return f"{m}:{ms / 1000:06.3f}"
+    return share_card.fmt_time(_num(t))
 
 def _card_stats(df):
-    """The tiles on the lap card. Anything the lap file doesn't carry (a
+    """The six tiles on the lap card. Anything the lap file doesn't carry (a
     downloaded ghost only has the compact input fields) shows as '--'."""
     def col(name):
         return df[name] if name in df.columns else None
@@ -420,137 +415,92 @@ def _card_stats(df):
             return default
     spd, thr = col("speed_kmh"), col("throttle")
     tyres = [col(c) for c in ("tyre_temp_fl", "tyre_temp_fr", "tyre_temp_rl", "tyre_temp_rr")]
-    fuel = col("fuel_remaining")
-    cap = col("fuel_capacity")
-    def fuel_used():
-        used = float(fuel.iloc[0] - fuel.iloc[-1])
-        if used <= 0:
-            return "--"
-        pct = cap is not None and float(cap.max()) in (0.0, 100.0)
-        return f"{used:.1f}" + ("%" if pct else "")
     def tyre_avg():
         vals = [float(s.mean()) for s in tyres]
         return f"{sum(vals) / 4:.0f} C" if all(v > 0 for v in vals) else "--"
+    def style():
+        label = corners._smoothness(df)
+        return label or "--"
     return [
         ("TOP SPEED",  safe(lambda: f"{float(spd.max()):.0f} km/h")),
         ("AVG SPEED",  safe(lambda: f"{float(spd.mean()):.0f} km/h")),
         ("FULL THROTTLE", safe(lambda: f"{float((thr > 0.95).mean() * 100):.0f}%")),
         ("MAX LAT G",  safe(lambda: f"{float(df['lat_g'].abs().max()):.2f} g")),
-        ("FUEL USED",  safe(fuel_used)),
         ("AVG TYRE",   safe(tyre_avg)),
+        ("STYLE",      safe(style)),
     ]
 
-def lap_card_png(data, df, width=1200, height=630):
-    """Render a shareable summary card for a lap and return it as PNG bytes
-    (car, track, lap time, thirds, a few headline numbers, a speed-coloured
-    track map when the lap has GPS data, and the speed / pedal traces)."""
-    import matplotlib.colors as mcolors
-    from matplotlib.backends.backend_agg import FigureCanvasAgg
-    from matplotlib.figure import Figure
+def _lap_fuel_used(df):
+    """(fuel used over the lap, is it a percentage gauge). None when the file
+    has no usable fuel data."""
+    if "fuel_remaining" not in df.columns or len(df) < 2:
+        return None, False
+    used = float(df["fuel_remaining"].iloc[0] - df["fuel_remaining"].iloc[-1])
+    if used <= 0:
+        return None, False
+    cap = float(df["fuel_capacity"].max()) if "fuel_capacity" in df.columns else 0.0
+    return used, cap in (0.0, 100.0)
 
-    c = _CARD
-    dpi = 100
-    fig = Figure(figsize=(width / dpi, height / dpi), dpi=dpi, facecolor=c["bg"])
-    FigureCanvasAgg(fig)
-    mono = dict(family="monospace")
-
-    lap_s = float(data.get("lap_time_s") or 0)
+def lap_card_spec(data, df):
+    """Everything share_card.render_card needs for a lap card, as a plain dict."""
+    lap_s = _num(data.get("lap_time_s"))
     if lap_s <= 0 and len(df) > 1 and "t" in df.columns:
         lap_s = float(df["t"].iloc[-1] - df["t"].iloc[0])
-    car = str(data.get("car") or "Unknown car")
-    track = str(data.get("track") or "unknown track").replace("_", " ").title()
     when = ""
     try:
         when = datetime.strptime(str(data.get("recorded_at"))[:15], "%Y%m%d_%H%M%S").strftime("%d %b %Y")
     except (TypeError, ValueError):
         pass
-    era = "" if leaderboard.is_current_era(data) else f"pre-{leaderboard.PHYSICS_ERA} physics"
+    spec = {
+        "kind": "LAP",
+        "when": when,
+        "car": str(data.get("car") or "Unknown car"),
+        "track": str(data.get("track") or "unknown track").replace("_", " ").title(),
+        "era": "" if leaderboard.is_current_era(data) else f"pre-{leaderboard.PHYSICS_ERA} physics",
+        "headline": {"big_label": "LAP TIME", "big_value": _fmt_laptime(lap_s) if lap_s > 0 else "--:--.---",
+                     "tiles": _card_stats(df)},
+        "chart": {"title": "speed round the lap, by sector", "kind": "trace", "ylabel": "km/h",
+                  "x": [], "y": []},
+        "map": None,
+        "fuel": {"title": "pit stops + fuel", "headline": "no fuel data", "empty": "no fuel data"},
+    }
 
-    # header
-    fig.text(0.05, 0.92, "TRACE", color=c["cyan"], fontsize=24, fontweight="bold", va="center", **mono)
-    fig.text(0.05, 0.865, "GT7 TELEMETRY", color=c["dim"], fontsize=8, va="center", **mono)
-    fig.text(0.95, 0.92, when, color=c["dim"], fontsize=10, ha="right", va="center", **mono)
-    # car / track / time
-    fig.text(0.05, 0.77, car[:34], color=c["fg"], fontsize=19, fontweight="bold", va="center", **mono)
-    fig.text(0.05, 0.705, track[:40], color=c["cyan"], fontsize=14, va="center", **mono)
-    fig.text(0.05, 0.575, _fmt_laptime(lap_s) if lap_s > 0 else "--:--.---",
-             color=c["green"], fontsize=50, fontweight="bold", va="center", **mono)
-    fig.text(0.05, 0.485, "LAP TIME" + (f"   [{era}]" if era else ""),
-             color=c["dim"], fontsize=9, va="center", **mono)
-
-    # thirds
-    try:
-        thirds = build_sector_stats(df)
-    except Exception:
-        thirds = []
-    for i, (name, tm, *_rest) in enumerate(thirds[:3]):
-        fig.text(0.05 + i * 0.15, 0.405, name, color=c["dim"], fontsize=8, va="center", **mono)
-        fig.text(0.05 + i * 0.15, 0.365, tm, color=c["fg"], fontsize=13, fontweight="bold", va="center", **mono)
-
-    # stat tiles (3 x 2)
-    for i, (label, value) in enumerate(_card_stats(df)):
-        x = 0.05 + (i % 3) * 0.15
-        y = 0.255 if i < 3 else 0.135
-        fig.text(x, y + 0.04, label, color=c["dim"], fontsize=7, va="center", **mono)
-        fig.text(x, y - 0.005, value, color=c["fg"], fontsize=13, fontweight="bold", va="center", **mono)
-
-    fig.text(0.05, 0.035, "gt7trace.netlify.app", color=c["cyan"], fontsize=10, va="center", **mono)
-    fig.text(0.95, 0.035, "made with TRACE", color=c["dim"], fontsize=8, ha="right", va="center", **mono)
-
-    def style(ax):
-        ax.set_facecolor(c["panel"])
-        for s in ax.spines.values():
-            s.set_visible(False)
-        ax.tick_params(colors=c["dim"], labelsize=7, length=0)
-        ax.grid(True, color="#1c1e30", lw=0.6)
-
-    # x axis for the traces: distance round the lap if we have it, else sample index
-    if "track_position" in df.columns and float(df["track_position"].max() - df["track_position"].min()) > 1:
-        xs = df["track_position"].to_numpy(dtype=float)
-    else:
-        xs = np.arange(len(df), dtype=float)
+    # speed trace against distance round the lap (sample index when there is no distance)
+    has_pos = "track_position" in df.columns and float(df["track_position"].max() - df["track_position"].min()) > 1
+    xs = df["track_position"].to_numpy(dtype=float) if has_pos else np.arange(len(df), dtype=float)
     order = np.argsort(xs, kind="stable")
     xs = xs[order]
-
-    has_map = ("world_x" in df.columns and "world_z" in df.columns and len(df) > 2
-               and float(df["world_x"].std()) > 1 and float(df["world_z"].std()) > 1)
-    if has_map:
-        axm = fig.add_axes([0.52, 0.40, 0.45, 0.47])
-        wx, wz = df["world_x"].to_numpy(dtype=float), df["world_z"].to_numpy(dtype=float)
-        v = df["speed_kmh"].to_numpy(dtype=float)
-        pts = np.array([wx, wz]).T.reshape(-1, 1, 2)
-        segs = np.concatenate([pts[:-1], pts[1:]], axis=1)
-        lc = LineCollection(segs, cmap="turbo", norm=mcolors.Normalize(v.min(), v.max() or 1), lw=3)
-        lc.set_array(v[:-1])
-        axm.add_collection(lc)
-        axm.autoscale()
-        axm.set_aspect("equal")
-        axm.axis("off")
-        axs = fig.add_axes([0.55, 0.20, 0.40, 0.17])
-        axp = fig.add_axes([0.55, 0.075, 0.40, 0.09], sharex=axs)
-    else:
-        axs = fig.add_axes([0.55, 0.38, 0.40, 0.40])
-        axp = fig.add_axes([0.55, 0.14, 0.40, 0.18], sharex=axs)
-    style(axs)
-    style(axp)
     spd = df["speed_kmh"].to_numpy(dtype=float)[order]
-    axs.plot(xs, spd, color=c["cyan"], lw=1.6)
-    axs.fill_between(xs, spd, alpha=0.15, color=c["cyan"])
-    axs.set_ylabel("km/h", color=c["dim"], fontsize=7)
-    axs.tick_params(labelbottom=False)
-    thr = df["throttle"].to_numpy(dtype=float)[order] * 100 if "throttle" in df.columns else np.zeros(len(xs))
-    brk = df["brake"].to_numpy(dtype=float)[order] * 100 if "brake" in df.columns else np.zeros(len(xs))
-    axp.fill_between(xs, thr, color=c["green"], alpha=0.75, step="post")
-    axp.fill_between(xs, -brk, color=c["red"], alpha=0.8, step="post")
-    axp.set_ylim(-105, 105)
-    axp.set_yticks([])
-    axp.set_xlabel("distance round the lap (m)" if xs.max() > len(xs) else "samples", color=c["dim"], fontsize=7)
-    axp.text(0.995, 0.88, "throttle", color=c["green"], fontsize=6, ha="right", va="top", transform=axp.transAxes)
-    axp.text(0.995, 0.10, "brake", color=c["red"], fontsize=6, ha="right", va="bottom", transform=axp.transAxes)
+    spec["chart"]["x"], spec["chart"]["y"] = xs.tolist(), spd.tolist()
+    try:
+        _segs, times = lap_sectors(df, 3)
+        if times and has_pos:
+            length = float(_lap_xy(df)[0][-1])
+            spec["chart"]["edges"] = np.linspace(0.0, length, len(times) + 1).tolist()
+            spec["chart"]["sector_times"] = times
+    except Exception:
+        pass
 
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, facecolor=c["bg"])
-    return buf.getvalue()
+    if ("world_x" in df.columns and "world_z" in df.columns and len(df) > 2
+            and float(df["world_x"].std()) > 1 and float(df["world_z"].std()) > 1):
+        spec["map"] = {"x": df["world_x"].tolist(), "z": df["world_z"].tolist(), "v": df["speed_kmh"].tolist()}
+
+    used, pct = _lap_fuel_used(df)
+    if used is not None:
+        unit = "%" if pct else ""
+        fuel = spec["fuel"]
+        fuel["headline"] = f"{used:.1f}{unit} used"
+        fuel["trace"] = {"x": xs.tolist(), "y": df["fuel_remaining"].to_numpy(dtype=float)[order].tolist(),
+                         "ylabel": "fuel left" + (" %" if pct else "")}
+        if pct:
+            fuel["foot"] = f"a full tank is about {100.0 / used:.0f} laps at this burn"
+    return spec
+
+def lap_card_png(data, df, width=1200, height=630):
+    """Render a shareable summary card for a lap and return it as PNG bytes:
+    headline stats, the speed trace by sector, a speed-coloured track map and
+    the fuel used on the lap. See share_card.py."""
+    return share_card.render_card(lap_card_spec(data, df), width, height)
 # ── Chart helpers ─────────────────────────────────────────────────────────────
 def _ax(ax, title, xl="Track Pos (m)", yl=""):
     ax.set_title(title, color=FG, fontsize=9)
