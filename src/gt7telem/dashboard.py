@@ -329,6 +329,12 @@ class App(tk.Tk):
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
+        self.notify_var = tk.BooleanVar(value=bool(runtime_config.NOTIFY_ENABLED))
+        tk.Checkbutton(hdr3, text="NOTIFICATIONS", variable=self.notify_var,
+                       command=self._on_notify_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+
         self.voice_var = tk.BooleanVar(value=bool(runtime_config.VOICE_ENABLED))
         tk.Checkbutton(hdr3, text="VOICE ALERTS", variable=self.voice_var,
                        command=self._on_voice_toggle, bg="#0f3460", fg=DIM,
@@ -1003,6 +1009,15 @@ class App(tk.Tk):
             self._post(self._ghosts.__setitem__, key, g)
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _on_notify_toggle(self):
+        """Desktop toast + sound on a new PB and when a race recording ends
+        (notify.py checks config.NOTIFY_ENABLED each time, so it applies at once).
+        Spoken alerts have their own VOICE ALERTS switch."""
+        runtime_config.NOTIFY_ENABLED = self.notify_var.get()
+        runtime_config.save(NOTIFY_ENABLED=runtime_config.NOTIFY_ENABLED)
+        state = "on" if runtime_config.NOTIFY_ENABLED else "off"
+        self.log_msg(f"Notifications {state} -- new personal best and race-end pop-ups and sounds")
 
     def _on_voice_toggle(self):
         runtime_config.VOICE_ENABLED = self.voice_var.get()

@@ -61,7 +61,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - **Spoken alerts** — fuel-low and tyre hot/cold warnings are read out through your system's voice (Windows speech and macOS `say` are built in; on Linux install `speech-dispatcher` for `spd-say`, or `espeak-ng`/`espeak`), falling back to the alert sound if no voice is available. Each alert is spoken when it turns on; fuel and hot-tyre warnings repeat every minute while they last. Untick **`VOICE ALERTS`** in the header's Preferences row to mute. It never blocks the display
 - **Live gap to the leaderboard's top lap** — the `VS TOP` readout shows how far ahead or behind the fastest public lap for your car and track you are, at the same spot on the track. It makes one read-only request per car and track per run (once they've stayed put for a few seconds, so typing a name by hand doesn't send a request per letter), and stays silent if you're offline or nobody has set a lap yet. Untick **`TOP-LAP GHOST`** to turn the request off (see [Privacy & analytics](#privacy--analytics))
 - **Time-loss summary** — after each lap, the log names the three corners that cost the most time against your reference lap (once you have one), e.g. `Time lost: T4 +0.21s, T9 +0.12s, T2 +0.08s`
-- **Preferences row** — `SHARE USAGE DATA`, **`CHECK FOR UPDATES`**, `TOP-LAP GHOST`, `VOICE ALERTS` and `DEBUG LOG` checkboxes, saved to `settings.json`
+- **Preferences row** — `SHARE USAGE DATA`, **`CHECK FOR UPDATES`**, `TOP-LAP GHOST`, **`NOTIFICATIONS`**, `VOICE ALERTS` and `DEBUG LOG` checkboxes, saved to `settings.json`
 - Incident timeline
 - Lap history table with alerts
 
@@ -91,7 +91,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 ### All tools
 - **Records** — the *Records* link in the Launcher footer opens a table of your best lap for every car and track, built from your saved laps (incomplete laps and laps from before GT7 update 1.71 are left out unless you tick the box). It reads only the summary at the start of each lap file, so even a big laps folder opens quickly
-- Desktop notifications (with a sound where the system supports one) on a new personal best and when a race recording ends automatically
+- Desktop notifications (with a sound where the system supports one) on a new personal best and when a race recording ends automatically. Switch them off with the **`NOTIFICATIONS`** checkbox in the Live Dashboard header
 - Dark / light theme toggle in the Launcher footer (applies the next time you open a tool)
 - Update check — the Launcher quietly looks for a newer GitHub release on startup and shows a small banner. Turn it off with the **`CHECK FOR UPDATES`** checkbox in the Live Dashboard header (see [Privacy & analytics](#privacy--analytics))
 
@@ -191,7 +191,7 @@ TRACE talks directly to the console for all core telemetry — no server, no bro
 - GT7 streams packets back to your PC on port `33740`.
 - Each packet is decrypted with Salsa20 and unpacked into a `Telemetry` snapshot — the protocol details this library relies on were reverse-engineered by [Bornhall](https://github.com/Bornhall/gt7telemetry) (see [Credits](#credits)).
 - Because TRACE always requests the extended packet, you get motion/sway/heave/surge and filtered-input data automatically — there's no separate "heartbeat type" setting to configure.
-- Settings (last-used IP, sample rate, known-good IPs, and the analytics, update-check, voice-alert and top-lap-ghost switches) persist to a `settings.json`, so there's nothing to reconfigure between sessions. It lives in `~/.gt7telem/`, which survives `pip install --upgrade` and package-manager upgrades — except for a standalone .exe/binary unzipped into a folder you can write to, which keeps it next to the executable so it stays portable.
+- Settings (last-used IP, sample rate, known-good IPs, and the analytics, update-check, notification, voice-alert and top-lap-ghost switches) persist to a `settings.json`, so there's nothing to reconfigure between sessions. It lives in `~/.gt7telem/`, which survives `pip install --upgrade` and package-manager upgrades — except for a standalone .exe/binary unzipped into a folder you can write to, which keeps it next to the executable so it stays portable.
 
 The exceptions are the optional leaderboard and the Dashboard's top-lap ghost: submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS, and so does the Dashboard's one-off top-lap fetch (see below). Nothing about your live session is ever sent unless you press "Submit to Leaderboard."
 

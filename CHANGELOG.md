@@ -9,6 +9,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Nine new features across the Dashboard, Lap Analyst, Race Analyst and Launcher.
 
 New
+- **Notifications switch.** A `NOTIFICATIONS` checkbox in the same Preferences row turns the new-PB and race-end pop-ups and sounds
+  on or off. `NOTIFY_ENABLED` already existed but could only be changed by editing `settings.json`.
 - **Update-check switch.** A `CHECK FOR UPDATES` checkbox in the Live Dashboard header, right beside `SHARE USAGE DATA`, turns the
   Launcher's startup update check on or off and saves it to `settings.json` (the setting already existed; it just had no control).
   The header's switches now live on their own Preferences row so the console / track / car row can't be squeezed.
@@ -38,7 +40,7 @@ New
 Changed
 - Lap Analyst now has 19 chart groups (added Theoretical) and Race Analyst 17 (added Corners and Consistency); README, the source
   README and the site are updated to match.
-- New settings in `settings.json`: `VOICE_ENABLED` and `GHOST_ENABLED` (both default on). `UPDATE_CHECK_ENABLED` is unchanged.
+- New settings in `settings.json`: `VOICE_ENABLED` and `GHOST_ENABLED` (both default on). `UPDATE_CHECK_ENABLED` and `NOTIFY_ENABLED` are unchanged but now have in-app checkboxes.
 - Privacy page: documents the Dashboard's one-off top-lap request, that the update check is now switched off in the app, that a signed-in
   lap submission carries your anonymous account ID, and that an expired login is renewed with your stored refresh token during a submission.
 - Docs: spoken alerts need `speech-dispatcher` or `espeak-ng` on Linux (Windows and macOS are built in); noted in the READMEs and the setup FAQ.

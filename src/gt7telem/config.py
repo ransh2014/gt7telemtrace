@@ -230,6 +230,7 @@ _DEFAULTS = {
     # takes effect the next time a tool window is opened.
     "THEME": "dark",
     # Desktop + sound alerts for new personal bests and session/race end.
+    # Switch: the NOTIFICATIONS checkbox in the Dashboard header.
     "NOTIFY_ENABLED": True,
     # Spoken Dashboard alerts (fuel low, tyres hot/cold) through the OS voice.
     # Mute with the VOICE ALERTS checkbox in the Dashboard header.

@@ -44,8 +44,8 @@ gt7telem/         The TRACE package itself (same source that ships on
                     Corners and a Consistency report), race card PNG
   udp.py            UDP capture, Salsa20 decrypt, packet parsing
   config.py         Settings persistence (IP, laps folder, sample rate,
-                    analytics opt-out, update-check, voice-alert and top-lap-ghost
-                    switches, Prometheus metrics opt-in and remote-access opt-in)
+                    analytics opt-out, update-check, notification, voice-alert and
+                    top-lap-ghost switches, Prometheus metrics opt-in and remote-access opt-in)
   auth.py           Optional free account — Supabase anonymous sign-in,
                     display name only, no email or password
   leaderboard.py    Global lap leaderboard, ghost-lap download, and
@@ -70,7 +70,8 @@ gt7telem/         The TRACE package itself (same source that ships on
                     (one read-only request per car and track; TOP-LAP GHOST switch)
   records.py        Records table (best lap per car and track from your saved
                     laps) -- the Records link on the launcher menu
-  notify.py         Desktop toast + sound alerts (new PB, race end)
+  notify.py         Desktop toast + sound alerts (new PB, race end); switch it
+                    off with NOTIFICATIONS in the Live Dashboard header
   voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS
                     voice (Windows SAPI, macOS say, Linux spd-say/espeak);
                     falls back to the notify.py sound. Mute with VOICE ALERTS.

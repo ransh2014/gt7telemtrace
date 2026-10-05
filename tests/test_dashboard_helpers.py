@@ -52,3 +52,30 @@ def test_update_check_toggle_persists(tmp_path, monkeypatch):
     dashboard.App._on_update_check_toggle(fake)
     assert config.UPDATE_CHECK_ENABLED is True
     assert config.load()["UPDATE_CHECK_ENABLED"] is True
+
+
+def test_notifications_toggle_persists_and_gates_notify(tmp_path, monkeypatch):
+    """The NOTIFICATIONS checkbox writes config.NOTIFY_ENABLED, which notify.notify() checks each call."""
+    from types import SimpleNamespace
+
+    from gt7telem import config, notify
+
+    monkeypatch.setattr(config, "_SETTINGS_FILE", tmp_path / "settings.json")
+    monkeypatch.setattr(config, "_KEY_FILE", tmp_path / ".settings.key")
+    monkeypatch.setattr(config, "NOTIFY_ENABLED", True)
+    beeps = []
+    monkeypatch.setattr(notify, "_beep", lambda root=None: beeps.append(1))
+    logged = []
+    fake = SimpleNamespace(notify_var=SimpleNamespace(get=lambda: False), log_msg=logged.append)
+
+    dashboard.App._on_notify_toggle(fake)
+    assert config.NOTIFY_ENABLED is False and config.load()["NOTIFY_ENABLED"] is False
+    assert "off" in logged[-1]
+    notify.notify("PB", "x")
+    assert beeps == []                                   # switched off: no sound, no toast
+
+    fake.notify_var = SimpleNamespace(get=lambda: True)
+    dashboard.App._on_notify_toggle(fake)
+    assert config.NOTIFY_ENABLED is True and config.load()["NOTIFY_ENABLED"] is True
+    notify.notify("PB", "x")
+    assert beeps == [1]
