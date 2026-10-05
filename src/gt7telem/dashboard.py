@@ -304,6 +304,12 @@ class App(tk.Tk):
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
+        self.update_var = tk.BooleanVar(value=bool(runtime_config.UPDATE_CHECK_ENABLED))
+        tk.Checkbutton(hdr2, text="CHECK FOR UPDATES", variable=self.update_var,
+                       command=self._on_update_check_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+
         self.metrics_var = tk.BooleanVar(value=bool(runtime_config.METRICS_ENABLED))
         tk.Checkbutton(hdr2, text=f"METRICS :{runtime_config.METRICS_PORT}", variable=self.metrics_var,
                        command=self._on_metrics_toggle, bg="#0f3460", fg=DIM,
@@ -927,6 +933,15 @@ class App(tk.Tk):
         runtime_config.save(ANALYTICS_ENABLED=runtime_config.ANALYTICS_ENABLED)
         state = "enabled" if runtime_config.ANALYTICS_ENABLED else "disabled"
         self.log_msg(f"Anonymous usage analytics {state} (see gt7trace.netlify.app/privacy.html)")
+
+    def _on_update_check_toggle(self):
+        # launcher.py reads config.UPDATE_CHECK_ENABLED at startup, so this
+        # takes effect the next time TRACE is opened.
+        runtime_config.UPDATE_CHECK_ENABLED = self.update_var.get()
+        runtime_config.save(UPDATE_CHECK_ENABLED=runtime_config.UPDATE_CHECK_ENABLED)
+        state = "on" if runtime_config.UPDATE_CHECK_ENABLED else "off"
+        self.log_msg(f"Update check {state} -- applies the next time TRACE starts "
+                     "(it only asks GitHub for the latest release number)")
 
     def _on_metrics_toggle(self):
         runtime_config.METRICS_ENABLED = self.metrics_var.get()
