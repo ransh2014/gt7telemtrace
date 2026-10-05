@@ -1391,7 +1391,8 @@ def draw_corners(fig, df, dfb=None):
         for d in deltas:
             lines.append(f"{d.number:>2}  {fmt(d.brake_m, '+7.0f', ' m')}  {fmt(d.min_speed_kmh, '+7.0f', ' km/h')}"
                          f"  {fmt(d.throttle_m, '+7.0f', ' m')}  {fmt(d.time_s, '+7.2f', ' s')}")
-        lines += ["", "Brake pt +: braked later than reference.  Throttle-on −: back on power earlier.",
+        lines += ["", corners.describe_time_loss(deltas), "",
+                  "Brake pt +: braked later than reference.  Throttle-on −: back on power earlier.",
                   "Min speed +: more speed through the corner."]
     else:
         lines = [" #   Brake at     Min speed      Throttle at"]

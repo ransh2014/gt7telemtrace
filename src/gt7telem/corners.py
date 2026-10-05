@@ -219,6 +219,22 @@ def session_label(df: pd.DataFrame, corners: list[Corner], deltas: list[CornerDe
 TIME_LOSS_MIN_S = 0.005  # a corner must cost at least this to be named
 
 
+def frame_from_samples(samples) -> pd.DataFrame | None:
+    """A frame with the columns corner analysis needs, from a saved lap's sample
+    dicts -- so the Dashboard can score a lap without loading the Lap Analyst
+    (and matplotlib). lat_g is derived the same way the analysts do: yaw rate
+    times speed. Returns None if there is nothing usable."""
+    try:
+        df = pd.DataFrame([s for s in samples if isinstance(s, dict)])
+        for col in ("track_position", "speed_kmh", "throttle", "brake", "steering", "t", "ang_y"):
+            df[col] = pd.to_numeric(df[col], errors="coerce") if col in df else 0.0
+        df = df.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        df["lat_g"] = (df["ang_y"] * df["speed_kmh"] / 3.6 / 9.81).clip(-4, 4)
+        return df
+    except Exception:
+        return None
+
+
 def time_loss_summary(deltas: list[CornerDelta], n: int = 3) -> list[CornerDelta]:
     """The `n` corners that cost the most time against the reference, worst
     first. Corners that were not slower (or lost under 5 ms) are left out, so a

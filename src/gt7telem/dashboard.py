@@ -2091,6 +2091,22 @@ class App(tk.Tk):
             return target
         return None
 
+    def _log_time_loss(self, samples, ref_samples):
+        """After a lap: name the (up to) three corners that cost the most time
+        against the track+car reference lap. Runs inside the save, i.e. off the
+        Tk thread for background saves; pandas is imported here, not at startup."""
+        try:
+            from . import corners
+            lap_df = corners.frame_from_samples(samples)
+            ref_df = corners.frame_from_samples(ref_samples)
+            if lap_df is None or ref_df is None:
+                return
+            _a, _b, deltas = corners.match_corners(lap_df, ref_df)
+            if deltas:
+                self.log_msg(f"{corners.describe_time_loss(deltas, 3)}  (vs your reference lap)")
+        except Exception:
+            pass   # a corner summary is a nicety; it must never break a save
+
     def _display_path(self, path):
         """laps/<...> for files under LAPS_FOLDER (as the log always showed
         them), the full path for anything else (e.g. the fallback folder)."""
@@ -2200,6 +2216,7 @@ class App(tk.Tk):
             if not gt7_time:
                 return saved
             ref_time = 0.0
+            ref_samples = None
             if ref.exists():
                 try:
                     with open(ref, encoding="utf-8-sig") as f:
@@ -2208,8 +2225,12 @@ class App(tk.Tk):
                     # replaced by the first lap driven under the new physics.
                     if leaderboard.is_current_era(ref_data):
                         ref_time = float(ref_data.get("lap_time_s") or 0)
+                        ref_samples = ref_data.get("samples")
                 except Exception:
                     ref_time = 0.0
+
+            if ref_samples:
+                self._log_time_loss(samples, ref_samples)
 
             if (ref_time <= 0 or new_time < ref_time) and \
                     self._save_json(ref, data, "reference lap", fallback=False):

@@ -75,3 +75,47 @@ def test_corner_spreads_rank_by_lap_to_lap_variation():
     assert all(c.n == 4 and c.std_time_s > 0 for c in spreads)
     # needs min_laps matches: two laps are not enough
     assert corners.corner_spreads(scored[:2]) == []
+
+
+# ── time-loss summary after a lap (Dashboard + Corners tab) ──────────────────
+def _samples(df):
+    """The saved-sample dicts a lap file would hold for a test lap frame (yaw rate
+    chosen so lat_g works out to the test lap's value)."""
+    out = []
+    for r in df.itertuples():
+        v = max(r.speed_kmh / 3.6, 1.0)
+        out.append({"t": r.t, "track_position": r.track_position, "speed_kmh": r.speed_kmh,
+                    "throttle": r.throttle, "brake": r.brake, "steering": 0.0, "ang_y": r.lat_g * 9.81 / v})
+    return out
+
+
+def test_frame_from_samples_rebuilds_the_corner_columns():
+    df = corners.frame_from_samples(_samples(_lap()))
+    assert {"track_position", "speed_kmh", "throttle", "brake", "lat_g", "t", "steering"} <= set(df.columns)
+    assert len(corners.detect_corners(df)) == 3
+    assert corners.frame_from_samples(None) is None
+
+
+def test_dashboard_names_the_three_corners_that_cost_time():
+    from types import SimpleNamespace
+
+    from gt7telem import dashboard
+    logged = []
+    fake = SimpleNamespace(log_msg=logged.append)
+    dashboard.App._log_time_loss(fake, _samples(_lap(speed_drop=15)), _samples(_lap()))
+    assert len(logged) == 1
+    assert logged[0].startswith("Time lost: T") and logged[0].count("+") == 3 and "reference lap" in logged[0]
+
+
+def test_dashboard_says_nothing_wrong_about_a_matching_lap_or_bad_data():
+    from types import SimpleNamespace
+
+    from gt7telem import dashboard
+    logged = []
+    fake = SimpleNamespace(log_msg=logged.append)
+    dashboard.App._log_time_loss(fake, _samples(_lap()), _samples(_lap()))
+    assert logged and logged[0].startswith("No corner lost time")
+    logged.clear()
+    dashboard.App._log_time_loss(fake, [{"oops": 1}], "not samples")      # must not raise
+    dashboard.App._log_time_loss(fake, None, None)
+    assert logged == []
