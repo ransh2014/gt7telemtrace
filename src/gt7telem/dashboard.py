@@ -2,6 +2,8 @@
 #   - Live readouts for everything GT7's telemetry packet carries
 #   - Mini track map, tyre/fuel alert banners, lap history, live delta
 #   - Record Lap / Record Race (auto-starts on a detected race)
+#   - Spoken fuel/tyre alerts, live gap to the leaderboard's top lap, after-lap
+#     time-loss summary, and a Preferences row of on/off switches
 
 import bisect
 import json

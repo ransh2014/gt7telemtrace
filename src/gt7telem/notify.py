@@ -81,7 +81,7 @@ def _beep(root=None):
 def notify(title: str, message: str, sound: bool = True, root=None):
     """Show a small self-dismissing toast in the bottom-right corner of the
     screen (or of `root` if given) and optionally beep. No-op if the user
-    turned notifications off in Settings. Safe to call from a background
+    turned notifications off (NOTIFY_ENABLED in settings.json). Safe to call from a background
     thread only via a Tk-owning caller -- schedule with `root.after(0, ...)`
     if this isn't running on the Tk main thread."""
     if not config.NOTIFY_ENABLED:

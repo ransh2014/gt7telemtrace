@@ -199,7 +199,8 @@ _DEFAULTS = {
     # Anonymous usage analytics -- on by default. Sends only: which tool was
     # launched, TRACE version, OS, and a timestamp. No telemetry content, no
     # PSN name, no IP stored on our end. See gt7trace.netlify.app/privacy.html
-    # for the full disclosure. Turn off here or in Settings.
+    # for the full disclosure. Turn off with the SHARE USAGE DATA checkbox in the
+    # Dashboard header (or here).
     "ANALYTICS_ENABLED": True,
     # Remembered PSN name for leaderboard submissions -- pre-fills the
     # submit dialog each time, editable inline there if you want to change it.
@@ -237,8 +238,9 @@ _DEFAULTS = {
     # Dashboard: one read-only request per car+track per run (see ghost.py and the
     # privacy page). Off = no leaderboard request from the Dashboard at all.
     "GHOST_ENABLED": True,
-    # Check GitHub for a newer release on launcher startup. Read-only HEAD
-    # request-equivalent to the public releases API -- no data sent.
+    # Check GitHub for a newer release on launcher startup (a read-only request to
+    # the public releases API, no data sent). Switch it off with the CHECK FOR
+    # UPDATES checkbox in the Dashboard header; applies from the next launch.
     "UPDATE_CHECK_ENABLED": True,
 }
 

@@ -19,8 +19,9 @@ pytest tests/
 ruff check .
 ```
 
-The tests cover car/track DB lookups, settings persistence, and a Salsa20
-decrypt+parse round-trip — they don't need a live GT7 session. For anything
+The tests cover car/track DB lookups, settings persistence, a Salsa20
+decrypt+parse round-trip, and the pure logic behind the analysis features
+(corners, consistency, share cards, records, theoretical best, ghost, voice) — they don't need a live GT7 session. For anything
 touching the GUI apps themselves, the fastest check is still running the
 affected tool (`dashboard`, `lap_analyst`, or `race_analyst`) against a live
 session or a previously recorded lap.
@@ -32,7 +33,12 @@ session or a previously recorded lap.
 - `src/gt7telem/dashboard.py`, `lap_analyst.py`, `race_analyst.py` — the
   three Tkinter GUI apps. Each is a single self-contained module by design
   (no shared UI framework) to keep the whole project pip-installable with
-  zero extra runtime dependencies.
+  zero extra runtime dependencies. Logic that has no UI lives in small
+  tkinter-free modules next to them so it can be tested headlessly:
+  `corners.py`, `consistency.py`, `theoretical.py`, `ghost.py`, `records.py`,
+  `voice.py` and `share_card.py` (the lap/race PNG renderer). Every file in
+  `src/gt7telem/` must be listed in `tools/source_readme.txt` (a test checks)
+  and on the website's `totalfiles.html`.
 - `src/gt7telem/cars.py` / `car_ids.csv` and `src/gt7telem/tracks.py` /
   `course_ids.csv` — ID → name lookups, sourced from
   [ddm999/gt7info](https://ddm999.github.io/gt7info/).

@@ -1,6 +1,7 @@
 """
 analytics.py -- anonymous usage ping. On by default; see config.ANALYTICS_ENABLED
-to opt out (Settings, or edit settings.json directly).
+to opt out (the SHARE USAGE DATA checkbox in the Live Dashboard header, or edit
+settings.json directly).
 
 Sends exactly five fields on tool launch, nothing else:
     event, tool, version, os, created_at

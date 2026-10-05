@@ -191,7 +191,7 @@ TRACE talks directly to the console for all core telemetry — no server, no bro
 - GT7 streams packets back to your PC on port `33740`.
 - Each packet is decrypted with Salsa20 and unpacked into a `Telemetry` snapshot — the protocol details this library relies on were reverse-engineered by [Bornhall](https://github.com/Bornhall/gt7telemetry) (see [Credits](#credits)).
 - Because TRACE always requests the extended packet, you get motion/sway/heave/surge and filtered-input data automatically — there's no separate "heartbeat type" setting to configure.
-- Settings (last-used IP, sample rate, known-good IPs, analytics opt-out) persist to a `settings.json`, so there's nothing to reconfigure between sessions. It lives in `~/.gt7telem/`, which survives `pip install --upgrade` and package-manager upgrades — except for a standalone .exe/binary unzipped into a folder you can write to, which keeps it next to the executable so it stays portable.
+- Settings (last-used IP, sample rate, known-good IPs, and the analytics, update-check, voice-alert and top-lap-ghost switches) persist to a `settings.json`, so there's nothing to reconfigure between sessions. It lives in `~/.gt7telem/`, which survives `pip install --upgrade` and package-manager upgrades — except for a standalone .exe/binary unzipped into a folder you can write to, which keeps it next to the executable so it stays portable.
 
 The exceptions are the optional leaderboard and the Dashboard's top-lap ghost: submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS, and so does the Dashboard's one-off top-lap fetch (see below). Nothing about your live session is ever sent unless you press "Submit to Leaderboard."
 
