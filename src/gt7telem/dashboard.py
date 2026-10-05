@@ -51,6 +51,7 @@ RECORD_RATE_OPTIONS = [10, 20, 30, 60]
 # save itself becomes the thing that fails.
 RACE_SAMPLE_WARN = 150_000   # ~230 MB
 RACE_SAMPLE_MAX  = 400_000   # ~610 MB
+GHOST_SETTLE_S = 3.0   # car + track must be unchanged this long before the top-lap lookup is made
 _RECORD_TICK_MS = 1000 // max(RECORD_RATE_OPTIONS)  # fast enough to thin down to any option above
 
 # Where a recording goes when its normal place under LAPS_FOLDER can't be
@@ -146,6 +147,7 @@ class App(tk.Tk):
         self._announcer         = voice.AlertAnnouncer()   # spoken fuel / tyre alerts
         self._ghosts            = {}      # (car, track) -> ghost.Ghost, or None when there is none to show
         self._ghost_fetching    = set()   # (car, track) pairs already asked about this run
+        self._ghost_stable      = {"key": None, "since": 0.0}   # when the current pair last changed
         self._track_pts  = deque(maxlen=3000)
         self._flash_tick = 0
         self._flash_on   = False
@@ -968,12 +970,20 @@ class App(tk.Tk):
         car, track = self.car_var.get().strip(), self.track_var.get().strip()
         return (car, track) if car and track else None
 
-    def _maybe_fetch_ghost(self):
+    def _maybe_fetch_ghost(self, now=None):
         """Once per car+track per run, ask the leaderboard for its fastest lap on
         a worker thread. Stays quiet if it's switched off, offline, or nobody has
-        set a lap yet."""
+        set a lap yet. The CAR and TRACK boxes are editable, so the pair must stay
+        put for GHOST_SETTLE_S first -- typing a name by hand mustn't send a
+        request per letter."""
         key = self._ghost_key()
         if key is None or not runtime_config.GHOST_ENABLED or key in self._ghost_fetching:
+            return
+        now = time.monotonic() if now is None else now
+        if self._ghost_stable["key"] != key:
+            self._ghost_stable.update(key=key, since=now)
+            return
+        if now - self._ghost_stable["since"] < GHOST_SETTLE_S:
             return
         self._ghost_fetching.add(key)
 

@@ -116,7 +116,7 @@ def _fake_app(car="Test Car", track="Test Circuit"):
     posted, logged = [], []
     app = SimpleNamespace(
         car_var=SimpleNamespace(get=lambda: car), track_var=SimpleNamespace(get=lambda: track),
-        _ghosts={}, _ghost_fetching=set(), log_msg=logged.append,
+        _ghosts={}, _ghost_fetching=set(), _ghost_stable={"key": None, "since": 0.0}, log_msg=logged.append,
         _post=lambda fn, *a: posted.append((fn, a)))
     app._ghost_key = lambda: dashboard.App._ghost_key(app)
     return app, posted, logged
@@ -132,7 +132,8 @@ def _run_fetch(app, monkeypatch, row):
 
     monkeypatch.setattr(leaderboard, "get_top_lap_ghost", fake_fetch)
     monkeypatch.setattr(config, "GHOST_ENABLED", True)
-    dashboard.App._maybe_fetch_ghost(app)
+    dashboard.App._maybe_fetch_ghost(app, now=0.0)                              # first sight of this pair
+    dashboard.App._maybe_fetch_ghost(app, now=dashboard.GHOST_SETTLE_S + 1.0)   # ...and it has stayed put
     done.wait(0.3)
     return calls
 
@@ -176,7 +177,8 @@ def test_dashboard_needs_both_car_and_track_and_respects_the_toggle(monkeypatch)
     calls = []
     monkeypatch.setattr(leaderboard, "get_top_lap_ghost", lambda *a: calls.append(a))
     monkeypatch.setattr(config, "GHOST_ENABLED", False)
-    dashboard.App._maybe_fetch_ghost(app)
+    dashboard.App._maybe_fetch_ghost(app, now=0.0)
+    dashboard.App._maybe_fetch_ghost(app, now=99.0)
     assert calls == [] and app._ghost_fetching == set()
 
 
@@ -190,3 +192,17 @@ def test_ghost_toggle_persists(tmp_path, monkeypatch):
     dashboard.App._on_ghost_toggle(fake)
     assert config.GHOST_ENABLED is False and config.load()["GHOST_ENABLED"] is False
     assert label["text"] == "--" and "no leaderboard requests" in logged[0]
+
+
+def test_typing_a_name_by_hand_does_not_send_a_request_per_letter(monkeypatch):
+    app, posted, _ = _fake_app(car="T")
+    calls = []
+    monkeypatch.setattr(leaderboard, "get_top_lap_ghost", lambda *a: calls.append(a))
+    monkeypatch.setattr(config, "GHOST_ENABLED", True)
+    for i, text in enumerate(["T", "Te", "Tes", "Test", "Test C", "Test Ca", "Test Car"]):
+        app.car_var = SimpleNamespace(get=lambda text=text: text)
+        dashboard.App._maybe_fetch_ghost(app, now=i * 0.5)      # a new letter every half second
+    assert calls == [] and app._ghost_fetching == set()
+    dashboard.App._maybe_fetch_ghost(app, now=3.0 + dashboard.GHOST_SETTLE_S)   # finally left alone
+    threading.Event().wait(0.3)
+    assert calls == [("Test Car", "Test Circuit")]
