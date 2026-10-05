@@ -294,34 +294,40 @@ class App(tk.Tk):
                  font=(runtime_config.MONO, 10), width=18, relief="flat",
                  insertbackground=FG).pack(side="left", padx=(0, 4))
 
-        # ── Advanced / debug (hidden by default) ────────────────────────────
+        # ── Header row 3: preferences. Their own row, so the console / track / car
+        # row above never loses its controls to a window that is too narrow.
+        hdr3 = tk.Frame(self, bg="#0f3460", pady=2)
+        hdr3.pack(fill="x")
+        tk.Label(hdr3, text="PREFERENCES", fg=DIM, bg="#0f3460",
+                 font=(runtime_config.MONO, 8)).pack(side="left", padx=(16, 2))
+
         self.debug_var = tk.BooleanVar(value=bool(runtime_config.DEBUG_LOG))
-        tk.Checkbutton(hdr2, text="DEBUG LOG", variable=self.debug_var,
+        tk.Checkbutton(hdr3, text="DEBUG LOG", variable=self.debug_var,
                        command=self._on_debug_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 16))
 
         self.analytics_var = tk.BooleanVar(value=bool(runtime_config.ANALYTICS_ENABLED))
-        tk.Checkbutton(hdr2, text="SHARE USAGE DATA", variable=self.analytics_var,
+        tk.Checkbutton(hdr3, text="SHARE USAGE DATA", variable=self.analytics_var,
                        command=self._on_analytics_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
+        self.update_var = tk.BooleanVar(value=bool(runtime_config.UPDATE_CHECK_ENABLED))
+        tk.Checkbutton(hdr3, text="CHECK FOR UPDATES", variable=self.update_var,
+                       command=self._on_update_check_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+
         self.ghost_var = tk.BooleanVar(value=bool(runtime_config.GHOST_ENABLED))
-        tk.Checkbutton(hdr2, text="TOP-LAP GHOST", variable=self.ghost_var,
+        tk.Checkbutton(hdr3, text="TOP-LAP GHOST", variable=self.ghost_var,
                        command=self._on_ghost_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.voice_var = tk.BooleanVar(value=bool(runtime_config.VOICE_ENABLED))
-        tk.Checkbutton(hdr2, text="VOICE ALERTS", variable=self.voice_var,
+        tk.Checkbutton(hdr3, text="VOICE ALERTS", variable=self.voice_var,
                        command=self._on_voice_toggle, bg="#0f3460", fg=DIM,
-                       selectcolor="#16213e", activebackground="#0f3460",
-                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
-
-        self.update_var = tk.BooleanVar(value=bool(runtime_config.UPDATE_CHECK_ENABLED))
-        tk.Checkbutton(hdr2, text="CHECK FOR UPDATES", variable=self.update_var,
-                       command=self._on_update_check_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 

@@ -173,6 +173,7 @@ def test_headings_hold_the_last_value_at_a_standstill():
     assert h[3] == pytest.approx(h[2]) and h[5] == pytest.approx(math.pi / 2)
 
 
+@pytest.mark.filterwarnings("ignore:Adding colorbar to a different Figure")
 def test_too_short_a_lap_does_not_crash_the_sector_chart():
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from matplotlib.figure import Figure
