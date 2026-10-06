@@ -95,6 +95,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Desktop notifications (with a sound where the system supports one) on a new personal best and when a race recording ends automatically. Switch them off with the **`NOTIFICATIONS`** checkbox in the Live Dashboard header
 - Dark / light theme toggle in the Launcher footer (applies the next time you open a tool)
 - Update check — the Launcher quietly looks for a newer GitHub release on startup and shows a small banner. Turn it off with the **`CHECK FOR UPDATES`** checkbox in the Live Dashboard header (see [Privacy & analytics](#privacy--analytics))
+- **Ask TRACE (website chat)** — the [website](https://gt7trace.netlify.app) has an AI support chat for setup and how-to questions. It only sends something when you type a question, it never runs in the desktop app, and nothing is stored. Answers are AI-generated and can be wrong; open an issue if it can't help. Details on the [Privacy](https://gt7trace.netlify.app/privacy.html) page
 
 ### Tooling
 - `gt7telem-add-car` / `gt7telem-add-track` — add a missing car/track ID to the local database from the terminal (also runnable as `python -m gt7telem.add_car` / `python -m gt7telem.add_track`). Additions are saved beside `settings.json` (`car_ids_local.csv` / `course_ids_local.csv`), so they survive upgrades
