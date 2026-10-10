@@ -26,8 +26,23 @@ def test_effective_rate_with_coarse_timer():
     assert n >= 10 * 55   # old logic gave ~32 Hz
 
 
-def test_session_has_wall_start():
-    assert hasattr(dashboard.session, "race_start_wall")
+def test_unknown_car_id_replaces_the_previous_cars_name(monkeypatch):
+    names = {3612: "Chaser Tourer V '97"}
+    monkeypatch.setattr(dashboard.car_db, "get_car_name", lambda i: names.get(int(i), ""))
+    # known car: its proper name
+    assert dashboard.car_box_autofill(3612, "", None) == "Chaser Tourer V '97"
+    # switch to a car ID missing from car_ids.csv: never keep the old name
+    assert dashboard.car_box_autofill(9999, "Chaser Tourer V '97", 3612) == "Unknown car (ID 9999)"
+    assert dashboard.unknown_car_label(9999) == "Unknown car (ID 9999)"
+    # no car reported: leave the box alone
+    assert dashboard.car_box_autofill(0, "anything", 3612) is None
+
+
+def test_manual_car_name_edit_sticks_for_the_same_car(monkeypatch):
+    monkeypatch.setattr(dashboard.car_db, "get_car_name", lambda i: "")
+    assert dashboard.car_box_autofill(9999, "Ferrari F355 Berlinetta '94", 9999) is None
+    # ...but an emptied box is filled again
+    assert dashboard.car_box_autofill(9999, "  ", 9999) == "Unknown car (ID 9999)"
 
 
 def test_update_check_toggle_persists(tmp_path, monkeypatch):

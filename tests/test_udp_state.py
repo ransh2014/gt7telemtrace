@@ -6,7 +6,6 @@ directly with synthetic input, with udp's module state isolated per test.
 """
 import socket
 import struct
-from collections import deque
 from types import SimpleNamespace
 
 import numpy as np
@@ -26,8 +25,8 @@ def race(monkeypatch):
     for name, value in {
         "_race_active": False, "_speed_hold_start": None, "_prev_paused": False,
         "_prev_loading": False, "_grid_start_armed_until": 0.0, "_event_callbacks": {},
-        "_debug_prev_state": {}, "_incidents": [], "_fuel_hist": deque(),
-        "_last_incident_t": {}, "_last_mix_change_t": None, "_loading_since": None,
+        "_debug_prev_state": {},
+        "_loading_since": None,
     }.items():
         monkeypatch.setattr(udp, name, value)
 

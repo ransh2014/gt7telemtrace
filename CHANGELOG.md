@@ -5,6 +5,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-10
+Bug-fix release: steadier recordings, the Incidents feature removed, and simpler share cards.
+
+- Keeps the PC awake while telemetry is arriving (Windows/macOS) so idle sleep/hibernate can't cut a race short; new `keepawake.py`.
+- The Dashboard log now warns when packets stop mid-lap or mid-race (the recording will be incomplete).
+- Live lap timer no longer ticks in menus, the garage, loading screens or while paused.
+- Removed the Dashboard's Incidents button and window, and the Incidents column in Session Summary. The background incident and fuel-mixture detection is removed (`get_incidents()` no longer exists).
+- Simplified the lap and race cards so they only show values read straight from the recording. Lap card: car (full name), track as typed, date, lap time (or INCOMPLETE), top speed, fuel used in the gauge's own unit, the speed trace and the speed-coloured map (none for ghosts). Race card: car, track, date, best lap to 0.01 s, laps, top speed, every lap time at its real height with the best highlighted, and the best-lap map. Removed from the cards: sector times, average speed, full-throttle share, max lateral G, tyre temperature, driving style, the full-tank estimate, race time, average lap, consistency, race fuel used and the pit-stop panel (the Analysts' own charts and tabs are unchanged). Removed the card-only helpers `race_analyst.pit_stop_laps()` and `lap_fuel_burn()`.
+- GT7 1.72 (Spec IV Part 1, 15 Oct) adds Sportsland SUGO and six cars: Citroën 2 CV 6 Charleston '86, Ferrari F355 Berlinetta '94, Honda Civic Si Group A Version '87, Honda Step WGN Spada Premium Line '23, Mazda RX-VISION GT3 EVO and Xiaomi Vision Gran Turismo. Their car and course IDs will be added once they are published; until then the new cars show as "Unknown car (ID N)" and SUGO has to be typed into the TRACK box.
+- Fixed: a car ID missing from `car_ids.csv` no longer leaves the previous car's name in the Dashboard's CAR box (and on the saved lap/race, cards and Analysts); it now shows and saves "Unknown car (ID N)". A known ID still shows its name, and a name you type for the current car is kept.
+
 ## [0.8.0] - 2026-10-05
 Nine new features across the Dashboard, Lap Analyst, Race Analyst and Launcher.
 

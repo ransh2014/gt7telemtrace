@@ -397,109 +397,73 @@ def build_sector_stats(df):
 
 # ── Shareable lap card (PNG) ──────────────────────────────────────────────────
 # The drawing lives in share_card.py (shared with the Race Analyst's race card);
-# this builds the lap's side of the spec: speed trace cut into sectors, the
-# speed-coloured track map, fuel used, and the headline numbers.
+# this builds the lap's side of the spec. Only values read straight from the
+# recording go on the card: GT7's lap time, top speed, fuel used, the speed
+# trace and the speed-coloured track map.
 def _fmt_laptime(t):
     """m:ss.mmm, rounded to the millisecond first so 59.9996 s reads 1:00.000, not 0:60.000."""
     return share_card.fmt_time(_num(t))
 
-def _card_stats(df):
-    """The six tiles on the lap card. Anything the lap file doesn't carry (a
-    downloaded ghost only has the compact input fields) shows as '--'."""
-    def col(name):
-        return df[name] if name in df.columns else None
-    def safe(fn, default="--"):
-        try:
-            return fn()
-        except Exception:
-            return default
-    spd, thr = col("speed_kmh"), col("throttle")
-    tyres = [col(c) for c in ("tyre_temp_fl", "tyre_temp_fr", "tyre_temp_rl", "tyre_temp_rr")]
-    def tyre_avg():
-        vals = [float(s.mean()) for s in tyres]
-        return f"{sum(vals) / 4:.0f} C" if all(v > 0 for v in vals) else "--"
-    def style():
-        label = corners._smoothness(df)
-        return label or "--"
-    return [
-        ("TOP SPEED",  safe(lambda: f"{float(spd.max()):.0f} km/h")),
-        ("AVG SPEED",  safe(lambda: f"{float(spd.mean()):.0f} km/h")),
-        ("FULL THROTTLE", safe(lambda: f"{float((thr > 0.95).mean() * 100):.0f}%")),
-        ("MAX LAT G",  safe(lambda: f"{float(df['lat_g'].abs().max()):.2f} g")),
-        ("AVG TYRE",   safe(tyre_avg)),
-        ("STYLE",      safe(style)),
-    ]
-
 def _lap_fuel_used(df):
-    """(fuel used over the lap, is it a percentage gauge). None when the file
-    has no usable fuel data."""
+    """Fuel used over the lap as card text in the gauge's own unit, or None when
+    the file has no usable fuel data. GT7 reports fuel against a capacity of 100
+    for nearly every car (a percentage), 0 for EVs (battery %), and something
+    else for a few cars such as karts (shown as "x of <capacity>")."""
     if "fuel_remaining" not in df.columns or len(df) < 2:
-        return None, False
+        return None
     used = float(df["fuel_remaining"].iloc[0] - df["fuel_remaining"].iloc[-1])
-    if used <= 0:
-        return None, False
-    cap = float(df["fuel_capacity"].max()) if "fuel_capacity" in df.columns else 0.0
-    return used, cap in (0.0, 100.0)
+    if not math.isfinite(used) or used <= 0:
+        return None
+    cap = float(df["fuel_capacity"].max()) if "fuel_capacity" in df.columns else 100.0
+    if cap == 100.0:
+        return f"{used:.1f}%"
+    if cap == 0.0:
+        return f"{used:.1f}% battery"
+    return f"{used:.2f} of {cap:g}"
 
 def lap_card_spec(data, df):
     """Everything share_card.render_card needs for a lap card, as a plain dict."""
     lap_s = _num(data.get("lap_time_s"))
-    if lap_s <= 0 and len(df) > 1 and "t" in df.columns:
-        lap_s = float(df["t"].iloc[-1] - df["t"].iloc[0])
+    if data.get("incomplete"):
+        big = "INCOMPLETE"
+    else:
+        big = _fmt_laptime(lap_s) if lap_s > 0 else "--:--.---"
     when = ""
     try:
         when = datetime.strptime(str(data.get("recorded_at"))[:15], "%Y%m%d_%H%M%S").strftime("%d %b %Y")
     except (TypeError, ValueError):
         pass
+    top = float(df["speed_kmh"].max()) if "speed_kmh" in df.columns and len(df) else 0.0
     spec = {
         "kind": "LAP",
         "when": when,
-        "car": str(data.get("car") or "Unknown car"),
-        "track": str(data.get("track") or "unknown track").replace("_", " ").title(),
+        "car": str(data.get("car_display") or data.get("car") or "Unknown car"),
+        "track": str(data.get("track_display") or str(data.get("track") or "unknown track").replace("_", " ")),
         "era": "" if leaderboard.is_current_era(data) else f"pre-{leaderboard.PHYSICS_ERA} physics",
-        "headline": {"big_label": "LAP TIME", "big_value": _fmt_laptime(lap_s) if lap_s > 0 else "--:--.---",
-                     "tiles": _card_stats(df)},
-        "chart": {"title": "speed round the lap, by sector", "kind": "trace", "ylabel": "km/h",
-                  "x": [], "y": []},
+        "headline": {"big_label": "LAP TIME", "big_value": big,
+                     "tiles": [("TOP SPEED", f"{top:.0f} km/h" if top > 0 else "--"),
+                               ("FUEL USED", _lap_fuel_used(df) or "--")]},
+        "chart": {"title": "speed round the lap", "kind": "trace", "ylabel": "km/h", "x": [], "y": []},
         "map": None,
-        "fuel": {"title": "pit stops + fuel", "headline": "no fuel data", "empty": "no fuel data"},
     }
 
     # speed trace against distance round the lap (sample index when there is no distance)
     has_pos = "track_position" in df.columns and float(df["track_position"].max() - df["track_position"].min()) > 1
     xs = df["track_position"].to_numpy(dtype=float) if has_pos else np.arange(len(df), dtype=float)
     order = np.argsort(xs, kind="stable")
-    xs = xs[order]
-    spd = df["speed_kmh"].to_numpy(dtype=float)[order]
-    spec["chart"]["x"], spec["chart"]["y"] = xs.tolist(), spd.tolist()
-    try:
-        _segs, times = lap_sectors(df, 3)
-        if times and has_pos:
-            length = float(_lap_xy(df)[0][-1])
-            spec["chart"]["edges"] = np.linspace(0.0, length, len(times) + 1).tolist()
-            spec["chart"]["sector_times"] = times
-    except Exception:
-        pass
+    spec["chart"]["x"] = xs[order].tolist()
+    spec["chart"]["y"] = df["speed_kmh"].to_numpy(dtype=float)[order].tolist()
 
-    if ("world_x" in df.columns and "world_z" in df.columns and len(df) > 2
+    # a downloaded ghost has no world coordinates, so it gets no map
+    if (not is_compact(df) and "world_x" in df.columns and "world_z" in df.columns and len(df) > 2
             and float(df["world_x"].std()) > 1 and float(df["world_z"].std()) > 1):
         spec["map"] = {"x": df["world_x"].tolist(), "z": df["world_z"].tolist(), "v": df["speed_kmh"].tolist()}
-
-    used, pct = _lap_fuel_used(df)
-    if used is not None:
-        unit = "%" if pct else ""
-        fuel = spec["fuel"]
-        fuel["headline"] = f"{used:.1f}{unit} used"
-        fuel["trace"] = {"x": xs.tolist(), "y": df["fuel_remaining"].to_numpy(dtype=float)[order].tolist(),
-                         "ylabel": "fuel left" + (" %" if pct else "")}
-        if pct:
-            fuel["foot"] = f"a full tank is about {100.0 / used:.0f} laps at this burn"
     return spec
 
 def lap_card_png(data, df, width=1200, height=630):
     """Render a shareable summary card for a lap and return it as PNG bytes:
-    headline stats, the speed trace by sector, a speed-coloured track map and
-    the fuel used on the lap. See share_card.py."""
+    lap time, top speed, fuel used, the speed trace and a speed-coloured track
+    map. See share_card.py."""
     return share_card.render_card(lap_card_spec(data, df), width, height)
 def theory_candidates(rows, lap_data, path_a, limit):
     """The saved laps worth stitching into the theoretical best: same car and

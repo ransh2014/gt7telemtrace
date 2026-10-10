@@ -1,4 +1,4 @@
-"""Lap-time consistency maths for the Race Analyst (race card + Consistency tab).
+"""Lap-time consistency maths for the Race Analyst's Consistency tab.
 
 Pure numpy, no tkinter, so it is easy to test. Only *clean* laps count: a lap
 more than 7 % slower than the best one (the usual "107 % rule") is almost

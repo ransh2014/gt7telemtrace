@@ -7,7 +7,7 @@ import pytest
 from matplotlib.figure import Figure
 from test_corners import _lap
 
-from gt7telem import consistency, share_card
+from gt7telem import share_card
 from gt7telem import lap_analyst as la
 from gt7telem import race_analyst as ra
 
@@ -127,37 +127,47 @@ def test_corner_baseline_modes(tmp_path):
     assert ra.corner_baseline(data, df, "pb", tmp_path)[1] is None
 
 
-def test_pit_stops_and_fuel_per_lap(tmp_path):
-    _, df = _race(tmp_path, pit_lap=3)
-    assert ra.pit_stop_laps(df) == [3]
-    burn = ra.lap_fuel_burn(df)
-    assert [b[0] for b in burn] == [1, 2, 3, 4, 5]
-    assert [b[2] for b in burn] == [False, False, True, False, False]
-    assert all(b[1] > 0 for b in burn)
-    _, df2 = _race(tmp_path)
-    assert ra.pit_stop_laps(df2) == []
-
-
-def test_race_card_spec_fills_the_four_blocks(tmp_path):
+def test_race_card_spec_shows_only_recorded_values(tmp_path):
     data, df = _race(tmp_path, pit_lap=3)
     spec = ra.race_card_spec(data, df)
-    assert spec["kind"] == "RACE" and spec["car"] == "Test Car" and spec["track"] == "Test Circuit"
-    tiles = dict(spec["headline"]["tiles"])
-    assert set(tiles) == {"BEST LAP", "AVG LAP", "CONSISTENCY", "LAPS", "TOP SPEED", "FUEL USED"}
-    assert tiles["LAPS"] == "5" and tiles["BEST LAP"] != "--"
-    assert spec["headline"]["big_label"] == "RACE TIME"
+    assert spec["kind"] == "RACE" and spec["car"] == "Test Car" and spec["track"] == "test circuit"
+    assert spec["headline"]["big_label"] == "BEST LAP"
+    times = [t for _n, t, _f in ra.race_lap_frames(df)]
+    assert spec["headline"]["big_value"] == share_card.fmt_time(min(times), 2)
+    assert spec["headline"]["big_value"].count(".") == 1 and len(spec["headline"]["big_value"].split(".")[1]) == 2
+    assert dict(spec["headline"]["tiles"]) == {"LAPS": "5", "TOP SPEED": f"{df['speed_kmh'].max():.0f} km/h"}
     chart = spec["chart"]
-    assert chart["x"] == [1, 2, 3, 4, 5] and chart["best"] == 0 and len(chart["y"]) == 5
+    assert chart["x"] == [1, 2, 3, 4, 5] and chart["best"] == 0 and chart["y"] == times
+    assert "dim" not in chart          # every lap drawn the same way, the best one highlighted
+    assert "fuel" not in spec
     assert spec["map"] is not None and len(spec["map"]["x"]) > 100
-    assert spec["fuel"]["headline"].startswith("1 stop: lap 3")
-    assert spec["fuel"]["bars"]["pit"][2] is True
 
 
-def test_race_card_spec_with_no_pit_stop_and_no_gps(tmp_path):
+def test_race_card_uses_the_names_as_typed(tmp_path):
+    data, df = _race(tmp_path)
+    data = {**data, "car_display": "Porsche 911 GT3 RS (992) '22", "track_display": "Nürburgring 24h"}
+    spec = ra.race_card_spec(data, df)
+    assert spec["car"] == "Porsche 911 GT3 RS (992) '22" and spec["track"] == "Nürburgring 24h"
+
+
+def test_race_card_spec_without_gps(tmp_path):
     data, df = _race(tmp_path)
     df = df.assign(world_x=0.0, world_z=0.0)
     spec = ra.race_card_spec(data, df)
-    assert spec["map"] is None and spec["fuel"]["headline"] == "no pit stops"
+    assert spec["map"] is None
+
+
+def test_race_card_bars_reach_the_slowest_lap(tmp_path):
+    """A slow lap must be drawn at its real height, not cut off at the top."""
+    data, df = _race(tmp_path, drops=(0, 6, 60, 3))
+    spec = ra.race_card_spec(data, df)
+    fig = Figure()
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    FigureCanvasAgg(fig)
+    share_card._draw_chart(fig, spec)
+    ax = fig.axes[0]
+    assert ax.get_ylim()[1] > max(spec["chart"]["y"])
+    assert all(b.get_height() == pytest.approx(y) for b, y in zip(ax.patches, spec["chart"]["y"]))
 
 
 def test_race_card_is_a_1200x630_png(tmp_path):
@@ -180,16 +190,18 @@ def test_lap_and_race_cards_share_one_renderer():
     assert share_card.fmt_time(None) == "--:--.---"
 
 
-def test_lap_card_spec_has_sectors_map_and_fuel():
+def test_lap_card_spec_shows_only_recorded_values():
     from test_udp_state import _card_lap
     data, df = _card_lap()
     spec = la.lap_card_spec(data, df)
     assert spec["kind"] == "LAP" and spec["headline"]["big_value"] == "1:23.456"
-    assert len(spec["chart"]["sector_times"]) == 3 and len(spec["chart"]["edges"]) == 4
-    assert spec["map"] is not None
-    assert spec["fuel"]["headline"].endswith("used") and "trace" in spec["fuel"]
-    names = [n for n, _ in spec["headline"]["tiles"]]
-    assert names == ["TOP SPEED", "AVG SPEED", "FULL THROTTLE", "MAX LAT G", "AVG TYRE", "STYLE"]
+    assert spec["headline"]["big_label"] == "LAP TIME"
+    assert dict(spec["headline"]["tiles"]) == {"TOP SPEED": f"{df['speed_kmh'].max():.0f} km/h",
+                                               "FUEL USED": "6.0%"}
+    chart = spec["chart"]
+    assert chart["kind"] == "trace" and "sector_times" not in chart and "edges" not in chart
+    assert len(chart["x"]) == len(chart["y"]) == len(df)
+    assert spec["map"] is not None and "fuel" not in spec
 
 
 def test_lap_card_spec_without_fuel_or_gps():
@@ -197,7 +209,59 @@ def test_lap_card_spec_without_fuel_or_gps():
     data, df = _card_lap(gps=False)
     df = df.assign(fuel_remaining=50.0)
     spec = la.lap_card_spec(data, df)
-    assert spec["map"] is None and spec["fuel"]["headline"] == "no fuel data"
+    assert spec["map"] is None and dict(spec["headline"]["tiles"])["FUEL USED"] == "--"
+
+
+def test_lap_card_says_incomplete_instead_of_a_time():
+    from test_udp_state import _card_lap
+    data, df = _card_lap()
+    spec = la.lap_card_spec({**data, "incomplete": True}, df)
+    assert spec["headline"]["big_value"] == "INCOMPLETE"
+    assert la.lap_card_spec({**data, "lap_time_s": 0}, df)["headline"]["big_value"] == "--:--.---"
+
+
+@pytest.mark.parametrize("cap, used", [(100.0, "6.0%"), (0.0, "6.0% battery"), (5.0, "5.98 of 5")])
+def test_lap_card_fuel_is_in_the_gauge_unit(cap, used):
+    from test_udp_state import _card_lap
+    data, df = _card_lap()
+    spec = la.lap_card_spec(data, df.assign(fuel_capacity=cap))
+    assert dict(spec["headline"]["tiles"])["FUEL USED"] == used
+
+
+def test_lap_card_uses_the_names_as_typed():
+    from test_udp_state import _card_lap
+    data, df = _card_lap()
+    spec = la.lap_card_spec({**data, "car_display": "Mercedes-AMG GT Black Series '20",
+                             "track_display": "Autodrome Lago Maggiore - GP"}, df)
+    assert spec["car"] == "Mercedes-AMG GT Black Series '20"
+    assert spec["track"] == "Autodrome Lago Maggiore - GP"
+
+
+def test_ghost_lap_card_has_no_map_and_no_made_up_numbers():
+    samples = [dict(track_position=float(i * 5), speed_kmh=120.0 + i % 40, throttle=0.5, brake=0.0,
+                    steering=0.0, gear=3) for i in range(200)]
+    data, df = la.load_lap_data({"car": "Ghost Car", "track": "somewhere", "lap_time_s": 99.9, "samples": samples})
+    spec = la.lap_card_spec(data, df.assign(world_x=range(200), world_z=range(200)))
+    assert spec["map"] is None
+    assert dict(spec["headline"]["tiles"]) == {"TOP SPEED": "159 km/h", "FUEL USED": "--"}
+
+
+def test_car_name_is_never_cut():
+    short = "Test Car"
+    assert share_card.car_title(short) == (short, 14.0)
+    mid = "Porsche 911 GT3 RS (992) '22"
+    text, size = share_card.car_title(mid)
+    assert text == mid and size < 14.0
+    long = "Volkswagen Polo GTI Gr.B Rally Car Concept Special Edition '99"
+    text, size = share_card.car_title(long)
+    assert text.replace("\n", " ") == long and "\n" in text
+
+
+def test_fmt_time_decimals():
+    assert share_card.fmt_time(116.804) == "1:56.804"
+    assert share_card.fmt_time(116.804, 2) == "1:56.80"
+    assert share_card.fmt_time(59.996, 2) == "1:00.00"
+    assert share_card.fmt_time(None, 2) == "--:--.--"
 
 
 @pytest.mark.parametrize("draw", [ra.draw_corners, ra.draw_consistency])
@@ -220,15 +284,6 @@ def test_corners_chart_explains_a_missing_pb(tmp_path):
     ra.draw_corners(fig, df, None, ra.corner_baseline(data, df, "pb", tmp_path))
     texts = [t.get_text() for ax in fig.axes for t in ax.texts]
     assert any("No saved PB lap" in t for t in texts)
-
-
-def test_consistency_numbers_match_the_stats_module(tmp_path):
-    data, df = _race(tmp_path)
-    times = [t for _n, t, _f in ra.race_lap_frames(df)]
-    stats = consistency.lap_time_stats(times)
-    spec = ra.race_card_spec(data, df)
-    cons = dict(spec["headline"]["tiles"])["CONSISTENCY"]
-    assert f"±{stats['std']:.2f}s" in cons
 
 
 def test_race_groups_registered():

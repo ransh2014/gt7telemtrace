@@ -350,7 +350,7 @@ def _show_onboarding(from_menu: bool = False):
 _TOOLS = [
     ("Live Dashboard", "Real-time telemetry overlay while you drive.", CYN, launch_dashboard),
     ("Lap Analyst", "Compare laps, chart every input, submit to the leaderboard.", PRP, launch_lap_analyst),
-    ("Race Analyst", "Full race breakdown, incidents, and pace review.", PINK, launch_race_analyst),
+    ("Race Analyst", "Full race breakdown and pace review.", PINK, launch_race_analyst),
 ]
 
 

@@ -20,7 +20,7 @@ from .config import PS_IP
 __all__ = [
     "get_snapshot", "get", "get_int", "get_float",
     "set_ip", "set_car", "set_track", "is_connected", "wait_for_connection",
-    "get_diagnostics", "get_last_error", "get_incidents", "register_event",
+    "get_diagnostics", "get_last_error", "register_event",
     "reset_lap", "get_log_lines", "discover_ps_ip", "get_ip", "StintTracker",
 ]
 
@@ -175,99 +175,6 @@ _grid_start_armed_until = 0.0
 # the exact state that triggered them (shows up in the GUI log panel).
 _debug_prev_state = {}
 
-# ── Incident detection (tyre slip / body motion spikes) ───────────────────────
-_incidents           = []   # list of dicts, reset each race_start
-SLIP_THRESHOLD       = 1.5  # raw slip ratio >= this = wheelspin (wheel outrunning ground)
-LOCKUP_THRESHOLD     = 0.5  # raw slip ratio <= this = lockup/skid (wheel under-rotating vs ground)
-SWAY_THRESHOLD       = 3.0  # sway/heave/surge magnitude (m/s^2-ish, tune per car)
-INCIDENT_COOLDOWN_S  = 2.0  # min seconds between logged incidents of the same type
-_last_incident_t      = {}  # type -> last fire time (time.time())
-
-# ── Fuel mixture change detection (step-change in burn rate) ─────────────────
-_fuel_hist            = deque()  # (t, fuel_remaining) pairs, cleared each race_start
-MIX_CHECK_WINDOW      = 5.0      # seconds per comparison window
-MIX_CHANGE_RATIO      = 1.3      # recent/prior burn-rate ratio to flag (either direction)
-MIX_CHANGE_COOLDOWN_S = 15.0     # don't re-flag more often than this
-_last_mix_change_t    = None
-
-def get_incidents() -> list:
-    return list(_incidents)
-
-def _log_incident(kind, parsed, value):
-    now = time.time()
-    last = _last_incident_t.get(kind)
-    if last is not None and now - last < INCIDENT_COOLDOWN_S:
-        return
-    _last_incident_t[kind] = now
-    _incidents.append({
-        "type":           kind,
-        "t":              round(now, 3),
-        "lap_number":     parsed.get("lap_number"),
-        "track_position": round(parsed.get("track_position", 0.0), 2),
-        "value":          round(value, 4),
-        "speed_kmh":      round(parsed.get("speed_kmh", 0.0), 1),
-    })
-
-def _check_incidents(parsed, now):
-    """Flags big tyre-slip and body-motion (sway/heave/surge) spikes as
-    incidents -- e.g. a spin, rear step-out, or big kerb strike."""
-    for wheel in ("fl", "fr", "rl", "rr"):
-        slip = parsed.get(f"tyre_slip_{wheel}")
-        if slip is None:
-            continue
-        axle = "front" if wheel in ("fl", "fr") else "rear"
-        if slip >= SLIP_THRESHOLD:
-            _log_incident(f"{axle}_slip", parsed, slip)
-        elif slip <= LOCKUP_THRESHOLD:
-            _log_incident(f"{axle}_lockup", parsed, slip)
-
-    for axis in ("sway", "heave", "surge"):
-        val = parsed.get(axis)
-        if val is not None and abs(val) >= SWAY_THRESHOLD:
-            _log_incident(f"{axis}_spike", parsed, val)
-
-def _check_fuel_mix(parsed, now):
-    """Watches for a sustained step-change in fuel burn rate -- a rough
-    signal that the driver switched fuel mixture (GT7 doesn't expose the
-    mixture setting itself over telemetry)."""
-    global _last_mix_change_t
-    fuel = parsed.get("fuel_remaining")
-    if fuel is None:
-        return
-    _fuel_hist.append((now, fuel))
-    cutoff = now - (MIX_CHECK_WINDOW * 2)
-    while _fuel_hist and _fuel_hist[0][0] < cutoff:
-        _fuel_hist.popleft()
-    if len(_fuel_hist) < 4:
-        return
-
-    mid = now - MIX_CHECK_WINDOW
-    recent = [(t, f) for t, f in _fuel_hist if t >= mid]
-    prior  = [(t, f) for t, f in _fuel_hist if t <  mid]
-    if len(recent) < 2 or len(prior) < 2:
-        return
-
-    recent_rate = (recent[0][1] - recent[-1][1]) / max(1e-6, recent[-1][0] - recent[0][0])
-    prior_rate  = (prior[0][1]  - prior[-1][1])  / max(1e-6, prior[-1][0]  - prior[0][0])
-    # rates are %/sec fuel burned (positive = burning fuel normally)
-    if prior_rate <= 0.0001 or recent_rate <= 0.0001:
-        return  # avoid div-by-near-zero / refuel noise
-
-    ratio = recent_rate / prior_rate
-    if ratio >= MIX_CHANGE_RATIO or ratio <= (1.0 / MIX_CHANGE_RATIO):
-        if _last_mix_change_t is not None and now - _last_mix_change_t < MIX_CHANGE_COOLDOWN_S:
-            return
-        _last_mix_change_t = now
-        _incidents.append({
-            "type":           "mix_change_suspected",
-            "t":              round(now, 3),
-            "lap_number":     parsed.get("lap_number"),
-            "track_position": round(parsed.get("track_position", 0.0), 2),
-            "prior_rate":     round(prior_rate, 5),
-            "recent_rate":    round(recent_rate, 5),
-            "ratio":          round(ratio, 3),
-        })
-
 def _check_debug_state(parsed, now, paused, car_on_track, loading, speed, lap_number, total_laps):
     """Fires a 'debug_state' event any time one of the key race-start-relevant
     fields changes, carrying a full snapshot -- lets us see exactly what GT7
@@ -361,9 +268,6 @@ def _check_events(parsed):
             elif now - _speed_hold_start >= ROLLING_START_HOLD:
                 _race_active = True
                 _speed_hold_start = None
-                _incidents.clear()
-                _fuel_hist.clear()
-                _last_incident_t.clear()
                 _fire_event("race_start", parsed)
         else:
             _speed_hold_start = None  # speed dropped (or not a race) -- reset the hold timer
@@ -378,16 +282,9 @@ def _check_events(parsed):
                 and now <= _grid_start_armed_until and total_laps > 0):
             _race_active = True
             _speed_hold_start = None
-            _incidents.clear()
-            _fuel_hist.clear()
-            _last_incident_t.clear()
             _fire_event("race_start", parsed)
 
-    # ── Incident / fuel-mix checks (only while a race is active) ─────────
     if _race_active:
-        _check_incidents(parsed, now)
-        _check_fuel_mix(parsed, now)
-
         # NOTE: car_on_track alone does NOT flip false at the finish line --
         # the car is still "on track" cruising back to pits/results after the
         # last lap. Watch lap_number cross past total_laps instead (e.g. 11/10).

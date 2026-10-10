@@ -358,29 +358,6 @@ def _lap_segments(df):
         segs = [s for s in segs if int(s["lap_number"].iloc[0]) != 0] or segs
     return segs
 
-def pit_stop_laps(df):
-    """Lap number of every pit stop, in race order (one entry per stop)."""
-    if "pit_flag" not in df.columns or len(df) == 0:
-        return []
-    flag = df["pit_flag"].to_numpy(dtype=float)
-    laps = df["lap_number"].to_numpy()
-    out = [int(laps[i]) for i in np.flatnonzero(np.diff(flag) > 0) + 1]
-    if flag[0] > 0:
-        out.insert(0, int(laps[0]))
-    return out
-
-def lap_fuel_burn(df):
-    """[(lap, fuel burned, had a pit stop)] for each lap that has a lap after it.
-    Burn is the sum of the drops, so a refuel inside the lap does not cancel it."""
-    segs = _lap_segments(df)
-    out = []
-    for i, (seg, nxt) in enumerate(zip(segs, segs[1:]), 1):
-        fuel = np.append(seg["fuel_remaining"].to_numpy(dtype=float), float(nxt["fuel_remaining"].iloc[0]))
-        burn = float(-np.minimum(np.diff(fuel), 0).sum())
-        pit = bool(_refuel_spans(fuel)) or (float(seg["pit_flag"].max()) > 0 if "pit_flag" in seg.columns else False)
-        out.append((int(seg["lap_number"].iloc[0]) or i, burn, pit))
-    return out
-
 def race_lap_frames(df):
     """[(lap number, time_s, frame)] for each complete lap long enough to analyse
     corner by corner. Each frame's track_position restarts at the line."""
@@ -391,87 +368,56 @@ def race_lap_frames(df):
             out.append((sp["lap"], sp["time_s"], seg.reset_index(drop=True)))
     return out
 
-def _fuel_is_percent(df):
-    cap = float(df["fuel_capacity"].max()) if "fuel_capacity" in df.columns else 0.0
-    return cap in (0.0, 100.0)
-
 def race_card_spec(data, df):
-    """Everything share_card.render_card needs for a race card, as a plain dict."""
+    """Everything share_card.render_card needs for a race card, as a plain dict.
+    Only values read straight from the recording go on the card: the best
+    complete lap (to 0.01 s -- race laps are timed on the PC's clock, not
+    GT7's), the number of complete laps, top speed, every lap time and a
+    speed-coloured map of the best lap."""
     from datetime import datetime
     splits = lap_split_stats(df)
     done = [sp for sp in splits if sp["complete"] and sp["time_s"] > 1]
     times = [sp["time_s"] for sp in done]
-    stats = consistency.lap_time_stats(times)
-    span = float(df["t"].iloc[-1] - df["t"].iloc[0]) if len(df) > 1 else 0.0
-    dur = _num(data.get("race_duration_s")) or span
+    best = int(np.argmin(times)) if times else None
     when = ""
     try:
         when = datetime.strptime(str(data.get("recorded_at"))[:15], "%Y%m%d_%H%M%S").strftime("%d %b %Y")
     except (TypeError, ValueError):
         pass
-    if stats is None:
-        cons = "--"
-    elif stats["score"] is None:
-        cons = f"±{stats['std']:.2f}s"
-    else:
-        cons = f"±{stats['std']:.2f}s  {stats['score']}/100"
-    pct = _fuel_is_percent(df)
-    unit = "%" if pct else ""
-    fuel_used = float(-np.minimum(np.diff(df["fuel_remaining"].to_numpy(dtype=float)), 0).sum()) if len(df) > 1 else 0.0
+    top = float(df["speed_kmh"].max()) if len(df) else 0.0
     spec = {
         "kind": "RACE",
         "when": when,
-        "car": str(data.get("car") or "Unknown car"),
-        "track": str(data.get("track") or "unknown track").replace("_", " ").title(),
+        "car": str(data.get("car_display") or data.get("car") or "Unknown car"),
+        "track": str(data.get("track_display") or str(data.get("track") or "unknown track").replace("_", " ")),
         "era": "" if leaderboard.is_current_era(data) else f"pre-{leaderboard.PHYSICS_ERA} physics",
         "headline": {
-            "big_label": "RACE TIME",
-            "big_value": share_card.fmt_time(dur) if dur > 0 else "--:--.---",
+            "big_label": "BEST LAP",
+            "big_value": share_card.fmt_time(times[best], 2) if times else "--:--.--",
             "tiles": [
-                ("BEST LAP", share_card.fmt_time(stats["best"]) if stats else "--"),
-                ("AVG LAP", share_card.fmt_time(stats["avg"]) if stats else "--"),
-                ("CONSISTENCY", cons),
                 ("LAPS", f"{len(done)}"),
-                ("TOP SPEED", f"{float(df['speed_kmh'].max()):.0f} km/h"),
-                ("FUEL USED", f"{fuel_used:.1f}{unit}" if fuel_used > 0 else "--"),
+                ("TOP SPEED", f"{top:.0f} km/h" if top > 0 else "--"),
             ],
         },
         "chart": {"title": "lap times  -  best lap highlighted", "kind": "bars",
-                  "x": [sp["lap"] for sp in done], "y": times,
-                  "best": int(np.argmin(times)) if times else None, "dim": []},
+                  "x": [sp["lap"] for sp in done], "y": times, "best": best},
         "map": None,
-        "fuel": {"title": "pit stops + fuel", "headline": "no pit stops", "empty": "no fuel data"},
     }
-    if stats:
-        clean = set(stats["clean_idx"])
-        spec["chart"]["dim"] = [i not in clean for i in range(len(times))]
     # the line on the map: the best lap (one clean lap reads better than the whole race overdrawn)
     if times:
-        best_lap_no = done[int(np.argmin(times))]["lap"]
+        best_lap_no = done[best]["lap"]
         for seg, sp in zip(_lap_segments(df), splits):
             if (sp["lap"] == best_lap_no and "world_x" in seg.columns and len(seg) > 2
                     and float(seg["world_x"].std()) > 1 and float(seg["world_z"].std()) > 1):
                 spec["map"] = {"x": seg["world_x"].tolist(), "z": seg["world_z"].tolist(),
                                "v": seg["speed_kmh"].tolist()}
                 break
-    stops = pit_stop_laps(df)
-    fuel = spec["fuel"]
-    if stops:
-        shown = ", ".join(str(n) for n in stops[:6]) + ("..." if len(stops) > 6 else "")
-        fuel["headline"] = f"{len(stops)} stop{'s' if len(stops) != 1 else ''}: lap {shown}"
-    burn = lap_fuel_burn(df)
-    if burn:
-        fuel["bars"] = {"x": [b[0] for b in burn], "y": [b[1] for b in burn], "pit": [b[2] for b in burn],
-                        "ylabel": "burn" + (" %" if pct else "")}
-    fpl, laps_tank, _n = fuel_per_lap_stats(df)
-    if fpl:
-        fuel["foot"] = f"avg {fpl:.1f}{unit}/lap, full tank ~{laps_tank:.0f} laps"
     return spec
 
 def race_card_png(data, df, width=1200, height=630):
-    """Render a shareable race summary card and return it as PNG bytes: headline
-    stats, every lap time, a speed-coloured map of the best lap, and pit stops
-    with fuel per lap. See share_card.py."""
+    """Render a shareable race summary card and return it as PNG bytes: best
+    lap, laps, top speed, every lap time and a speed-coloured map of the best
+    lap. See share_card.py."""
     return share_card.render_card(race_card_spec(data, df), width, height)
 
 # ── Corner baselines ──────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
+from . import keepawake
 from . import __version__, ghost, leaderboard, metrics_server, notify, voice
 from . import cars as car_db
 from . import config as runtime_config
@@ -97,6 +98,21 @@ def _next_due(due, now, dt):
     return now + dt if nxt <= now else nxt
 
 
+def unknown_car_label(car_id):
+    """CAR box text for a car ID missing from car_ids.csv."""
+    return f"Unknown car (ID {car_id})"
+
+
+def car_box_autofill(car_id, current, last_autofilled_id):
+    """What the CAR box should be set to for the car GT7 reports, or None to
+    leave it alone. A new car ID always replaces the box -- with its name, or
+    "Unknown car (ID N)" when car_ids.csv doesn't know it, never the previous
+    car's name. The same ID leaves a non-empty box alone, so a manual edit sticks."""
+    if car_id <= 0 or (car_id == last_autofilled_id and current.strip()):
+        return None
+    return car_db.get_car_name(car_id) or unknown_car_label(car_id)
+
+
 def _tk_text(s):
     """Tk 8.5 (system Python on older macOS) raises on characters above the
     BMP, e.g. emoji -- drop them there, keep them everywhere else."""
@@ -126,7 +142,6 @@ class Session:
     race_recording = False
     race_samples   = []
     race_start_t   = 0.0
-    race_start_wall = 0.0   # wall clock at race start (incident timestamps are wall time)
     paused         = False   # True while GT7 reports the game paused -- recording freezes
     paused_at      = None    # time.monotonic() when the current pause began
 
@@ -159,7 +174,6 @@ class App(tk.Tk):
         self._submitted_unknown_tracks  = set()
         self._session_start_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         self._session_summary  = []
-        self._incident_timeline = []   # flat list of incident dicts across the whole session
         self._unsaved_races     = []   # races whose save failed everywhere -- Export Session includes them
         self._connect_gen       = 0    # bumped per connect attempt; a superseded attempt stays quiet
         self._last_poll_error   = None
@@ -232,10 +246,6 @@ class App(tk.Tk):
                   font=(runtime_config.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
         tk.Button(hdr, text="Session Summary",
                   command=self._show_session_summary,
-                  bg="#16213e", fg=FG, relief="flat",
-                  font=(runtime_config.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
-        tk.Button(hdr, text="Incidents",
-                  command=self._show_incident_timeline,
                   bg="#16213e", fg=FG, relief="flat",
                   font=(runtime_config.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
 
@@ -1171,12 +1181,19 @@ class App(tk.Tk):
                 self._drop_logged = True
                 reason = telem.get_last_error() or "no packets received"
                 self.log_msg(f"Connection dropped: {reason}")
+                if session.recording or session.race_recording:
+                    what = "race" if session.race_recording else "lap"
+                    self.log_msg(f"WARNING: packets stopped mid-{what} -- the recording will be "
+                                 "incomplete. If your PC went to sleep/hibernate, turn that off "
+                                 "(Power & sleep -> Never) while you race.")
+            keepawake.set_awake(False)
             self._was_connected = False
             for _a in (self.alert_hot, self.alert_cold, self.alert_fuel):
                 _a.grid_remove()
             return
         self._was_connected = True
         self._drop_logged = False
+        keepawake.set_awake(True)
 
         if runtime_config.METRICS_ENABLED:
             metrics_server.update(d)
@@ -1337,17 +1354,15 @@ class App(tk.Tk):
             fg="#2ecc71" if d.get("is_ev") else FG)
         _car_id_val = int(d.get("car_id") or 0)
         self.carid_lbl.config(text=str(_car_id_val))
-        if _car_id_val > 0 and (
-            _car_id_val != self._last_autofilled_car_id
-            or not self.car_var.get().strip()
-        ):
-            _auto_name = car_db.get_car_name(_car_id_val)
-            if _auto_name:
-                self.car_var.set(_auto_name)
-                self._last_autofilled_car_id = _car_id_val
-            elif _car_id_val not in self._submitted_unknown_car_ids:
+        _auto_name = car_box_autofill(_car_id_val, self.car_var.get(), self._last_autofilled_car_id)
+        if _auto_name is not None:
+            # a name typed before any car was auto-filled is the user's guess for an unknown ID
+            guessed = (self.car_var.get().strip() or None) if self._last_autofilled_car_id is None else None
+            self.car_var.set(_auto_name)
+            self._last_autofilled_car_id = _car_id_val
+            if (_auto_name == unknown_car_label(_car_id_val)
+                    and _car_id_val not in self._submitted_unknown_car_ids):
                 self._submitted_unknown_car_ids.add(_car_id_val)
-                guessed = self.car_var.get().strip() or None
                 threading.Thread(
                     target=leaderboard.submit_car_id,
                     args=(_car_id_val,),
@@ -1447,7 +1462,13 @@ class App(tk.Tk):
         cur_track_pos = float(d.get("track_position") or 0)
 
         cur_lap_ms_live = d.get("current_lap_ms")
-        if cur_lap_ms_live is not None and cur_lap_ms_live > 0:
+        _in_lap = cur_lap >= 1 and not session.paused and bool(d.get("car_on_track", True)) \
+            and not d.get("loading")
+        if not _in_lap:
+            # menu / garage / loading: no live lap clock
+            cur_elapsed = 0.0
+            self._delta_lap_start_t = None
+        elif cur_lap_ms_live is not None and cur_lap_ms_live > 0:
             cur_elapsed = cur_lap_ms_live / 1000.0
         elif self._delta_lap_start_t is not None:
             cur_elapsed = time.monotonic() - self._delta_lap_start_t
@@ -1491,6 +1512,7 @@ class App(tk.Tk):
         until a lap or race completes, so closing mid-race threw away
         everything with no prompt; and metrics_server.stop() was only ever
         called from the toggle, so the exporter was left running."""
+        keepawake.set_awake(False)
         pending = []
         lap_pending  = (session.recording or session.waiting) and bool(session.samples)
         race_pending = session.race_recording and bool(session.race_samples)
@@ -1554,7 +1576,7 @@ class App(tk.Tk):
 
     def _show_close_recap(self):
         """Quick recap shown once, right before the window actually closes --
-        not to be confused with _show_session_summary (the race/incident
+        not to be confused with _show_session_summary (the per-race
         summary opened from its own toolbar button). Reads session.laps_saved,
         which _save_lap's _do_save() appends to for every lap saved this
         session regardless of where the file landed, so no disk re-scan is
@@ -1754,7 +1776,6 @@ class App(tk.Tk):
         session.race_recording = True
         session.race_samples   = []
         session.race_start_t   = time.monotonic()
-        session.race_start_wall = time.time()
         self._rec_due_race = 0.0
         self.race_btn.config(text="Stop Race Recording", bg="#e94560")
         self.log_msg("Race recording started")
@@ -1846,8 +1867,6 @@ class App(tk.Tk):
         if session.paused and session.paused_at is not None:
             paused_for = max(0.0, time.monotonic() - session.paused_at)
         race_duration = max(0.0, time.monotonic() - session.race_start_t - paused_for)
-        incidents = [i for i in telem.get_incidents()
-                     if (i.get("t") or 0) >= session.race_start_wall]
         gear_ratios = list(telem.get("gear_ratios") or [])
 
         def _work():
@@ -1860,7 +1879,6 @@ class App(tk.Tk):
                 "race_duration_s": round(race_duration, 3),
                 "physics_era":     leaderboard.PHYSICS_ERA,
                 "total_samples":   len(samples),
-                "incidents":       incidents,
                 # See the matching note in _save_lap -- per-car constant, stored
                 # once here instead of on every sample.
                 "gear_ratios":     gear_ratios,
@@ -1869,16 +1887,14 @@ class App(tk.Tk):
             saved = self._save_json(folder / f"race_{car_safe}_{ts}.json", data, "race")
             if saved is not None:
                 self.log_msg(f"Race saved: {self._display_path(saved)}  "
-                             f"({len(samples)} samples, {race_duration:.1f}s, "
-                             f"{len(incidents)} incidents)")
+                             f"({len(samples)} samples, {race_duration:.1f}s)")
             else:
                 if final:
                     self._unsaved_races.append(data)
                 self.log_msg(f"Race NOT saved ({len(samples)} samples) -- it's still in memory; "
                              "use Export Session to write it somewhere else.")
             if saved is not None or final:
-                self._incident_timeline.extend(incidents)
-                self._append_session_summary(data, incidents)
+                self._append_session_summary(data)
             if notify_end:
                 msg = "Recording saved." if saved is not None else \
                       "Recording could NOT be saved -- check the log."
@@ -1887,7 +1903,7 @@ class App(tk.Tk):
 
         return self._run_save(_work, background)
 
-    def _append_session_summary(self, race_data, incidents):
+    def _append_session_summary(self, race_data):
         samples = race_data["samples"]
         if not samples:
             return
@@ -1898,10 +1914,6 @@ class App(tk.Tk):
         # take the first valid one; there is no finishing position to read.
         grid_pos   = next((s.get("current_position") for s in samples
                            if (s.get("current_position") or 0) > 0), None)
-
-        incident_counts = {}
-        for inc in incidents:
-            incident_counts[inc["type"]] = incident_counts.get(inc["type"], 0) + 1
 
         summary = {
             "recorded_at":        race_data["recorded_at"],
@@ -1914,8 +1926,6 @@ class App(tk.Tk):
             "fuel_used":          round(fuel_start - fuel_end, 2),
             "fuel_unit":          "%" if samples[-1].get("fuel_capacity") in (100, 0) else "",
             "grid_position":      grid_pos,
-            "incident_count":     len(incidents),
-            "incident_breakdown": incident_counts,
         }
         self._session_summary.append(summary)
 
@@ -1938,10 +1948,9 @@ class App(tk.Tk):
         dlg.configure(bg="#0a0a12")
         dlg.geometry("760x320")
 
-        cols = ("race", "track", "car", "laps", "duration", "fuel", "pos", "incidents")
+        cols = ("race", "track", "car", "laps", "duration", "fuel", "pos")
         headers = {"race": "#", "track": "Track", "car": "Car", "laps": "Laps",
-                   "duration": "Duration", "fuel": "Fuel Used", "pos": "Grid",
-                   "incidents": "Incidents"}
+                   "duration": "Duration", "fuel": "Fuel Used", "pos": "Grid"}
 
         st = ttk.Style()
         st.configure("Summary.Treeview",
@@ -1962,56 +1971,7 @@ class App(tk.Tk):
             tree.insert("", "end", values=(
                 idx, s["track"], s["car"], s["laps"],
                 f"{s['duration_s']:.1f}s", f"{s['fuel_used']:.1f} {s['fuel_unit']}",
-                f"P{s['grid_position']}" if s.get("grid_position") else "--", s["incident_count"],
-            ))
-
-    def _show_incident_timeline(self):
-        """Simple in-memory incident timeline for the session -- tyre-slip
-        spikes, sway/heave/surge body-motion events, suspected fuel-mixture
-        changes -- collected as races finish. Replaces dumping raw
-        [DEBUG] state lines into the log for every user."""
-        timeline = list(self._incident_timeline)
-        # also fold in incidents from the race currently in progress (if any)
-        if session.race_recording:
-            timeline = timeline + [i for i in telem.get_incidents()
-                                   if (i.get("t") or 0) >= session.race_start_wall]
-
-        dlg = tk.Toplevel(self)
-        dlg.title("Incident Timeline")
-        dlg.configure(bg="#0a0a12")
-        dlg.geometry("560x320")
-
-        if not timeline:
-            tk.Label(dlg, text="No incidents recorded this session.",
-                     fg="#c0c0e0", bg="#0a0a12", font=(runtime_config.MONO, 10),
-                     pady=20).pack()
-            return
-
-        cols = ("time", "type", "lap", "speed", "value")
-        headers = {"time": "Time", "type": "Type", "lap": "Lap",
-                   "speed": "Speed", "value": "Value"}
-
-        st = ttk.Style()
-        st.configure("Incidents.Treeview",
-                     background="#050510", foreground="#c0c0e0",
-                     fieldbackground="#050510", font=(runtime_config.MONO, 9), rowheight=20)
-        st.configure("Incidents.Treeview.Heading",
-                     background="#0f0f1e", foreground="#e94560",
-                     font=(runtime_config.MONO, 9, "bold"))
-
-        tree = ttk.Treeview(dlg, columns=cols, show="headings", height=12,
-                            style="Incidents.Treeview")
-        for c in cols:
-            tree.heading(c, text=headers[c])
-            tree.column(c, width=100, anchor="center")
-        tree.pack(fill="both", expand=True, padx=8, pady=8)
-
-        for inc in sorted(timeline, key=lambda x: x.get("t", 0)):
-            t_str = datetime.fromtimestamp(inc.get("t", 0)).strftime("%H:%M:%S")
-            value = inc.get("value", inc.get("ratio", ""))
-            tree.insert("", "end", values=(
-                t_str, inc.get("type", "?"), inc.get("lap_number", "--"),
-                f"{inc.get('speed_kmh', '')}", value,
+                f"P{s['grid_position']}" if s.get("grid_position") else "--",
             ))
 
     # ─────────────────────────────────────────────────────────────────────────

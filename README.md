@@ -63,7 +63,6 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - **Time-loss summary** — after each lap, the log names the three corners that cost the most time against your reference lap (once you have one), e.g. `Time lost: T4 +0.21s, T9 +0.12s, T2 +0.08s`
 - **Preferences row** — `SHARE USAGE DATA`, **`CHECK FOR UPDATES`**, `TOP-LAP GHOST`, **`NOTIFICATIONS`**, `VOICE ALERTS` and `DEBUG LOG` checkboxes, saved to `settings.json`. The `METRICS` and `ALLOW REMOTE` switches (below) sit in the console row above it
 - **Prometheus metrics export (off by default)** — tick **`METRICS :9109`** to serve live gauges (speed, RPM, throttle, brake, fuel, current lap time and a connected flag) at `http://127.0.0.1:9109/metrics` for Grafana or any Prometheus scraper. It listens on this PC only. **`ALLOW REMOTE`** widens it to your whole local network (`0.0.0.0`) so a Grafana/Prometheus box elsewhere can scrape it — the endpoint has no password, so anyone on the same Wi-Fi/LAN could then read your live telemetry. Leave it off unless you need it and trust the network. Nothing is sent to the internet either way
-- Incident timeline
 - Lap history table with alerts
 
 ### Lap Analyst
@@ -79,7 +78,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Driver ratings radar
 - Track-map heatmaps across 9 metrics (speed, throttle, brake, lateral/longitudinal/total G, tyre temp, RPM, steering)
 - CSV and HTML chart export
-- **Lap card** — one click turns a lap into a shareable 1200x630 PNG with four blocks: headline stats (car, track, lap time, top/average speed, full-throttle share, max lateral G, tyre temperature, driving style), the speed trace cut into sectors with their times, a speed-coloured track map, and the fuel used on the lap
+- **Lap card** — one click turns a lap into a shareable 1200x630 PNG showing only values read straight from the recording: car, track (as you typed it), date, lap time (or INCOMPLETE), top speed, fuel used, the speed trace round the lap and a speed-coloured track map (no map for a downloaded ghost)
 
 ### Race Analyst
 - Same chart-group depth as Lap Analyst (17 groups, race-oriented: Race overview + Laps in place of Sectors + Extended, plus Corners and Consistency)
@@ -88,7 +87,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Fuel per lap and laps per full tank, measured from the clean laps of the recording
 - **Corners tab** — scores *every* lap of the race corner by corner (time gained or lost per corner, as a lap × corner heat-map plus the average per corner). Switch the baseline with the **Corner baseline** button: the best lap of the race, or your saved PB lap for that car and track (`reference_<car>.json`, the file the Dashboard keeps)
 - **Consistency tab** — lap-time spread, trend (speeding up or slowing down per lap), a 0–100 consistency score, and the most and least consistent corners over the race. Laps more than 7 % slower than your best (pit laps, spins) are left out of the numbers and shown dimmed. The score is 100 minus the standard deviation of your clean laps as a share of the average lap, scaled so a 2 % standard deviation scores 0
-- **Race card** — a shareable 1200x630 PNG built the same way as the lap card: headline stats (race time, best/average lap, consistency, laps, top speed, fuel used), every lap time with the best highlighted, a speed-coloured map of the best lap, and pit-stop laps with fuel burned per lap
+- **Race card** — a shareable 1200x630 PNG built the same way as the lap card: car, track, date, best lap (to 0.01 s), laps completed, top speed, every lap time at its real height with the best highlighted, and a speed-coloured map of the best lap
 
 ### All tools
 - **Records** — the *Records* link in the Launcher footer opens a table of your best lap for every car and track, built from your saved laps (incomplete laps and laps from before GT7 update 1.71 are left out unless you tick the box). It reads only the summary at the start of each lap file, so even a big laps folder opens quickly
@@ -249,6 +248,7 @@ dashboard.App().mainloop()
 | Packets arriving but not decrypting | Something else is bound to port 33740, an unexpected console/game version, or a mid-stream corrupt packet (usually self-resolves) |
 | A module named `gt7telem` already exists | You (or another package) installed an unrelated `gt7telem`; run `pip show gt7telem` to check before installing |
 | Car/track shows as a blank name | The ID isn't in the local database yet — run `gt7telem-add-car` / `gt7telem-add-track`, or wait for the next scheduled DB refresh |
+| Race or lap saved as incomplete / recording stops partway | The PC went to sleep or hibernated, which stops packets. TRACE keeps Windows/macOS awake while it's receiving, but that can't stop a closed lid or a manual Sleep/Hibernate — set **Power & sleep → Sleep: Never** (and turn hibernation off) before you race |
 
 Live connection diagnostics (heartbeat count, packet loss, last error) are always visible in the Dashboard, and available programmatically via `gt7telem.get_diagnostics()`.
 

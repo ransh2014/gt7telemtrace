@@ -62,7 +62,7 @@ gt7telem/         The TRACE package itself (same source that ships on
   corners.py        Corner detection and per-corner analysis (the Corners chart
                     group in Lap Analyst)
   consistency.py    Lap-time spread, trend and 0-100 consistency score (Race
-                    Analyst Consistency tab and race card)
+                    Analyst Consistency tab)
   share_card.py     Shared 1200x630 PNG renderer behind the lap card and race card
   theoretical.py    Theoretical best lap: stitches the fastest micro-sectors of
                     your laps (Theoretical chart group in Lap Analyst)
@@ -70,6 +70,8 @@ gt7telem/         The TRACE package itself (same source that ships on
                     (one read-only request per car and track; TOP-LAP GHOST switch)
   records.py        Records table (best lap per car and track from your saved
                     laps) -- the Records link on the launcher menu
+  keepawake.py      Keeps the PC from idle-sleeping/hibernating while telemetry
+                    is arriving (Windows/macOS), so races don't end up incomplete
   notify.py         Desktop toast + sound alerts (new PB, race end); switch it
                     off with NOTIFICATIONS in the Live Dashboard header
   voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS
