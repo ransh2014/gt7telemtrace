@@ -18,8 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from . import keepawake
-from . import __version__, ghost, leaderboard, metrics_server, notify, voice
+from . import __version__, ghost, keepawake, leaderboard, metrics_server, notify, voice
 from . import cars as car_db
 from . import config as runtime_config
 from . import tracks as track_db

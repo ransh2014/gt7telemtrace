@@ -7,9 +7,9 @@ import pytest
 from matplotlib.figure import Figure
 from test_corners import _lap
 
-from gt7telem import share_card
 from gt7telem import lap_analyst as la
 from gt7telem import race_analyst as ra
+from gt7telem import share_card
 
 
 def _samples_for_lap(lap_no, t0, speed_drop, pit=False):

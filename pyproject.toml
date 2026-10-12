@@ -74,6 +74,7 @@ dev = [
 ]
 
 [tool.ruff]
+extend-exclude = ["android"]
 line-length = 120
 target-version = "py310"
 
