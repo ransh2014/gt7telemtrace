@@ -51,11 +51,19 @@ session or a previously recorded lap.
   1.71). When a GT7 update changes physics again, bump them there, in
   the website's `leaderboard.html`, and in the `validate_lap_submission` /
   `get_consensus_line` SQL functions.
+- `android/` — the standalone Android app (Kotlin + Jetpack Compose, built with
+  Gradle: `gradlew assembleRelease`). Its packet decoding is checked against golden
+  packets made by `android/tools/make_fixtures*.py` from the Python code. `ruff`
+  skips this folder. It has its own `car_ids.csv` / `course_ids.csv` copies in
+  `android/app/src/main/assets/`, so update those whenever the ones in `src/gt7telem/`
+  change. CI builds and signs the APK (`.github/workflows/build-android.yml`) on every
+  `v*` tag.
 - `tools/build_source_zip.py` — builds `gt7telem-source.zip`, the "Python
-  Source" download on the website. Run it after every release (`python
-  tools/build_source_zip.py -o <website-dir>`); the three binary downloads
-  are built by GitHub Actions, but this one isn't, and it has silently
-  shipped a release behind before.
+  Source" download. CI runs it on every version tag
+  (`.github/workflows/build-source.yml`) and attaches the zip to the GitHub
+  Release, like the binaries; the website's download buttons link to the
+  latest release, so nothing is copied to the site by hand. To try it locally:
+  `python tools/build_source_zip.py -o gt7telem-source.zip`.
 
 ## Reporting a bug
 
@@ -88,8 +96,12 @@ download a release behind):
    version-only bump (say so explicitly). `pyproject.toml`'s `Changelog`
    URL points here, so a missing entry means PyPI links to a file that
    never mentions the version being served.
-3. After the tag builds, run `python tools/build_source_zip.py -o
-   <website-dir>` and redeploy the site, so the source download matches.
+3. CI builds the binaries, the APK and the source zip on the tag and
+   attaches them to the GitHub Release; the website links to the latest
+   release, so no files are copied to the site. Check the release has all of
+   `gt7telem-windows.zip`, `gt7telem-macos.zip`, `gt7telem-linux.zip` (+ `.asc`),
+   `gt7telem-source.zip` and `gt7telem-android.apk` — the same names every
+   time, since the site links to them by name.
 4. Check the package managers picked the release up: the Chocolatey and
    WinGet workflows in `.github/workflows/` run on the tag push (WinGet
    skips itself until its first manifest is merged upstream), and the

@@ -2,20 +2,20 @@
 build_source_zip.py -- produce gt7telem-source.zip, the "Python Source"
 download offered on gt7trace.netlify.app/setup.html.
 
-The three binary downloads are built by GitHub Actions on every version
-tag; this one used to be assembled by hand, which is exactly why it drifted
-a release behind (the site was still serving a 0.3.2 source zip after 0.3.3
-shipped). Run this instead -- it always reads the live package source, so
-the zip can't disagree with pyproject.toml.
+GitHub Actions runs this on every version tag (.github/workflows/
+build-source.yml) and attaches the zip to the GitHub Release, next to the
+binaries; the website's download buttons link to the latest release. It used
+to be assembled by hand, which is exactly why it drifted a release behind
+(the site was still serving a 0.3.2 source zip after 0.3.3 shipped). It
+always reads the live package source, so the zip can't disagree with
+pyproject.toml.
 
 Usage (from anywhere):
 
     python tools/build_source_zip.py                 # -> dist/gt7telem-source.zip
     python tools/build_source_zip.py -o <dir-or-zip> # write somewhere else
 
-To refresh the website copy after cutting a release:
-
-    python tools/build_source_zip.py -o ../gt7telemwebsite/gt7telem-source.zip
+You only need to run it yourself to test a change to the zip's contents.
 
 Layout produced (matches what setup.html and totalfiles.html describe):
 

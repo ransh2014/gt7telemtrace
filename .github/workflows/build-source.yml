@@ -1,0 +1,71 @@
+name: Build Python Source Zip
+
+# Builds gt7telem-source.zip (the "Python Source" download: launcher.py,
+# README.txt, requirements.txt and the gt7telem/ package) with
+# tools/build_source_zip.py and attaches it to the GitHub Release for the
+# tag. The website's download links point at the latest release, so this
+# is the only place the zip is produced -- it used to be built by hand and
+# silently shipped a release behind. Can also be triggered manually from the
+# Actions tab to test a build without cutting a release.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    # Gate: a tag must not publish a release whose tests fail.
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Tk (Race Analyst tests import tkinter)
+        run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m ruff check .
+      - run: xvfb-run -a python -m pytest tests/ -q
+
+  build:
+    needs: test
+    name: Build source zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build gt7telem-source.zip
+        run: python tools/build_source_zip.py -o gt7telem-source.zip
+
+      - name: Check the zip contents
+        run: |
+          python - << 'EOF'
+          import zipfile
+          names = zipfile.ZipFile("gt7telem-source.zip").namelist()
+          for required in ("launcher.py", "README.txt", "requirements.txt", "gt7telem/__init__.py", "gt7telem/car_ids.csv", "gt7telem/course_ids.csv"):
+              assert required in names, f"missing {required}"
+          print(f"OK: {len(names)} files")
+          EOF
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gt7telem-source
+          path: gt7telem-source.zip
+          retention-days: 30
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: gt7telem-source.zip
