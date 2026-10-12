@@ -98,6 +98,16 @@ def _next_due(due, now, dt):
     return now + dt if nxt <= now else nxt
 
 
+def lap_clock_running(cur_lap, total_laps, paused, on_track, loading):
+    """True only while a real lap is being driven. Menus, the garage, loading
+    screens and pause have no lap clock. After the last lap of a race GT7's
+    lap counter runs past total_laps (e.g. 11/10) while car_on_track stays
+    true on the cruise back to the results, so that counts as finished too."""
+    if cur_lap < 1 or paused or not on_track or loading:
+        return False
+    return not (total_laps > 0 and cur_lap > total_laps)
+
+
 def unknown_car_label(car_id):
     """CAR box text for a car ID missing from car_ids.csv."""
     return f"Unknown car (ID {car_id})"
@@ -1462,8 +1472,8 @@ class App(tk.Tk):
         cur_track_pos = float(d.get("track_position") or 0)
 
         cur_lap_ms_live = d.get("current_lap_ms")
-        _in_lap = cur_lap >= 1 and not session.paused and bool(d.get("car_on_track", True)) \
-            and not d.get("loading")
+        _in_lap = lap_clock_running(cur_lap, tot_lap, session.paused,
+                                    bool(d.get("car_on_track", True)), d.get("loading"))
         if not _in_lap:
             # menu / garage / loading: no live lap clock
             cur_elapsed = 0.0

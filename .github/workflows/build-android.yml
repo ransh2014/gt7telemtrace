@@ -1,0 +1,52 @@
+name: android
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - name: Telemetry unit tests (golden packets from Python)
+        run: ./gradlew :telemetry:test --no-daemon
+      - name: Decode keystore (if provided)
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/trace.jks"
+            echo "TRACE_KEYSTORE=$RUNNER_TEMP/trace.jks" >> "$GITHUB_ENV"
+          fi
+      - name: Build release APK
+        env:
+          TRACE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          TRACE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          TRACE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease --no-daemon
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk gt7telem-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TRACE-apk
+          path: android/gt7telem-android.apk
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/gt7telem-android.apk

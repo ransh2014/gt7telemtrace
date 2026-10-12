@@ -4,6 +4,7 @@ Sleep/hibernate stops the UDP socket, so a race or lap recording silently
 ends up incomplete. This only blocks *idle* sleep: closing the lid or
 choosing Sleep/Hibernate yourself still suspends the PC.
 """
+import os
 import subprocess
 import sys
 
@@ -25,7 +26,8 @@ def set_awake(on: bool) -> None:
                 _ES_CONTINUOUS | _ES_SYSTEM_REQUIRED if on else _ES_CONTINUOUS)
         elif sys.platform == "darwin":
             if on:
-                _proc = subprocess.Popen(["caffeinate", "-i"])
+                # -w ties caffeinate to this process, so a crash or kill cannot leave the Mac awake
+                _proc = subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())])
             elif _proc:
                 _proc.terminate()
                 _proc = None

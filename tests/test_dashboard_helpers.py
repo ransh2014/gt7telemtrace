@@ -94,3 +94,19 @@ def test_notifications_toggle_persists_and_gates_notify(tmp_path, monkeypatch):
     assert config.NOTIFY_ENABLED is True and config.load()["NOTIFY_ENABLED"] is True
     notify.notify("PB", "x")
     assert beeps == [1]
+
+
+def test_lap_clock_runs_only_on_a_real_lap():
+    run = dashboard.lap_clock_running
+    assert run(1, 5, False, True, False)          # mid-race
+    assert run(3, 0, False, True, False)          # time trial / practice (no lap total)
+    assert not run(0, 5, False, True, False)      # menu / garage (no lap yet)
+    assert not run(2, 5, True, True, False)       # paused
+    assert not run(2, 5, False, False, False)     # off track
+    assert not run(2, 5, False, True, True)       # loading screen
+
+
+def test_lap_clock_stops_after_the_final_lap():
+    run = dashboard.lap_clock_running
+    assert run(10, 10, False, True, False)        # still on the last lap
+    assert not run(11, 10, False, True, False)    # crossed the line: 11/10 on the results run

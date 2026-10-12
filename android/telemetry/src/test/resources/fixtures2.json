@@ -1,0 +1,4470 @@
+{
+ "events": [
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": true,
+    "paused": false,
+    "speed_kmh": 0.0,
+    "total_laps": 3
+   },
+   "t": 1000.0
+  },
+  {
+   "fired": [
+    "race_start"
+   ],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 0.0,
+    "total_laps": 3
+   },
+   "t": 1000.5
+  },
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 0.0,
+    "total_laps": 3
+   },
+   "t": 1000.6
+  },
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 50.0,
+    "total_laps": 3
+   },
+   "t": 1001.6
+  },
+  {
+   "fired": [
+    "pause"
+   ],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": false,
+    "paused": true,
+    "speed_kmh": 50.0,
+    "total_laps": 3
+   },
+   "t": 1002.6
+  },
+  {
+   "fired": [
+    "resume"
+   ],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 50.0,
+    "total_laps": 3
+   },
+   "t": 1003.6
+  },
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 2,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 150.0,
+    "total_laps": 3
+   },
+   "t": 1004.6
+  },
+  {
+   "fired": [
+    "race_end"
+   ],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 4,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 150.0,
+    "total_laps": 3
+   },
+   "t": 1005.6
+  },
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 4,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 150.0,
+    "total_laps": 3
+   },
+   "t": 1008.6
+  },
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 100.0,
+    "total_laps": 3
+   },
+   "t": 1009.6
+  },
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 100.0,
+    "total_laps": 3
+   },
+   "t": 1010.6
+  },
+  {
+   "fired": [
+    "race_start"
+   ],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": false,
+    "paused": false,
+    "speed_kmh": 100.0,
+    "total_laps": 3
+   },
+   "t": 1012.1
+  },
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": true,
+    "paused": false,
+    "speed_kmh": 0.0,
+    "total_laps": 3
+   },
+   "t": 1012.6
+  },
+  {
+   "fired": [],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": true,
+    "paused": false,
+    "speed_kmh": 0.0,
+    "total_laps": 3
+   },
+   "t": 1013.2
+  },
+  {
+   "fired": [
+    "race_end"
+   ],
+   "packet": {
+    "car_on_track": true,
+    "lap_number": 1,
+    "loading": true,
+    "paused": false,
+    "speed_kmh": 0.0,
+    "total_laps": 3
+   },
+   "t": 1013.8000000000001
+  }
+ ],
+ "stint": {
+  "free_run": [
+   {
+    "args": [
+     1,
+     0,
+     79.5,
+     0,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     0,
+     79.0,
+     0,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     0,
+     78.5,
+     0,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     0,
+     78.0,
+     0,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     0,
+     77.5,
+     0,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     0,
+     77.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 30.8,
+     "pace_loss_s": null,
+     "pit_by_lap": 31,
+     "spare_laps": null,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     0,
+     76.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 30.6,
+     "pace_loss_s": null,
+     "pit_by_lap": 31,
+     "spare_laps": null,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     0,
+     76.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 30.4,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     0,
+     75.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 30.2,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     0,
+     75.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 30.0,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     0,
+     74.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 29.8,
+     "pace_loss_s": null,
+     "pit_by_lap": 31,
+     "spare_laps": null,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     0,
+     74.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 29.6,
+     "pace_loss_s": null,
+     "pit_by_lap": 31,
+     "spare_laps": null,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     0,
+     73.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 29.4,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     0,
+     73.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 29.2,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     0,
+     72.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 29.0,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     0,
+     72.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 28.8,
+     "pace_loss_s": null,
+     "pit_by_lap": 31,
+     "spare_laps": null,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     0,
+     71.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 28.6,
+     "pace_loss_s": null,
+     "pit_by_lap": 31,
+     "spare_laps": null,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     0,
+     71.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 28.4,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     0,
+     70.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 28.2,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     0,
+     70.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 28.0,
+     "pace_loss_s": null,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     5,
+     0,
+     69.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 27.8,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": 31,
+     "spare_laps": null,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     0,
+     69.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 27.6,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": 31,
+     "spare_laps": null,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     0,
+     68.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 27.4,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     0,
+     68.0,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 27.2,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     0,
+     67.5,
+     90000,
+     null,
+     0.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 2.5,
+     "heat": null,
+     "laps_of_fuel": 27.0,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": 30,
+     "spare_laps": null,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": true,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   }
+  ],
+  "steps": [
+   {
+    "args": [
+     1,
+     12,
+     59.75,
+     0,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     59.5,
+     0,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     59.25,
+     0,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     59.0,
+     0,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     58.75,
+     0,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     58.5,
+     0,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     58.25,
+     0,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     58.0,
+     0,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     57.75,
+     0,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     57.5,
+     0,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     57.25,
+     0,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     57.0,
+     0,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": null,
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     56.74166666666667,
+     108400,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.86149584487535,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     56.483333333333334,
+     108400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.775623268698066,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     56.225,
+     108400,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.68975069252078,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     55.96666666666667,
+     108400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.603878116343495,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     55.708333333333336,
+     108400,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.518005540166207,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     55.45,
+     108400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.432132963988924,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     55.19166666666667,
+     108400,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.34626038781164,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     54.93333333333334,
+     108400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.260387811634352,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     54.675000000000004,
+     108400,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.17451523545707,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     54.41666666666667,
+     108400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.08864265927978,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     54.15833333333334,
+     108400,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 18.002770083102497,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     2,
+     12,
+     53.900000000000006,
+     108400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 1,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.916897506925213,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.86149584487535,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     53.65833333333334,
+     107900,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.616963064295504,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     53.41666666666667,
+     107900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.537619699042423,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     53.175000000000004,
+     107900,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.458276333789346,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     52.93333333333334,
+     107900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.37893296853627,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     52.69166666666667,
+     107900,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.299589603283188,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     52.45,
+     107900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.22024623803011,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     52.208333333333336,
+     107900,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.140902872777033,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     51.96666666666667,
+     107900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 17.061559507523956,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     51.725,
+     107900,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.982216142270875,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     51.483333333333334,
+     107900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.902872777017798,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     51.24166666666667,
+     107900,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.82352941176472,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     3,
+     12,
+     51.0,
+     107900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 2,
+     "fuel_per_lap": 3.0458333333333307,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.744186046511643,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.616963064295504,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     50.75,
+     107750,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.869806094182827,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     50.5,
+     107750,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.786703601108037,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     50.25,
+     107750,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.703601108033244,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     50.0,
+     107750,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.62049861495845,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     49.75,
+     107750,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.53739612188366,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     49.5,
+     107750,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.454293628808866,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     49.25,
+     107750,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.371191135734076,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     49.0,
+     107750,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.288088642659282,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     48.75,
+     107750,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.20498614958449,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     48.5,
+     107750,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.1218836565097,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     48.25,
+     107750,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 16.038781163434905,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     4,
+     12,
+     48.0,
+     107750,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 3,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.955678670360113,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     47.74166666666667,
+     107800,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.869806094182827,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     47.483333333333334,
+     107800,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.783933518005544,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     47.225,
+     107800,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.698060941828258,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     46.96666666666667,
+     107800,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.612188365650972,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     46.708333333333336,
+     107800,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.526315789473687,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     46.45,
+     107800,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.440443213296403,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     46.19166666666667,
+     107800,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.354570637119117,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     45.93333333333334,
+     107800,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.268698060941832,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     45.675000000000004,
+     107800,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.182825484764546,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     45.41666666666667,
+     107800,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.096952908587262,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     45.15833333333334,
+     107800,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 15.011080332409977,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     5,
+     12,
+     44.900000000000006,
+     107800,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 4,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.925207756232691,
+     "pace_loss_s": 0.0,
+     "pit_by_lap": null,
+     "spare_laps": 7.869806094182827,
+     "stint_age": 4,
+     "stint_clean_laps": 3,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     44.65833333333334,
+     108300,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.844875346260391,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     44.41666666666667,
+     108300,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.764542936288093,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     44.175000000000004,
+     108300,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.684210526315793,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     43.93333333333334,
+     108300,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.603878116343493,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     43.69166666666667,
+     108300,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.523545706371195,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     43.45,
+     108300,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.443213296398895,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     43.208333333333336,
+     108300,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.362880886426597,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     42.96666666666667,
+     108300,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.282548476454297,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     42.725,
+     108300,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.202216066481997,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     42.483333333333334,
+     108300,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.121883656509699,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     42.24166666666667,
+     108300,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 14.041551246537399,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     6,
+     12,
+     42.0,
+     108300,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 13.961218836565099,
+     "pace_loss_s": 0.04999999999999716,
+     "pit_by_lap": null,
+     "spare_laps": 7.844875346260391,
+     "stint_age": 5,
+     "stint_clean_laps": 4,
+     "stop_needed": false,
+     "trend_s_per_lap": 0.09166666666666383,
+     "tyre_state": "Fresh"
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     71.75,
+     109400,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.85041551246538,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     71.5,
+     109400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.767313019390585,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     71.25,
+     109400,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.684210526315795,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     71.0,
+     109400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.601108033241,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     70.75,
+     109400,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.518005540166207,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     70.5,
+     109400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.434903047091417,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     70.25,
+     109400,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.351800554016624,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     70.0,
+     109400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.268698060941833,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     69.75,
+     109400,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.18559556786704,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     69.5,
+     109400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.102493074792246,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     69.25,
+     109400,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 23.019390581717456,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     7,
+     12,
+     69.0,
+     109400,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.008333333333333,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.936288088642662,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246538,
+     "stint_age": 1,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     68.74166666666666,
+     110500,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.85041551246532,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     68.48333333333332,
+     110500,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.764542936288034,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     68.22499999999998,
+     110500,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.678670360110747,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     67.96666666666664,
+     110500,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.59279778393346,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     67.7083333333333,
+     110500,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.506925207756172,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     67.44999999999996,
+     110500,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.421052631578885,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     67.19166666666662,
+     110500,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.335180055401597,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     66.93333333333328,
+     110500,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.24930747922431,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     66.67499999999994,
+     110500,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.163434903047023,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     66.4166666666666,
+     110500,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 22.077562326869735,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     66.15833333333326,
+     110500,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.991689750692448,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     8,
+     12,
+     65.89999999999992,
+     110500,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.90581717451516,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.85041551246532,
+     "stint_age": 2,
+     "stint_clean_laps": 1,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     65.65833333333326,
+     111900,
+     [
+      88,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.825484764542864,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     65.4166666666666,
+     111900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.745152354570568,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     65.17499999999994,
+     111900,
+     [
+      90,
+      92,
+      86,
+      97
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.66481994459827,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     64.93333333333328,
+     111900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.584487534625975,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     64.69166666666662,
+     111900,
+     [
+      92,
+      94,
+      88,
+      99
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.50415512465368,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     64.44999999999996,
+     111900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.42382271468138,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     64.2083333333333,
+     111900,
+     [
+      94,
+      96,
+      90,
+      101
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.343490304709082,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     63.96666666666663,
+     111900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.263157894736786,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     63.724999999999966,
+     111900,
+     [
+      96,
+      98,
+      92,
+      103
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.182825484764486,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     63.4833333333333,
+     111900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.102493074792186,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     63.24166666666663,
+     111900,
+     [
+      98,
+      100,
+      94,
+      105
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 21.022160664819886,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     9,
+     12,
+     62.999999999999964,
+     111900,
+     [
+      58,
+      90,
+      84,
+      95
+     ],
+     120.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 20.941828254847586,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 3,
+     "stint_clean_laps": 2,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "reset_stint": true,
+    "snap": {
+     "fuel_basis_laps": 5,
+     "fuel_per_lap": 3.00833333333334,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": 20.941828254847586,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": 17.825484764542864,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": false,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   },
+   {
+    "args": [
+     1,
+     12,
+     50.0,
+     0,
+     [
+      90,
+      90,
+      90,
+      90
+     ],
+     100.0
+    ],
+    "snap": {
+     "fuel_basis_laps": 0,
+     "fuel_per_lap": null,
+     "heat": {
+      "front_avg": 84.0,
+      "pct_cold": 50.0,
+      "pct_hot": 25.0,
+      "rear_avg": 92.0
+     },
+     "laps_of_fuel": null,
+     "pace_loss_s": null,
+     "pit_by_lap": null,
+     "spare_laps": null,
+     "stint_age": 0,
+     "stint_clean_laps": 0,
+     "stop_needed": null,
+     "trend_s_per_lap": null,
+     "tyre_state": null
+    }
+   }
+  ]
+ }
+}

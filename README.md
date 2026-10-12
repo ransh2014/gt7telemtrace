@@ -96,6 +96,11 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Update check — the Launcher quietly looks for a newer GitHub release on startup and shows a small banner. Turn it off with the **`CHECK FOR UPDATES`** checkbox in the Live Dashboard header (see [Privacy & analytics](#privacy--analytics))
 - **Ask TRACE (website chat)** — the [website](https://gt7trace.netlify.app) has an AI support chat for setup and how-to questions. It only sends something when you type a question, it never runs in the desktop app, and nothing is stored. Answers are AI-generated and can be wrong; open an issue if it can't help. Details on the [Privacy](https://gt7trace.netlify.app/privacy.html) page
 
+### Android app (sideload)
+- A standalone phone version of all three tools — Live Dashboard, Lap Analyst and Race Analyst — with the same features, layout, colours and fonts, tweaked for a touch screen. The phone receives your PS5's telemetry itself over Wi-Fi, so no PC is needed
+- Everything the desktop apps do: live dashboard with strategy and the top-lap ghost gap, lap and race recording, all chart groups with chart-to-HTML export, replay with the saved track boundary, Lap and Race share cards (PNG), the Community Leaderboard (Top-10, ghost download, submit, consensus line), the Records table, spoken alerts (Android text-to-speech), notifications, the optional metrics endpoint, and **Backup All Laps** to a zip
+- Free and sideloaded: download `gt7telem-android.apk` from the [latest release](https://github.com/ransh2014/gt7telemtrace/releases/latest) (see [Install](#option-5--android-apk)). Not on the Play Store
+
 ### Tooling
 - `gt7telem-add-car` / `gt7telem-add-track` — add a missing car/track ID to the local database from the terminal (also runnable as `python -m gt7telem.add_car` / `python -m gt7telem.add_track`). Additions are saved beside `settings.json` (`car_ids_local.csv` / `course_ids_local.csv`), so they survive upgrades
 - Ships with **580+ cars** and **120+ tracks** pre-resolved out of the box; the car database is refreshed every time 10 or more new cars have been added since the last update
@@ -155,13 +160,17 @@ brew install --cask gt7telem
 ```
 Package-manager releases go through a review step, so a new version can take a little while to appear there. The binaries above are always the latest build.
 
+### Option 5 — Android APK
+Download `gt7telem-android.apk` from the [latest release](https://github.com/ransh2014/gt7telemtrace/releases/latest) on your phone, open it and allow *Install unknown apps* for your browser or file manager when Android asks. It needs Android 8.0 or newer and the phone on the same Wi-Fi as your PS5 (enter the PS5's IP, or use **Auto-Detect**). Laps are saved in the app's own folder; use **Backup Laps** on the launcher to zip them out. Updating: install the newer APK over the old one — it keeps your laps and settings.
+
 ---
 
 ## Code signing
 
 TRACE's binaries are unsigned on Windows today. If your browser or Windows SmartScreen flags the `.exe` as untrusted, that's expected for now — see the status below for each platform:
 
-- **Windows** — Not yet signed. An application is in with **[SignPath Foundation](https://signpath.org/)**, a free code-signing program for open-source projects, and TRACE is expected to have a trusted signed `.exe` within the next month or two once that's approved.
+- **Windows** — Not signed. TRACE applied to **[SignPath Foundation](https://signpath.org/)**, a free code-signing program for open-source projects, but wasn't approved yet — they look for more public adoption (stars, forks, external mentions) first, and TRACE will reapply once it has them. Until then SmartScreen shows "Windows protected your PC": click **More info → Run anyway**.
+- **Android** — `gt7telem-android.apk` is signed with TRACE's own release key (not a Play Store signature), so Android shows its usual "unknown source" prompt on install. Updates install over an older APK as long as they are signed with the same key.
 - **macOS** — `TRACE.app` is **ad-hoc signed** (a local signature with no Apple-issued certificate). This satisfies macOS's baseline "must be signed" check and avoids "app is damaged" errors, but you'll still see an "unidentified developer" warning on first launch — right-click the app and choose **Open** to bypass it. Full notarization requires a paid Apple Developer account, which isn't in place yet.
 - **Linux** — The binary is built on Ubuntu 22.04, so it needs glibc 2.35 or newer (Ubuntu 22.04+, Fedora 36+, Debian 12+ and equivalents). The release zip is signed with a dedicated GPG key so you can verify it wasn't tampered with after being built. Import the public key and verify with:
   ```bash
@@ -200,11 +209,11 @@ The exceptions are the optional leaderboard and the Dashboard's top-lap ghost (t
 
 ## Privacy & analytics
 
-TRACE sends a small anonymous usage ping (which tool launched, TRACE version, OS, a timestamp — five fields, nothing else) each time you open Live Dashboard, Lap Analyst, or Race Analyst. It's **on by default** and helps decide where to spend limited development time; it never includes telemetry content, lap data, PSN name, or IP.
+TRACE sends a small anonymous usage ping (which tool launched, TRACE version, OS, a timestamp — five fields, nothing else) each time you open Live Dashboard, Lap Analyst, or Race Analyst (the Android app sends the same five fields, with the OS reported as `android`). It's **on by default** and helps decide where to spend limited development time; it never includes telemetry content, lap data, PSN name, or IP.
 
 Turn it off any time: **Live Dashboard → `SHARE USAGE DATA` checkbox** (in the header's Preferences row) — the setting applies to all three tools since they share the same `settings.json`.
 
-The Launcher also checks GitHub's public releases API for a newer version on startup, so it can show an update banner. That request goes to GitHub, not to this project's database, and carries no version, ID or usage data (just a fixed `TRACE-updater` label) — though GitHub can see your IP, as with any web request. It's **on by default**; untick **Live Dashboard → `CHECK FOR UPDATES`** (right beside `SHARE USAGE DATA`) to turn it off from then on — no need to edit `settings.json`.
+The Launcher also checks GitHub's public releases API for a newer version on startup, so it can show an update banner. That request goes to GitHub, not to this project's database, and carries no version, ID or usage data (just a fixed `TRACE-updater` label) — though GitHub can see your IP, as with any web request. It's **on by default**; untick **Live Dashboard → `CHECK FOR UPDATES`** (right beside `SHARE USAGE DATA`) to turn it off from then on — no need to edit `settings.json`. The Android app does the same check and shows a tap-to-open banner on its launcher.
 
 The Live Dashboard's **top-lap ghost** makes one read-only request to the leaderboard database once your car and track have both been known and unchanged for a few seconds in a run (and once more for each new car/track you switch to): it asks for the single fastest public lap for that exact car and track so it can show your live gap. The request carries only the car and track names — no account, PSN name, lap or telemetry data — and stays silent if you're offline or no lap exists. Untick **`TOP-LAP GHOST`** and the Dashboard makes no leaderboard requests at all.
 

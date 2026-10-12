@@ -1,16 +1,21 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [0.8.1] - 2026-10-10
-Bug-fix release: steadier recordings, the Incidents feature removed, and simpler share cards.
+## [0.8.1] - 2026-10-15
+Bug-fix release: steadier recordings, the Incidents feature removed, and simpler share cards. Also the first release of TRACE for Android.
 
-- Keeps the PC awake while telemetry is arriving (Windows/macOS) so idle sleep/hibernate can't cut a race short; new `keepawake.py`.
+New
+- **TRACE for Android.** A standalone Kotlin + Jetpack Compose port of the Live Dashboard, Lap Analyst and Race Analyst (same features, layout, colours and fonts, tweaked for a phone). The phone receives the PS5's telemetry itself, so no PC is needed. Includes lap and race recording, all chart groups with chart-to-HTML export, replay with Save Boundary, Lap and Race cards (PNG), the Community Leaderboard, Records, Backup All Laps, spoken alerts, notifications, the top-lap ghost gap, the optional metrics endpoint and the update check. Sideloaded from the release as `gt7telem-android.apk` (built by the new `build-android.yml` workflow, signed with TRACE's own release key). The usage ping reports its OS as `android` (the `app_events` table now accepts it).
+- Windows: the SignPath Foundation application was not approved yet (needs more public adoption); the README's Code signing section now says so and explains the SmartScreen prompt.
+
+Fixed and changed
+- Keeps the PC awake while telemetry is arriving (Windows/macOS) so idle sleep/hibernate can't cut a race short; new `keepawake.py` (on macOS `caffeinate` is tied to the TRACE process, so a crash can't leave the Mac awake).
 - The Dashboard log now warns when packets stop mid-lap or mid-race (the recording will be incomplete).
-- Live lap timer no longer ticks in menus, the garage, loading screens or while paused.
+- Live lap timer no longer ticks in menus, the garage, loading screens, while paused or after a race's final lap.
 - Removed the Dashboard's Incidents button and window, and the Incidents column in Session Summary. The background incident and fuel-mixture detection is removed (`get_incidents()` no longer exists).
 - Simplified the lap and race cards so they only show values read straight from the recording. Lap card: car (full name), track as typed, date, lap time (or INCOMPLETE), top speed, fuel used in the gauge's own unit, the speed trace and the speed-coloured map (none for ghosts). Race card: car, track, date, best lap to 0.01 s, laps, top speed, every lap time at its real height with the best highlighted, and the best-lap map. Removed from the cards: sector times, average speed, full-throttle share, max lateral G, tyre temperature, driving style, the full-tank estimate, race time, average lap, consistency, race fuel used and the pit-stop panel (the Analysts' own charts and tabs are unchanged). Removed the card-only helpers `race_analyst.pit_stop_laps()` and `lap_fuel_burn()`.
 - GT7 1.72 (Spec IV Part 1, 15 Oct) adds Sportsland SUGO and six cars: Citroën 2 CV 6 Charleston '86, Ferrari F355 Berlinetta '94, Honda Civic Si Group A Version '87, Honda Step WGN Spada Premium Line '23, Mazda RX-VISION GT3 EVO and Xiaomi Vision Gran Turismo. Their car and course IDs will be added once they are published; until then the new cars show as "Unknown car (ID N)" and SUGO has to be typed into the TRACK box.
