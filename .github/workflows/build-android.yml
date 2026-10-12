@@ -29,7 +29,7 @@ jobs:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
         run: |
           if [ -n "$KS_B64" ]; then
-            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/trace.jks"
+            echo "$KS_B64" | tr -d "\r\n " | base64 -d > "$RUNNER_TEMP/trace.jks"
             echo "TRACE_KEYSTORE=$RUNNER_TEMP/trace.jks" >> "$GITHUB_ENV"
           fi
       - name: Build release APK
