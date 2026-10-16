@@ -5,6 +5,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-10-16
 - Leaderboard: fixed the Top-10, ghost-lap download and community line showing nothing. The car/track filter was sent double-quoted, which PostgREST doesn't unquote for equality, so it matched no rows. Also fixed on the website's leaderboard page.
 
 ## [0.8.3] - 2026-10-16
