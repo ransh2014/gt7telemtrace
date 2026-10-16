@@ -4,7 +4,7 @@ submissions (Phase 2 of TRACE's Supabase-backed features).
 
 Anti-cheat runs server-side (see the `validate_lap_submission` Postgres
 trigger): physically-impossible times are rejected outright and never
-appear anywhere; times that beat the current record by more than 20% are
+appear anywhere; suspiciously fast first times for a car/track are
 held in a review queue instead of hitting the public leaderboard
 immediately. Both cases still return (True, "ok") from submit_lap() below,
 since that success value only means "the request reached Supabase

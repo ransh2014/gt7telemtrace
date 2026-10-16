@@ -108,7 +108,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 ### Community Leaderboard (Lap Analyst)
 - Submit any recorded lap to a public per-car, per-track leaderboard with one click; live Top-10 panel in the sidebar
-- Server-side anti-cheat — physically-impossible times are rejected outright; times beating the record by more than 20%, and suspiciously fast first times for a car/track, are held for manual review
+- Server-side anti-cheat — physically-impossible times are rejected outright; suspiciously fast first times for a car/track are held for manual review
 - Ghost lap download — pull any Top-10 lap straight into the A/B compare view as Lap B
 - Consensus racing line — overlay a community-average speed/throttle/brake line, bucketed from the current top 10 laps for your car and track
 - Optional free account (display name only, no email or password) so a submission ties to something real; entirely skippable — viewing the leaderboard, ghost downloads, and the consensus line all work without one

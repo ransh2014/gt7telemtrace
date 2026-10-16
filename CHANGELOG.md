@@ -5,6 +5,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- Leaderboard: removed the server-side "beats the record by more than 20%" hold. Only physically-impossible times (rejected) and suspiciously fast first times for a car and track (held for review) are checked now.
+
 ## [0.8.2] - 2026-10-16
 Track auto-detect now works in races.
 
