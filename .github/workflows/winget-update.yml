@@ -126,7 +126,7 @@ jobs:
           for ($i = 0; $i -lt 30; $i++) {
             try {
               $resp = Invoke-WebRequest -Uri $installerUrl -Method Head -UseBasicParsing
-              if ($resp.StatusCode -eq 200) { $ready = $true; break }
+              if ($resp.StatusCode -eq 200) { Start-Sleep -Seconds 20; $ready = $true; break }
             } catch {
               Write-Host "asset not ready yet (attempt $i), waiting 30s..."
             }
@@ -144,4 +144,13 @@ jobs:
         run: |
           iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
           $version = "$env:TARGET_TAG".TrimStart("v")
-          .\wingetcreate.exe update $env:WINGET_PACKAGE_ID -s -v $version -u "$env:INSTALLER_URL" -t "${{ secrets.WINGET_TOKEN }}"
+          # The release asset can still 404 for wingetcreate for a moment after the
+          # wait loop above saw it (CDN lag while the release is being finished), so
+          # retry. A failed attempt here fails before anything is submitted.
+          for ($try = 1; $try -le 4; $try++) {
+            .\wingetcreate.exe update $env:WINGET_PACKAGE_ID -s -v $version -u "$env:INSTALLER_URL" -t "${{ secrets.WINGET_TOKEN }}"
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "wingetcreate attempt $try failed (exit $LASTEXITCODE), waiting 60s..."
+            Start-Sleep -Seconds 60
+          }
+          exit 1
