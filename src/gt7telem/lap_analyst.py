@@ -277,6 +277,9 @@ def _scan_laps(folder, limit=300):
         files = sorted(folder.rglob("*.json"), key=lambda q: q.stat().st_mtime, reverse=True)
     except OSError:
         return entries
+    # Race recordings (<track>/races/race_*.json) are not laps.
+    files = [q for q in files if q.parent.name.lower() not in ("races", "_session")
+             and not q.name.lower().startswith("race_")]
     for f in files[:limit]:
         try:
             st = f.stat()
