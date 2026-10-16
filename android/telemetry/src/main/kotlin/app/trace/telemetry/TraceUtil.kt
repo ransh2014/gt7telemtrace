@@ -46,7 +46,7 @@ object TraceUtil {
         return !(totalLaps > 0 && curLap > totalLaps)
     }
 
-    /** leaderboard.PHYSICS_ERA -- bump with each GT7 physics change (1.72 on Oct 15). */
+    /** leaderboard.PHYSICS_ERA -- bump with each GT7 physics change (last one: 1.71, 20 Aug 2026). */
     const val PHYSICS_ERA = "1.71"
     private const val EPOCH_STAMP = "20260820_000000"
 

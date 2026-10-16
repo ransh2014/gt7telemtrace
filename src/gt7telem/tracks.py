@@ -4,15 +4,16 @@ same folder). To refresh: download
 https://raw.githubusercontent.com/ddm999/gt7info/web-new/_data/db/course.csv
 and overwrite course_ids.csv.
 
-Note -- unlike cars.py, this is NOT a live autofill. GT7's telemetry stream
+Note -- unlike cars.py, this is NOT a live ID lookup. GT7's telemetry stream
 does not expose a track/course ID anywhere in the packet (confirmed against
 udp.py's own byte-offset parsing, plus every other community GT7 telemetry
 tool we could find -- none of them get a track ID from the stream either).
-So there's nothing to auto-detect from. What this backs instead is a
-searchable track picker for the TRACK field: pick a real track name from the
-dropdown instead of hand-typing it, so recordings land in consistent,
-non-typo'd folders (no more "suzuka" vs "Suzuka Circuit" vs "suzuka_circuit"
-splitting one track's laps across three folders).
+What this backs is a searchable track picker for the TRACK field: pick a real
+track name from the dropdown instead of hand-typing it, so recordings land in
+consistent, non-typo'd folders (no more "suzuka" vs "Suzuka Circuit" vs
+"suzuka_circuit" splitting one track's laps across three folders). The track
+can still be guessed from where a lap starts and how long it is -- see
+trackdetect.py, which suggests a name from this list for the user to confirm.
 """
 import csv
 import json

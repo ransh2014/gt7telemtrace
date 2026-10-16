@@ -122,7 +122,7 @@ def clean(v):
 
 
 def main(out):
-    udp.set_track("Sportsland SUGO")
+    udp.set_track("SUGO International Racing Course")
     udp.set_car("Honda Civic SI '87")
     cases = []
     for idx, (n, t, lap, spd, steer, flags, gear) in enumerate(SEQ):

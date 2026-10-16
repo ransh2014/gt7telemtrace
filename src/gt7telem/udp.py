@@ -774,6 +774,30 @@ def _normalise_steering(angle, source, heading_estimate, car_id, speed_kmh):
     sign = -1.0 if _steer_corr < 0 else 1.0
     return max(-1.0, min(1.0, sign * angle / lock))
 
+# Optional hook for the recorder: fn(parsed, mono), called on this receive thread
+# for every good packet, with the packet's arrival time (time.monotonic()). It
+# must be quick and must not touch Tk. An exception in it is contained (the
+# packet still reaches the state and event logic) and logged once.
+_packet_tap = None
+_tap_error_logged = False
+
+def set_packet_tap(fn) -> None:
+    global _packet_tap, _tap_error_logged
+    _packet_tap = fn
+    _tap_error_logged = False
+
+def _run_packet_tap(parsed, mono):
+    global _tap_error_logged
+    tap = _packet_tap
+    if tap is None:
+        return
+    try:
+        tap(parsed, mono)
+    except Exception as e:
+        if not _tap_error_logged:
+            _tap_error_logged = True
+            _log(f"[gt7udp] Packet tap error: {e}")
+
 def _ingest(raw):
     global _connected, _latest
     dec = _decrypt(raw)
@@ -785,11 +809,13 @@ def _ingest(raw):
         _diag_incr("parse_failures")
         return
     global _last_packet_mono
+    mono = time.monotonic()
     with _lock:
         _latest    = parsed
         _connected = True
-        _last_packet_mono = time.monotonic()
+        _last_packet_mono = mono
     _diag_update(last_good_packet_at=time.time())
+    _run_packet_tap(parsed, mono)
     _check_events(parsed)
 
 # ── Thread 1: heartbeat ────────────────────────────────────────────────────────

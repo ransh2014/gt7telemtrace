@@ -437,3 +437,31 @@ def test_lap_card_for_a_ghost_lap_with_only_the_compact_fields():
                     steering=0.0, gear=3, t=i * 0.1) for i in range(200)]
     data, df = load_lap_data({"car": "Ghost Car", "track": "somewhere", "lap_time_s": 99.9, "samples": samples})
     assert lap_card_png(data, df)[:4] == b"\x89PNG"
+
+
+def test_packet_tap_sees_every_good_packet_and_cannot_break_ingest(monkeypatch):
+    seen, events = [], []
+    monkeypatch.setattr(udp, "_decrypt", lambda raw: None if raw == b"bad" else b"x" * 0x44)
+    monkeypatch.setattr(udp, "_parse", lambda dec: {"speed_kmh": 12.0})
+    monkeypatch.setattr(udp, "_check_events", events.append)
+    monkeypatch.setattr(udp, "_latest", {}, raising=False)
+    monkeypatch.setattr(udp, "_connected", False, raising=False)
+    monkeypatch.setattr(udp, "_last_packet_mono", None, raising=False)
+    monkeypatch.setattr(udp, "_packet_tap", None, raising=False)
+    monkeypatch.setattr(udp, "_tap_error_logged", False, raising=False)
+    try:
+        udp.set_packet_tap(lambda parsed, mono: seen.append((parsed, mono)))
+        for raw in (b"a", b"bad", b"b"):
+            udp._ingest(raw)
+        assert [p["speed_kmh"] for p, _ in seen] == [12.0, 12.0]
+        assert seen[0][1] <= seen[1][1] and len(events) == 2
+
+        def boom(parsed, mono):
+            raise RuntimeError("tap bug")
+        udp.set_packet_tap(boom)
+        udp._ingest(b"c")
+        udp._ingest(b"d")
+        assert len(events) == 4
+        assert udp._latest == {"speed_kmh": 12.0}
+    finally:
+        udp._reset_diagnostics()

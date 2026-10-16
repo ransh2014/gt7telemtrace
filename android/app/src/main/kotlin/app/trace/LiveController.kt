@@ -19,10 +19,10 @@ class LiveController(private val appCtx: Context) {
     val lapsDir = File(appCtx.getExternalFilesDir(null) ?: appCtx.filesDir, "laps")
 
     val log = mutableStateListOf<String>()
-    var ip by mutableStateOf(prefs.getString("ip", "192.168.1.11") ?: "192.168.1.11")
+    var ip by mutableStateOf(prefs.getString("ip", "192.168.1.1") ?: "192.168.1.1")
     var track by mutableStateOf(prefs.getString("track", "") ?: "")
     var car by mutableStateOf("")
-    var rate by mutableStateOf(prefs.getInt("rate", 60))
+    var rate by mutableStateOf(prefs.getInt("rate", 10))
     var d by mutableStateOf<Packet>(emptyMap())
     var online by mutableStateOf(false)
     var strat by mutableStateOf(StintTracker().snapshot())

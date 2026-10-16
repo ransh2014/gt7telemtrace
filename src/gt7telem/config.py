@@ -19,7 +19,7 @@ __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_R
            "ANALYTICS_ENABLED", "PSN_NAME",
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL",
-           "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "GHOST_ENABLED", "UPDATE_CHECK_ENABLED", "backup_laps",
+           "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "GHOST_ENABLED", "UPDATE_CHECK_ENABLED", "AUTO_LAP_ENABLED", "backup_laps",
            "ensure_ca_bundle", "explain_error", "MONO", "install_mac_buttons"]
 
 _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
@@ -243,6 +243,11 @@ _DEFAULTS = {
     # the public releases API, no data sent). Switch it off with the CHECK FOR
     # UPDATES checkbox in the Dashboard header; applies from the next launch.
     "UPDATE_CHECK_ENABLED": True,
+    # Auto lap: in time trial / practice / free run (no race laps set) the Dashboard
+    # arms Record Lap by itself once you are driving, so every lap from the next
+    # start/finish crossing is saved with no button press. Off by default. Switch:
+    # the AUTO LAP checkbox in the Dashboard header. Races already auto-start.
+    "AUTO_LAP_ENABLED": False,
 }
 
 def remember_good_ip(ip: str) -> list:
@@ -389,6 +394,7 @@ NOTIFY_ENABLED = _cfg["NOTIFY_ENABLED"]
 VOICE_ENABLED = _cfg["VOICE_ENABLED"]
 GHOST_ENABLED = _cfg["GHOST_ENABLED"]
 UPDATE_CHECK_ENABLED = _cfg["UPDATE_CHECK_ENABLED"]
+AUTO_LAP_ENABLED = _cfg["AUTO_LAP_ENABLED"]
 
 
 def backup_laps() -> "Path | None":

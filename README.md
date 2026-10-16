@@ -54,6 +54,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Mini track map with live position
 - Configurable recording sample rate (10/20/30/60 Hz)
 - Live delta vs. your best lap in the same car on the same track (`reference_<car>.json`)
+- **Track auto-detect** — GT7 doesn't report the track, so TRACE recognises it from where a lap starts and which way you leave the line, and offers "Looks like X — use it?" (never fills it silently). Unseen tracks are shortlisted by lap length, and the save-time "no track" dropdown lists the best guesses first
 - Connection diagnostics — heartbeats, packet loss, decrypt/parse failures, actionable error messages
 - Remembers every PS4/PS5 IP you've connected to (most recent first), plus an Auto-Detect button that finds the console on your network
 - Automatic race recording — starts on a detected race start (race sessions only, not time trial/practice), stops at the flag or when you quit
@@ -217,6 +218,8 @@ The Launcher also checks GitHub's public releases API for a newer version on sta
 
 The Live Dashboard's **top-lap ghost** makes one read-only request to the leaderboard database once your car and track have both been known and unchanged for a few seconds in a run (and once more for each new car/track you switch to): it asks for the single fastest public lap for that exact car and track so it can show your live gap. The request carries only the car and track names — no account, PSN name, lap or telemetry data — and stays silent if you're offline or no lap exists. Untick **`TOP-LAP GHOST`** and the Dashboard makes no leaderboard requests at all.
 
+**Track auto-detect** reads a shared list of known start points (layout name, start position and heading) once on launch, and keeps what it learns on your PC in `track_fingerprints.json`. With **`SHARE USAGE DATA`** on, a newly learned start point (layout name, start position and heading in game-world coordinates, and lap length) is also shared to that list; nothing about you, your car or your lap time is sent. Untick it and nothing is shared.
+
 The optional **metrics export** (off by default) isn't data sent anywhere: it only serves live gauges from a small web server on your own PC (`127.0.0.1`, port 9109). Ticking **`ALLOW REMOTE`** makes that server reachable by other devices on your local network, with no password, so only do it on a network you trust.
 
 Submitting a lap to the leaderboard is a separate, always-explicit opt-in (a button you press). A signed-in submission also carries your anonymous account ID (the database needs it to attach the lap to an account; it isn't shown publicly). The optional free account only ever stores a display name and that anonymous ID — no email, no password. If a submission is rejected because your login has expired, TRACE sends your stored refresh token to the same database to renew it and retries once — only during a submission you started, never in the background.
@@ -258,6 +261,7 @@ dashboard.App().mainloop()
 | A module named `gt7telem` already exists | You (or another package) installed an unrelated `gt7telem`; run `pip show gt7telem` to check before installing |
 | Car/track shows as a blank name | The ID isn't in the local database yet — run `gt7telem-add-car` / `gt7telem-add-track`, or wait for the next scheduled DB refresh |
 | Race or lap saved as incomplete / recording stops partway | The PC went to sleep or hibernated, which stops packets. TRACE keeps Windows/macOS awake while it's receiving, but that can't stop a closed lid or a manual Sleep/Hibernate — set **Power & sleep → Sleep: Never** (and turn hibernation off) before you race |
+| Endurance / timed race wasn't recorded or saved | TRACE only auto-starts and auto-stops recording for races with a set number of laps. For a timed or endurance race, press **Record Race** yourself at the start, keep the Dashboard open for the whole race (the recording stays in memory until you stop it), and press **Stop Record Race** after the chequered flag |
 
 Live connection diagnostics (heartbeat count, packet loss, last error) are always visible in the Dashboard, and available programmatically via `gt7telem.get_diagnostics()`.
 

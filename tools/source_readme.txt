@@ -72,8 +72,12 @@ gt7telem/         The TRACE package itself (same source that ships on
                     laps) -- the Records link on the launcher menu
   keepawake.py      Keeps the PC from idle-sleeping/hibernating while telemetry
                     is arriving (Windows/macOS), so races don't end up incomplete
+  lapclean.py       Junk-lap guards (too short / parked / double save) and the
+                    duplicate-lap finder (extras move to _duplicates, never deleted)
   notify.py         Desktop toast + sound alerts (new PB, race end); switch it
                     off with NOTIFICATIONS in the Live Dashboard header
+  trackdetect.py    Track auto-detect: learns each layout's start-line position +
+                    heading (and lap length) and suggests the track for you to confirm
   voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS
                     voice (Windows SAPI, macOS say, Linux spd-say/espeak);
                     falls back to the notify.py sound. Mute with VOICE ALERTS.

@@ -17,7 +17,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import __version__, auth, corners, leaderboard, records, share_card, theoretical, tracks
+from . import __version__, auth, corners, lapclean, leaderboard, records, share_card, theoretical, tracks
 from . import config as runtime_config
 
 matplotlib.use("TkAgg")
@@ -2141,6 +2141,9 @@ class AnalystApp(tk.Tk):
         tk.Button(fe, text="🗄  Backup All Laps", command=self._backup_all_laps,
                   bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
+        tk.Button(fe, text="🧹  Find Duplicate Laps", command=self._find_duplicate_laps,
+                  bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
         fl = _section("LEADERBOARD", YLW)
         tk.Button(fl, text="🏆  Submit to Leaderboard", command=self._submit_leaderboard,
@@ -2256,6 +2259,40 @@ class AnalystApp(tk.Tk):
             err = runtime_config.last_backup_error
             self._post(lambda: self._after_backup(path, err))
         threading.Thread(target=worker, daemon=True).start()
+
+    def _find_duplicate_laps(self):
+        """Scan the laps folder for identical lap files and offer to move the extra
+        copies into _duplicates (nothing is deleted)."""
+        folder = Path(runtime_config.load().get("LAPS_FOLDER") or runtime_config.LAPS_FOLDER)
+
+        def worker():
+            try:
+                groups = lapclean.find_duplicates(folder)
+            except Exception as e:
+                msg = str(e)
+                self._post(lambda: messagebox.showerror("Duplicate laps", f"Scan failed:\n{msg}"))
+                return
+            self._post(lambda: self._after_duplicate_scan(folder, groups))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _after_duplicate_scan(self, folder, groups):
+        extras = [p for _keep, ps in groups for p in ps]
+        if not extras:
+            messagebox.showinfo("Duplicate laps", "No duplicate laps found.")
+            return
+        shown = "\n".join(f"  {p.parent.name}/{p.name}" for p in extras[:12])
+        more = f"\n  ... and {len(extras) - 12} more" if len(extras) > 12 else ""
+        if not messagebox.askyesno(
+                "Duplicate laps",
+                f"Found {len(extras)} extra cop{'y' if len(extras) == 1 else 'ies'} of laps you already have:"
+                f"\n\n{shown}{more}\n\nMove them to the _duplicates folder? The original of each "
+                "lap stays where it is, and nothing is deleted."):
+            return
+        moved, errors = lapclean.move_duplicates(groups, folder)
+        msg = f"Moved {len(moved)} file(s) to:\n{folder / lapclean.DUP_FOLDER}"
+        if errors:
+            msg += f"\n\n{len(errors)} could not be moved (first: {errors[0][1]})"
+        messagebox.showinfo("Duplicate laps", msg)
 
     def _after_backup(self, path, err):
         if path is not None:

@@ -73,8 +73,8 @@ def next_local_id(rows):
 def main():
     print("=== Add a track to TRACE's track list ===")
     print(f"File: {tracks.local_csv_path()}\n")
-    print("GT7's telemetry doesn't report a track ID, so there's nothing to")
-    print("look up by number here -- this just adds a name to the TRACK")
+    print("GT7's telemetry doesn't report a track ID, so there's no number to")
+    print("look up here -- this just adds a name to the TRACK")
     print("dropdown in the Live Dashboard.\n")
 
     rows = load_rows()

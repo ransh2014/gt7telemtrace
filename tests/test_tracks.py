@@ -37,9 +37,9 @@ def test_add_track_writes_local_file_only(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "_base_dir", lambda: tmp_path)
     monkeypatch.setattr(tracks._runtime_config, "_base_dir", lambda: tmp_path)
     shipped_before = add_track.SHIPPED_CSV.read_bytes()
-    monkeypatch.setattr("builtins.input", lambda *_: "Sportsland SUGO")
+    monkeypatch.setattr("builtins.input", lambda *_: "SUGO International Racing Course")
     add_track.main()
     assert add_track.SHIPPED_CSV.read_bytes() == shipped_before
     monkeypatch.setattr(tracks, "_loaded", False)
     monkeypatch.setattr(tracks, "_track_names", {})
-    assert "Sportsland SUGO" in tracks.all_track_names()
+    assert "SUGO International Racing Course" in tracks.all_track_names()

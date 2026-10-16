@@ -7,7 +7,7 @@ import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Heartbeat sender + receiver. Port of udp._heartbeat_thread / _udp_thread. */
-class TelemetryClient(ip: String = "192.168.1.11", private val onPacket: ((Packet) -> Unit)? = null) {
+class TelemetryClient(ip: String = "192.168.1.1", private val onPacket: ((Packet) -> Unit)? = null) {
     @Volatile var ip: String = ip
     val decoder = PacketDecoder()
     @Volatile var latest: Packet = emptyMap(); private set

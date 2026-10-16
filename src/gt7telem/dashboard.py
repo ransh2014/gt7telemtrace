@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from . import __version__, ghost, keepawake, leaderboard, metrics_server, notify, voice
+from . import __version__, ghost, keepawake, lapclean, leaderboard, metrics_server, notify, trackdetect, voice
 from . import cars as car_db
 from . import config as runtime_config
 from . import tracks as track_db
@@ -32,15 +32,12 @@ runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op els
 # Recording sample rate
 # ─────────────────────────────────────────────────────────────────────────────
 # Options the user can pick for how often samples are recorded during
-# Record Lap / Record Race. gt7udp.py doesn't document GT7's actual telemetry
-# packet rate anywhere (no constant/comment gives a number), so we don't
-# claim one -- 60 Hz is used as a conservative ceiling. Recording is driven
-# by its own timer (_record_tick, below) that runs independently of the
-# fixed 100ms/10Hz GUI redraw poll (_poll), so it isn't limited to that
-# 10Hz UI-only artifact. If the console is actually delivering fresh
-# packets slower than the chosen rate, telem.get_snapshot() will just
-# return the same latest packet more than once -- we never fabricate or
-# interpolate values to hit a higher rate (no upsampling).
+# Record Lap / Record Race. GT7 streams about 60 telemetry packets a second, so
+# 60 Hz means "every packet". Samples are chosen per packet on the UDP receive
+# thread (see _on_packet_tap and _thin_accept, below), so the rate does not
+# depend on the Tk timer or on how busy the UI is. If the console delivers
+# packets slower than the chosen rate, we record what arrives -- we never
+# fabricate or interpolate values to hit a higher rate (no upsampling).
 RECORD_RATE_OPTIONS = [10, 20, 30, 60]
 
 # A race is buffered entirely in memory until it ends, so the sample count is
@@ -54,7 +51,7 @@ RECORD_RATE_OPTIONS = [10, 20, 30, 60]
 RACE_SAMPLE_WARN = 150_000   # ~230 MB
 RACE_SAMPLE_MAX  = 400_000   # ~610 MB
 GHOST_SETTLE_S = 3.0   # car + track must be unchanged this long before the top-lap lookup is made
-_RECORD_TICK_MS = 1000 // max(RECORD_RATE_OPTIONS)  # fast enough to thin down to any option above
+_RECORD_TICK_MS = 1000 // max(RECORD_RATE_OPTIONS)  # how often the UI thread drains the recording queue
 
 # Where a recording goes when its normal place under LAPS_FOLDER can't be
 # written (disk full, folder not writable, path gone), so a finished race
@@ -95,6 +92,102 @@ def _next_due(due, now, dt):
     effective rate below the selected one; resyncs after a stall."""
     nxt = due + dt if due > 0 else now + dt
     return now + dt if nxt <= now else nxt
+
+
+# Per-packet thinning, run on the UDP receive thread. `slack` lets a packet that
+# arrives a hair early (network jitter) still count, so a 60 Hz stream thinned to
+# 60 Hz keeps every packet instead of dropping every other one.
+RECORD_TAP_SLACK_S = 0.004
+RECORD_QUEUE_MAX = 6000   # ~100 s of 60 Hz samples if the UI thread ever stalls
+
+
+def _thin_accept(due, now, dt):
+    """Is the packet that arrived at `now` a sample, when one is wanted every
+    `dt` seconds? Returns (accept, new_due). Deadlines are anchored to the
+    previous deadline (not to when the packet happened to arrive) so jitter
+    can't drag the rate down; after a stall of more than one interval it resyncs."""
+    if due <= 0.0:
+        return True, now + dt
+    if now + RECORD_TAP_SLACK_S < due:
+        return False, due
+    nxt = due + dt
+    if nxt < now - dt:
+        nxt = now + dt
+    return True, nxt
+
+
+# Auto lap (optional): in a session with no race laps set (time trial, practice,
+# free run) arm Record Lap by itself once the car is moving on track.
+AUTO_LAP_MIN_KPH = 5.0
+AUTO_LAP_ARM_HOLD_S = 1.5     # on track and moving this long before arming
+AUTO_LAP_LEAVE_HOLD_S = 3.0   # out of the session (menu, garage, race) this long before disarming
+
+
+# Returned by _save_lap/_save_race when a recording was deliberately not saved
+# (junk or duplicate), so callers don't mistake it for a failed save.
+_SKIPPED = Path("skipped")
+
+
+# Low-battery warning: while a lap/race is armed or recording on battery power
+BATTERY_WARN_PCT = 20.0
+BATTERY_CRIT_PCT = 10.0
+BATTERY_ALARM_AFTER_S = 30.0   # unacknowledged this long -> loud repeating alarm
+BATTERY_CHECK_S = 2.0
+
+
+def read_battery():
+    """(percent, plugged_in) or None when there is no battery or it can't be read."""
+    try:
+        import psutil
+        b = psutil.sensors_battery()
+        if b is not None:
+            return float(b.percent), bool(b.power_plugged)
+    except Exception:
+        pass
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            class _SPS(ctypes.Structure):
+                _fields_ = [("ACLineStatus", ctypes.c_ubyte), ("BatteryFlag", ctypes.c_ubyte),
+                            ("BatteryLifePercent", ctypes.c_ubyte), ("SystemStatusFlag", ctypes.c_ubyte),
+                            ("BatteryLifeTime", ctypes.c_ulong), ("BatteryFullLifeTime", ctypes.c_ulong)]
+            s = _SPS()
+            if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(s)):
+                return None
+            if s.BatteryFlag == 128 or s.BatteryLifePercent == 255:
+                return None
+            return float(s.BatteryLifePercent), s.ACLineStatus == 1
+        except Exception:
+            return None
+    return None
+
+
+def battery_needs_warning(batt, active, warn_pct=BATTERY_WARN_PCT):
+    """True when a lap/race is in progress, the laptop is on battery and low."""
+    if not active or batt is None:
+        return False
+    pct, plugged = batt
+    return (not plugged) and pct < warn_pct
+
+
+def battery_alarm_due(warned_since, now, acked):
+    """Loud alarm once the warning has gone unacknowledged for a while."""
+    return (not acked) and warned_since is not None and now - warned_since >= BATTERY_ALARM_AFTER_S
+
+
+def auto_lap_in_session(d):
+    """True while the player is on track in a session without race laps."""
+    if d.get("loading") or not d.get("car_on_track", False):
+        return False
+    return int(d.get("total_laps") or 0) == 0
+
+
+def auto_lap_can_arm(d):
+    """In-session, not paused and actually moving."""
+    if d.get("paused") or not auto_lap_in_session(d):
+        return False
+    return float(d.get("speed_kmh") or 0.0) >= AUTO_LAP_MIN_KPH
 
 
 def lap_clock_running(cur_lap, total_laps, paused, on_track, loading):
@@ -208,8 +301,32 @@ class App(tk.Tk):
         self._record_rate            = _saved_rate
         self._rec_due      = 0.0
         self._rec_due_race = 0.0
+        self._rec_q        = deque(maxlen=RECORD_QUEUE_MAX)   # (kind, arrival time, packet) from the UDP thread
+        self._lap_rec_since  = 0.0   # packets that arrived before a recording started are ignored
+        self._race_rec_since = 0.0
+        self._auto_lap_since     = None    # when the "driving in a non-race session" state began
+        self._auto_lap_off_since = None    # when the session was left, while an auto lap is armed
+        self._auto_lap_active    = False   # the current Record Lap arming was done automatically
+        self._auto_lap_block     = False   # user stopped an auto lap: stay off until the session is left
+        self._batt_next      = 0.0     # next battery check (monotonic)
+        self._batt_warned_at = None    # when the low-battery warning first showed
+        self._batt_ack       = False   # user pressed OK on the warning bar
+        self._batt_crit      = False   # re-alarmed once at the critical level
+        self._batt_bar       = None    # the red warning bar (built on first use)
+        self._batt_lbl       = None
+        self._beeping        = False
+        self._last_lap_sig   = None    # identity of the last saved lap, to refuse a double save
+        self._save_unknown_ok = False  # user chose "save as unknown": don't ask again this run of laps
+        self._td_store       = trackdetect.FingerprintStore()   # learned + shared start-line fingerprints
+        self._td_lap         = -1      # lap number we already tried to detect a track for
+        self._td_bar         = None    # the "Looks like X" offer bar (built on first use)
+        self._td_lbl         = None
+        self._td_guess       = ""
+        self._td_rejected    = set()   # layouts the user said "Not this" to
+        threading.Thread(target=self._td_fetch_shared, daemon=True).start()
 
         self._build()
+        telem.set_packet_tap(self._on_packet_tap)
 
         if runtime_config.METRICS_ENABLED:
             addr = "0.0.0.0" if runtime_config.METRICS_BIND_ALL else "127.0.0.1"
@@ -357,6 +474,12 @@ class App(tk.Tk):
         self.voice_var = tk.BooleanVar(value=bool(runtime_config.VOICE_ENABLED))
         tk.Checkbutton(hdr3, text="VOICE ALERTS", variable=self.voice_var,
                        command=self._on_voice_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+
+        self.auto_lap_var = tk.BooleanVar(value=bool(runtime_config.AUTO_LAP_ENABLED))
+        tk.Checkbutton(hdr3, text="AUTO LAP", variable=self.auto_lap_var,
+                       command=self._on_auto_lap_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
@@ -1102,6 +1225,14 @@ class App(tk.Tk):
             state = "will bind to your LAN (0.0.0.0)" if runtime_config.METRICS_BIND_ALL else "will bind to localhost only"
             self.log_msg(f"Metrics export {state} next time it's enabled")
 
+    def _on_auto_lap_toggle(self):
+        runtime_config.AUTO_LAP_ENABLED = self.auto_lap_var.get()
+        runtime_config.save(AUTO_LAP_ENABLED=runtime_config.AUTO_LAP_ENABLED)
+        if runtime_config.AUTO_LAP_ENABLED:
+            self.log_msg("Auto lap on -- in time trial / practice, laps record by themselves from the next start/finish crossing")
+        else:
+            self.log_msg("Auto lap off")
+
     def _on_rate_change(self):
         try:
             rate = int(self.rate_var.get().split()[0])
@@ -1249,6 +1380,8 @@ class App(tk.Tk):
         last_ms = int(d.get("last_lap_ms") or -1)
         top_spd = int(d.get("est_top_speed") or 0)
 
+        self._auto_lap_step(d, time.monotonic())
+        self._battery_step(time.monotonic())
         self.lap_lbl.config(text=f"{cur_lap}/{tot_lap}")
         self.best_lbl.config(text=ms_to_laptime(best_ms))
         self.last_lbl.config(text=ms_to_laptime(last_ms))
@@ -1643,26 +1776,44 @@ class App(tk.Tk):
             pass
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Recording tick -- runs on its own timer, independent of the 10Hz GUI
-    # redraw poll above, so the user-selected recording rate (self._record_rate,
-    # up to RECORD_RATE_OPTIONS' max) isn't capped by that UI-only cadence.
-    # Ticks at _RECORD_TICK_MS and thins samples down to the selected rate by
-    # skipping ticks that land inside the same 1/rate window as the last
-    # recorded sample -- it never invents/upsamples data between real packets.
+    # Recording. Samples are chosen on the UDP receive thread, one decision per
+    # packet (_on_packet_tap), and queued with their arrival time. The Tk timer
+    # below only drains that queue on the UI thread, where lap detection,
+    # saving and button updates happen. Recording used to read
+    # telem.get_snapshot() from a Tk timer instead, which on Windows fires every
+    # 15.6-31 ms and slows further when the UI is busy, so a "60 Hz" recording
+    # came out at 35-48 Hz. Nothing is invented or interpolated between real
+    # packets (no upsampling).
     # ─────────────────────────────────────────────────────────────────────────
+    def _on_packet_tap(self, d, mono):
+        """Receive thread, once per good packet (~60/s). Keep it cheap and free
+        of Tk calls: decide whether this packet is a sample at the chosen rate
+        and queue a copy for _record_tick."""
+        if self._closing or session.paused:
+            return
+        dt = 1.0 / max(self._record_rate, 1)
+        if session.recording or session.waiting:
+            ok, self._rec_due = _thin_accept(self._rec_due, mono, dt)
+            if ok:
+                self._rec_q.append(("lap", mono, dict(d)))
+        if session.race_recording:
+            ok, self._rec_due_race = _thin_accept(self._rec_due_race, mono, dt)
+            if ok:
+                self._rec_q.append(("race", mono, dict(d)))
+
     def _record_tick(self):
         try:
-            if not session.paused and telem.is_connected():
-                min_dt = 1.0 / max(self._record_rate, 1)
-                now = time.monotonic()
-
-                if (session.recording or session.waiting) and now >= self._rec_due:
-                    self._rec_due = _next_due(self._rec_due, now, min_dt)
-                    self._record_sample(telem.get_snapshot())
-
-                if session.race_recording and now >= self._rec_due_race:
-                    self._rec_due_race = _next_due(self._rec_due_race, now, min_dt)
-                    self._record_race_sample(telem.get_snapshot())
+            q = self._rec_q
+            while q:
+                try:
+                    kind, mono, d = q.popleft()
+                except IndexError:
+                    break
+                if kind == "lap":
+                    if (session.recording or session.waiting) and mono >= self._lap_rec_since:
+                        self._record_sample(d, mono)
+                elif session.race_recording and mono >= self._race_rec_since:
+                    self._record_race_sample(d, mono)
         except Exception as e:
             err = f"{type(e).__name__}: {e}"
             if err != self._last_record_error:
@@ -1688,23 +1839,320 @@ class App(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
     # Record
     # ─────────────────────────────────────────────────────────────────────────
+    # ── Low battery ──────────────────────────────────────────────────────────
+    def _battery_beep(self, loud):
+        """Short alert (loud=False) or a harsh siren burst (loud=True), off the UI thread."""
+        if self._beeping:
+            return
+        self._beeping = True
+
+        def run():
+            try:
+                try:
+                    import winsound
+                except ImportError:
+                    winsound = None
+                if winsound is None:
+                    return
+                if loud:
+                    for _ in range(3):
+                        winsound.Beep(2800, 300)
+                        winsound.Beep(1500, 300)
+                else:
+                    winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+            except Exception:
+                pass
+            finally:
+                self._beeping = False
+        threading.Thread(target=run, daemon=True).start()
+
+    def _show_battery_bar(self, pct):
+        if self._batt_bar is None:
+            bar = tk.Frame(self, bg="#c0392b")
+            self._batt_lbl = tk.Label(bar, text="", bg="#c0392b", fg="white",
+                                      font=(runtime_config.MONO, 11, "bold"), pady=4)
+            self._batt_lbl.pack(side="left", padx=10)
+            tk.Button(bar, text="OK, I'll charge", command=self._battery_ack, relief="flat",
+                      bg="#16213e", fg="white", font=(runtime_config.MONO, 9),
+                      padx=8).pack(side="right", padx=10, pady=3)
+            self._batt_bar = bar
+        self._batt_lbl.config(text=f"LOW BATTERY ({pct:.0f}%) - plug in your charger now, "
+                                   f"or this lap/race will be lost when the laptop dies")
+        if not self._batt_bar.winfo_ismapped():
+            first = [w for w in self.pack_slaves() if w is not self._batt_bar]
+            if first:
+                self._batt_bar.pack(fill="x", side="top", before=first[0])
+            else:
+                self._batt_bar.pack(fill="x", side="top")
+
+    def _hide_battery_bar(self):
+        if self._batt_bar is not None and self._batt_bar.winfo_ismapped():
+            self._batt_bar.pack_forget()
+
+    def _battery_ack(self):
+        self._batt_ack = True
+        self._hide_battery_bar()
+
+    def _battery_step(self, now):
+        """~10 Hz caller, throttled. Warns (bar, then siren if ignored) while a lap or
+        race is in progress on low battery."""
+        if now < self._batt_next:
+            return
+        self._batt_next = now + BATTERY_CHECK_S
+        batt = read_battery()
+        active = bool(session.recording or session.waiting or session.race_recording)
+        if not battery_needs_warning(batt, active):
+            if self._batt_warned_at is not None:
+                self._hide_battery_bar()
+                self._batt_warned_at = None
+                self._batt_ack = False
+                self._batt_crit = False
+            return
+        pct = batt[0]
+        if self._batt_warned_at is None:
+            self._batt_warned_at = now
+            self._batt_ack = False
+            self._show_battery_bar(pct)
+            self.log_msg(f"WARNING: battery at {pct:.0f}% and not charging -- plug in so the recording isn't lost")
+            self._battery_beep(False)
+            return
+        if pct < BATTERY_CRIT_PCT and not self._batt_crit:
+            self._batt_crit = True
+            self._batt_ack = False
+            self._batt_warned_at = now - BATTERY_ALARM_AFTER_S
+            self.log_msg(f"CRITICAL: battery at {pct:.0f}% -- charge NOW")
+        if not self._batt_ack:
+            self._show_battery_bar(pct)
+        if battery_alarm_due(self._batt_warned_at, now, self._batt_ack):
+            self._battery_beep(True)
+
+    # ── Track selection ──────────────────────────────────────────────────────
+    def _warn_no_track(self, modal):
+        """Called when a recording starts. Never blocks recording; the track can still
+        be chosen when the lap/race is saved."""
+        self._save_unknown_ok = False
+        if self.track_var.get().strip():
+            return
+        self.log_msg("WARNING: no track selected -- pick one in the TRACK box "
+                     "(you'll be asked again when it is saved)")
+        if modal:
+            messagebox.showwarning(
+                "No track selected",
+                "No track is selected.\n\nPick one in the TRACK box so this recording is "
+                "filed under the right track. You can still record, and you'll be asked "
+                "again when it is saved.", parent=self)
+        else:
+            self.bell()
+
+    # ── track auto-detect ────────────────────────────────────────────────────
+    def _td_fetch_shared(self):
+        rows = trackdetect.fetch_shared()
+        if rows is not None:
+            self._td_store.set_shared(rows)
+
+    def _td_step(self, lap):
+        """Called per recorded sample. Once per lap, when no track is set and the car
+        has driven ~20 m from the line, offer the layout whose learned start matches."""
+        if self._td_lap == lap or not session.recording:
+            return
+        if self.track_var.get().strip():
+            self._td_lap = lap
+            return
+        fp = trackdetect.fingerprint_of(session.samples)
+        if fp is None:
+            if len(session.samples) > 900:
+                self._td_lap = lap
+            return
+        self._td_lap = lap
+        for name, _d in self._td_store.match(fp):
+            if name not in self._td_rejected:
+                self._show_track_offer(name)
+                return
+
+    def _show_track_offer(self, name):
+        self._td_guess = name
+        if self._td_bar is None:
+            bar = tk.Frame(self, bg="#1f6f8b")
+            self._td_lbl = tk.Label(bar, text="", bg="#1f6f8b", fg="white",
+                                    font=(runtime_config.MONO, 11, "bold"), pady=4)
+            self._td_lbl.pack(side="left", padx=10)
+            tk.Button(bar, text="Not this", command=self._td_decline, relief="flat",
+                      bg="#16213e", fg="white", font=(runtime_config.MONO, 9),
+                      padx=8).pack(side="right", padx=(0, 10), pady=3)
+            tk.Button(bar, text="Use it", command=self._td_accept, relief="flat",
+                      bg="#27ae60", fg="white", font=(runtime_config.MONO, 9, "bold"),
+                      padx=8).pack(side="right", padx=4, pady=3)
+            self._td_bar = bar
+        self._td_lbl.config(text=f"Looks like {name} - use it as the track?")
+        if not self._td_bar.winfo_ismapped():
+            first = [w for w in self.pack_slaves() if w is not self._td_bar]
+            if first:
+                self._td_bar.pack(fill="x", side="top", before=first[0])
+            else:
+                self._td_bar.pack(fill="x", side="top")
+
+    def _td_hide(self):
+        if self._td_bar is not None and self._td_bar.winfo_ismapped():
+            self._td_bar.pack_forget()
+
+    def _td_accept(self):
+        if self._td_guess and not self.track_var.get().strip():
+            self.track_var.set(self._td_guess)
+            self.log_msg(f"Track set to {self._td_guess} (detected from the start line)")
+        self._td_hide()
+
+    def _td_decline(self):
+        if self._td_guess:
+            self._td_rejected.add(self._td_guess)
+        self._td_hide()
+
+    def _td_learn(self, ui_track, samples, incomplete):
+        """After a confirmed, complete lap on a real layout, remember its start-line
+        fingerprint locally (and share it when usage sharing is on)."""
+        try:
+            if incomplete or not ui_track or not trackdetect.can_learn(ui_track, samples):
+                return
+            fp = trackdetect.fingerprint_of(samples)
+            if fp is None or not self._td_store.add(ui_track, fp):
+                return
+            if runtime_config.ANALYTICS_ENABLED:
+                length = trackdetect.lap_length(samples)
+                threading.Thread(target=trackdetect.submit_shared,
+                                 args=(ui_track, fp, length), daemon=True).start()
+        except Exception:
+            pass
+
+    def _ask_track_for_save(self, what, samples=None):
+        """No track set at save time: confirm, and let the user pick the track they drove.
+        Returns the chosen track name, or '' to save as unknown (closing the box counts).
+        With samples, likely tracks (start-line match, then lap length) go first."""
+        if self._save_unknown_ok:
+            return ""
+        hint = []
+        if samples:
+            try:
+                fp = trackdetect.fingerprint_of(samples)
+                hint = [n for n, _d in self._td_store.match(fp)]
+                if what == "lap":
+                    for n in trackdetect.shortlist_by_length(trackdetect.lap_length(samples)):
+                        if n not in hint:
+                            hint.append(n)
+            except Exception:
+                hint = []
+        dlg = tk.Toplevel(self)
+        dlg.title("No track selected")
+        dlg.configure(bg="#16213e")
+        dlg.transient(self)
+        choice = {"v": ""}
+        tk.Label(dlg, text=f"No track is selected, so this {what} would be saved as 'unknown'.\n"
+                           "Are you sure? Pick the track you drove on:",
+                 bg="#16213e", fg="white", justify="left",
+                 font=(runtime_config.MONO, 10)).pack(padx=16, pady=(14, 8))
+        var = tk.StringVar(value=hint[0] if hint else "")
+        names = track_db.all_track_names()
+        ttk.Combobox(dlg, textvariable=var, values=hint + [n for n in names if n not in hint],
+                     width=40).pack(padx=16, pady=4)
+        if hint:
+            tk.Label(dlg, text="Best guesses are listed first.", bg="#16213e", fg="#8aa",
+                     font=(runtime_config.MONO, 8)).pack()
+        row = tk.Frame(dlg, bg="#16213e")
+        row.pack(pady=12)
+
+        def use():
+            choice["v"] = var.get().strip()
+            dlg.destroy()
+
+        def unknown():
+            choice["v"] = ""
+            dlg.destroy()
+        tk.Button(row, text="Save to this track", command=use, bg="#27ae60", fg="white",
+                  relief="flat", padx=10).pack(side="left", padx=6)
+        tk.Button(row, text="Save as unknown", command=unknown, bg="#16213e", fg="white",
+                  relief="flat", padx=10).pack(side="left", padx=6)
+        dlg.protocol("WM_DELETE_WINDOW", unknown)
+        dlg.update_idletasks()
+        try:
+            dlg.geometry(f"+{self.winfo_rootx() + 120}+{self.winfo_rooty() + 120}")
+            dlg.grab_set()
+        except tk.TclError:
+            pass
+        self.wait_window(dlg)
+        if choice["v"]:
+            self.track_var.set(choice["v"])
+        else:
+            self._save_unknown_ok = True
+        return choice["v"]
+
+    def _auto_lap_disarm(self, why):
+        """Drop an auto-armed lap without saving: leaving a session mid-lap would
+        otherwise leave a stray partial lap behind."""
+        n = len(session.samples)
+        session.recording = False
+        session.waiting   = False
+        session.samples   = []
+        self._auto_lap_active = False
+        self._auto_lap_since = self._auto_lap_off_since = None
+        self.rec_btn.config(text="Record Lap", bg="#16213e")
+        self.log_msg(f"Auto lap: {why}" + (f" -- partial lap ({n} samples) discarded" if n else ""))
+
+    def _auto_lap_step(self, d, now):
+        """~10 Hz, UI thread. Arms Record Lap while driving in a non-race session
+        and disarms it when the session is left. Never touches a lap the user armed."""
+        if not runtime_config.AUTO_LAP_ENABLED:
+            if self._auto_lap_active:
+                self._auto_lap_disarm("turned off")
+            self._auto_lap_since = None
+            return
+        in_session = auto_lap_in_session(d)
+        if not in_session:
+            self._auto_lap_block = False
+        if self._auto_lap_active:
+            if in_session:
+                self._auto_lap_off_since = None
+            elif self._auto_lap_off_since is None:
+                self._auto_lap_off_since = now
+            elif now - self._auto_lap_off_since >= AUTO_LAP_LEAVE_HOLD_S:
+                self._auto_lap_disarm("session ended")
+            return
+        if (session.recording or session.waiting or session.race_recording
+                or session.paused or self._auto_lap_block):
+            self._auto_lap_since = None
+            return
+        if not auto_lap_can_arm(d):
+            self._auto_lap_since = None
+            return
+        if self._auto_lap_since is None:
+            self._auto_lap_since = now
+        elif now - self._auto_lap_since >= AUTO_LAP_ARM_HOLD_S:
+            self._auto_lap_since = self._auto_lap_off_since = None
+            self._auto_lap_active = True
+            self._start_record()
+            self.log_msg("Auto lap: armed -- recording starts at the next start/finish crossing")
+            self._warn_no_track(False)
+
     def _toggle_record(self):
         if session.recording or session.waiting:
             self._stop_record()
         else:
             self._start_record()
+            self._warn_no_track(True)
 
     def _start_record(self):
+        self._rec_due = 0.0
+        self._lap_rec_since = time.monotonic()
         session.waiting   = True
         session.recording = False
         session.samples   = []
         session.cur_lap   = telem.get_int("lap_number")
         session.prev_lap  = session.cur_lap
-        self._rec_due = 0.0
         self.rec_btn.config(text="Waiting for start line...", bg="#f39c12")
         self.log_msg("Armed -- cross the start line to begin recording")
 
     def _stop_record(self):
+        if self._auto_lap_active:
+            # the user stopped an auto-armed lap: stay off until they leave this session
+            self._auto_lap_active = False
+            self._auto_lap_block = True
         session.recording = False
         session.waiting   = False
         self.rec_btn.config(text="Record Lap", bg="#16213e")
@@ -1724,6 +2172,7 @@ class App(tk.Tk):
         if not session.race_recording:
             self._start_record_race()
             self.log_msg("Auto: race start detected -- recording started")
+            self._warn_no_track(False)
 
     def _on_race_end(self, parsed):
         self._post(self._handle_race_end)
@@ -1780,12 +2229,14 @@ class App(tk.Tk):
             self._stop_record_race()
         else:
             self._start_record_race()
+            self._warn_no_track(True)
 
     def _start_record_race(self):
-        session.race_recording = True
         session.race_samples   = []
         session.race_start_t   = time.monotonic()
+        self._race_rec_since   = session.race_start_t
         self._rec_due_race = 0.0
+        session.race_recording = True
         self.race_btn.config(text="Stop Race Recording", bg="#e94560")
         self.log_msg("Race recording started")
 
@@ -1800,13 +2251,13 @@ class App(tk.Tk):
             if notify_end:
                 notify.notify("🏁 Race Ended", "No samples were recorded.", root=self)
 
-    def _record_race_sample(self, d):
+    def _record_race_sample(self, d, now=None):
         # Re-check the flag here rather than trusting the caller: _stop_record_race()
         # below can fire from inside this very method, and an already-queued tick
         # must not append (or re-trip the limit) after the race has been saved.
         if not session.race_recording:
             return
-        session.race_samples.append(self._sample_dict(d, session.race_start_t))
+        session.race_samples.append(self._sample_dict(d, session.race_start_t, now))
 
         n = len(session.race_samples)
         if n == RACE_SAMPLE_WARN:
@@ -1862,7 +2313,13 @@ class App(tk.Tk):
         """final=False (window-close path) leaves no bookkeeping behind when
         the save fails, so a retry after the user keeps the window open can't
         duplicate the race in the summary / export."""
+        why = lapclean.junk_reason(samples)
+        if why:
+            self.log_msg(f"Race not saved -- {why}")
+            return _SKIPPED
         ui_track = self.track_var.get().strip()
+        if not ui_track and final:
+            ui_track = self._ask_track_for_save("race", samples)
         ui_car   = self.car_var.get().strip()
         track    = telem.sanitize(ui_track)
         car      = ui_car or "unknown"
@@ -1986,7 +2443,9 @@ class App(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
     # Sample building (shared by lap recording and race recording)
     # ─────────────────────────────────────────────────────────────────────────
-    def _sample_dict(self, d, start_t):
+    def _sample_dict(self, d, start_t, now=None):
+        if now is None:
+            now = time.monotonic()
         def _f(k):
             try: return round(float(d.get(k) or 0), 4)
             except Exception: return 0.0
@@ -2001,7 +2460,7 @@ class App(tk.Tk):
             except Exception: return 0.0
 
         return {
-            "t":                round(time.monotonic() - start_t, 3),
+            "t":                round(now - start_t, 3),
             "world_x":          _f("world_x"),   "world_y":    _f("world_y"),
             "world_z":          _f("world_z"),   "heading":    _f("heading"),
             "track_position":   _f("track_position"),
@@ -2057,7 +2516,9 @@ class App(tk.Tk):
             "car_category":              d.get("car_category") or "",
         }
 
-    def _record_sample(self, d):
+    def _record_sample(self, d, now=None):
+        if now is None:
+            now = time.monotonic()
         lap_raw = d.get("lap_number")
         try:
             lap = int(lap_raw) if lap_raw is not None else session.prev_lap
@@ -2068,7 +2529,7 @@ class App(tk.Tk):
             if lap > session.prev_lap:
                 session.waiting   = False
                 session.recording = True
-                session.start_t   = time.monotonic()
+                session.start_t   = now
                 session.prev_lap  = lap
                 self.rec_btn.config(text="Stop Recording", bg="#e94560")
                 self.log_msg(f"Start line crossed -- recording lap {lap}")
@@ -2105,12 +2566,15 @@ class App(tk.Tk):
                 # Used to fall through and keep appending, merging two laps.
                 self.log_msg(f"Lap changed after only {n} samples -- not saved")
             session.samples = []
-            session.start_t = time.monotonic()
+            session.start_t = now
             # No telem.reset_lap() here: udp.py restarts track_position itself,
             # at the exact packet where the lap counter changes.
         session.prev_lap = lap
 
-        session.samples.append(self._sample_dict(d, session.start_t))
+        session.samples.append(self._sample_dict(d, session.start_t, now))
+        step = getattr(self, "_td_step", None)
+        if step is not None:
+            step(lap)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Save lap
@@ -2189,7 +2653,19 @@ class App(tk.Tk):
         asking Save/Discard (window-close path). background=True does the
         file work on a worker thread. final=False: on failure leave no
         in-memory bookkeeping, so a retry can't duplicate the lap."""
+        _gt7 = bool(lap_time_ms and lap_time_ms > 0)
+        _secs = (lap_time_ms / 1000.0) if _gt7 else max(0.0, time.monotonic() - session.start_t)
+        why = lapclean.junk_reason(samples, _secs, self._lap_distance(samples) if len(samples) > 1 else 0.0)
+        if why:
+            self.log_msg(f"Lap not saved -- {why}")
+            return _SKIPPED
+        _sig = lapclean.samples_signature("", "", _secs, samples)
+        if _sig is not None and _sig == self._last_lap_sig:
+            self.log_msg("Lap not saved -- identical to the lap just saved (duplicate)")
+            return _SKIPPED
         ui_track = self.track_var.get().strip()
+        if not ui_track and prompt and final:
+            ui_track = self._ask_track_for_save("lap", samples)
         ui_car   = self.car_var.get().strip()
         track    = telem.sanitize(ui_track)
         car      = ui_car or "unknown"
@@ -2252,6 +2728,8 @@ class App(tk.Tk):
                 return None
             meta["file"] = str(saved)
             session.laps_saved.append(meta)
+            self._last_lap_sig = _sig
+            self._td_learn(ui_track, samples, incomplete)
             self.log_msg(f"Saved: {self._display_path(saved)}")
             self._post(self._add_lap_to_history, lap_num, new_time, track, car, incomplete, is_pb)
             if incomplete or saved != lap_path:

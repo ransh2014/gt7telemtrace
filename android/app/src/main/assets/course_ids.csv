@@ -1,4 +1,5 @@
 ID,Name,Base,Country,Category,Length,LongestStraight,ElevationDiff,Altitude,MinTimeH,MinTimeM,MinTimeS,MaxTimeH,MaxTimeM,MaxTimeS,LayoutNumber,IsReverse,PitLaneDelta,IsOval,NumCorners,NoRain
+-1,SUGO International Racing Course,,2,circuit,3586,704.5,69.83,244,,,,,,,1,0,,0,13,0
 4,Daytona Tri-Oval,14,3,circuit,4023,914,10.0,8.4,0,0,0,0,0,0,1,0,14.0,1,4,1
 10,Suzuka Circuit,29,2,circuit,5807,1200,40.0,29.0,4,20,0,19,40,0,1,0,20.5,0,20,0
 11,High Speed Ring,20,2,original,4345,1060,8.5,300.0,3,28,0,19,30,0,1,0,10.0,0,6,0

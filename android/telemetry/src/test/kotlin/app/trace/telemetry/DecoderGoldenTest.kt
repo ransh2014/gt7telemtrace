@@ -30,7 +30,7 @@ class DecoderGoldenTest {
     @Test fun matchesPythonOutput() {
         val root = JSONObject(File("src/test/resources/fixtures.json").readText())
         val cases = root.getJSONArray("cases")
-        val dec = PacketDecoder().apply { track = "Sportsland SUGO"; car = "Honda Civic SI '87" }
+        val dec = PacketDecoder().apply { track = "SUGO International Racing Course"; car = "Honda Civic SI '87" }
         for (c in 0 until cases.length()) {
             val case = cases.getJSONObject(c)
             val got = dec.decode(unhex(case.getString("hex")))

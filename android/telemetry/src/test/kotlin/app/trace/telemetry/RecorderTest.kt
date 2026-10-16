@@ -26,7 +26,7 @@ class RecorderTest {
         val logs = ArrayList<String>()
         val r = Recorder(dir, { logs.add(it) }, { t })
         r.recordRate = 60
-        val ctx = Recorder.Ctx("Sportsland SUGO", "Honda Civic SI '87", listOf(3.6, 2.2))
+        val ctx = Recorder.Ctx("SUGO International Racing Course", "Honda Civic SI '87", listOf(3.6, 2.2))
         r.startLap(1)
         // lap 1: waiting -> lap counter 2 starts recording
         for (i in 0 until 130) { t += 0.02; r.tick(pkt(2, i * 3.0), true, ctx) }
@@ -35,12 +35,12 @@ class RecorderTest {
         assertEquals(logs.joinToString("\n"), 1, files.size)
         val j = JSONObject(files[0].readText())
         assertEquals(107.12, j.getDouble("lap_time_s"), 1e-9)
-        assertEquals("sportsland_sugo", j.getString("track"))
+        assertEquals("sugo_international_racing_course", j.getString("track"))
         assertTrue(j.getJSONArray("samples").length() >= 100)
-        assertTrue(File(dir, "sportsland_sugo/reference_honda_civic_si_87.json").exists())
-        assertTrue(File(dir, "sportsland_sugo/personal_bests.json").exists())
+        assertTrue(File(dir, "sugo_international_racing_course/reference_honda_civic_si_87.json").exists())
+        assertTrue(File(dir, "sugo_international_racing_course/personal_bests.json").exists())
         // live delta against that reference
-        val d = r.liveDelta("sportsland_sugo", "honda_civic_si_87", 10.0, 100.0)
+        val d = r.liveDelta("sugo_international_racing_course", "honda_civic_si_87", 10.0, 100.0)
         assertNotNull(d)
     }
 
