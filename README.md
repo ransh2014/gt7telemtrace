@@ -54,7 +54,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Mini track map with live position
 - Configurable recording sample rate (10/20/30/60 Hz)
 - Live delta vs. your best lap in the same car on the same track (`reference_<car>.json`)
-- **Track auto-detect** — GT7 doesn't report the track, so TRACE recognises it from where a lap starts and which way you leave the line, and offers "Looks like X — use it?" (never fills it silently). Unseen tracks are shortlisted by lap length, and the save-time "no track" dropdown lists the best guesses first
+- **Track auto-detect** — GT7 doesn't report the track, so TRACE recognises it from where a lap starts and which way you leave the line, and offers "Looks like X — use it?" (never fills it silently; in a race it appears about one lap in, once you cross the line). Unseen tracks are shortlisted by lap length, and the save-time "no track" dropdown lists the best guesses first
 - Connection diagnostics — heartbeats, packet loss, decrypt/parse failures, actionable error messages
 - Remembers every PS4/PS5 IP you've connected to (most recent first), plus an Auto-Detect button that finds the console on your network
 - Automatic race recording — starts on a detected race start (race sessions only, not time trial/practice), stops at the flag or when you quit

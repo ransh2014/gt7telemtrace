@@ -74,3 +74,42 @@ def test_reverse_twin_is_symmetric_when_present():
         t = td.reverse_twin(name)
         if t:
             assert td.reverse_twin(t) == name
+
+def _race(laps=3, per=400, lap0=0):
+    """Race samples: optional lap-0 countdown, a grid run-up far from the line, then
+    laps that each start on the line (the lap counter ticks up there)."""
+    s = [{"lap_number": 0, "world_x": -300.0, "world_z": 50.0}] * lap0
+    s += [{"lap_number": 1, "world_x": -300.0 + i, "world_z": 50.0} for i in range(60)]
+    for k in range(laps):
+        for smp in _lap(length=3586, n=per):
+            s.append(dict(smp, lap_number=k + 2))
+    return s
+
+
+def test_rollover_and_race_fingerprints(tmp_path):
+    st = _store(tmp_path)
+    st.add(SUGO, td.fingerprint_of(_lap()))
+    for lap0 in (0, 20):                       # with and without a lap-0 countdown
+        race = _race(lap0=lap0)
+        assert td.rollover_indexes(race, 2)
+        hits = [h for fp in td.race_fingerprints(race) for h in st.match(fp)]
+        assert hits and hits[0][0] == SUGO
+    assert SUGO in td.shortlist_by_length(td.race_lap_lengths(_race())[0])
+
+
+def test_race_step_offers_the_track_at_the_line(tmp_path, monkeypatch):
+    st = _store(tmp_path)
+    st.add(SUGO, td.fingerprint_of(_lap()))
+    shown = []
+    from types import SimpleNamespace
+
+    from gt7telem import dashboard
+    app = SimpleNamespace(track_var=SimpleNamespace(get=lambda: ""), _td_store=st,
+                          _td_rejected=set(), _show_track_offer=shown.append)
+    dashboard.App._td_race_reset(app)
+    monkeypatch.setattr(dashboard.session, "race_samples", [], raising=False)
+    for smp in _race(laps=1):
+        dashboard.session.race_samples.append(smp)
+        dashboard.App._td_race_step(app)
+    assert shown == [SUGO]
+    assert app._td_race_done

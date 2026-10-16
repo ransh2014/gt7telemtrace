@@ -323,6 +323,7 @@ class App(tk.Tk):
         self._td_lbl         = None
         self._td_guess       = ""
         self._td_rejected    = set()   # layouts the user said "Not this" to
+        self._td_race_reset()
         threading.Thread(target=self._td_fetch_shared, daemon=True).start()
 
         self._build()
@@ -1950,6 +1951,45 @@ class App(tk.Tk):
         if rows is not None:
             self._td_store.set_shared(rows)
 
+    def _td_race_reset(self):
+        self._td_race_done = False     # offer made or given up for this race
+        self._td_race_idx = []         # sample indexes where the lap counter ticked up
+        self._td_race_tried = set()
+        self._td_race_lap = None
+
+    def _td_race_step(self):
+        """Races start on the grid, so recognise the track at a start-line crossing
+        instead: when the lap counter ticks up the car is on the line."""
+        if self._td_race_done:
+            return
+        smp = session.race_samples
+        if not smp:
+            return
+        if self.track_var.get().strip():
+            self._td_race_done = True
+            return
+        try:
+            lap = int(smp[-1].get("lap_number"))
+        except (TypeError, ValueError):
+            return
+        if self._td_race_lap is not None and lap > self._td_race_lap and len(self._td_race_idx) < 2:
+            self._td_race_idx.append(len(smp) - 1)
+        self._td_race_lap = lap
+        for i in self._td_race_idx:
+            if i in self._td_race_tried:
+                continue
+            fp = trackdetect.fingerprint_of(smp[i:i + 1500])
+            if fp is None:
+                continue
+            self._td_race_tried.add(i)
+            for name, _d in self._td_store.match(fp):
+                if name not in self._td_rejected:
+                    self._td_race_done = True
+                    self._show_track_offer(name)
+                    return
+        if len(self._td_race_tried) >= 2:
+            self._td_race_done = True
+
     def _td_step(self, lap):
         """Called per recorded sample. Once per lap, when no track is set and the car
         has driven ~20 m from the line, offer the layout whose learned start matches."""
@@ -2031,10 +2071,18 @@ class App(tk.Tk):
         hint = []
         if samples:
             try:
-                fp = trackdetect.fingerprint_of(samples)
-                hint = [n for n, _d in self._td_store.match(fp)]
-                if what == "lap":
-                    for n in trackdetect.shortlist_by_length(trackdetect.lap_length(samples)):
+                if what == "race":
+                    fps = trackdetect.race_fingerprints(samples)
+                    lengths = trackdetect.race_lap_lengths(samples)[:2]
+                else:
+                    fps = [trackdetect.fingerprint_of(samples)]
+                    lengths = [trackdetect.lap_length(samples)]
+                for fp in fps:
+                    for n, _d in self._td_store.match(fp):
+                        if n not in hint:
+                            hint.append(n)
+                for ln in lengths:
+                    for n in trackdetect.shortlist_by_length(ln):
                         if n not in hint:
                             hint.append(n)
             except Exception:
@@ -2237,6 +2285,7 @@ class App(tk.Tk):
         self._race_rec_since   = session.race_start_t
         self._rec_due_race = 0.0
         session.race_recording = True
+        self._td_race_reset()
         self.race_btn.config(text="Stop Race Recording", bg="#e94560")
         self.log_msg("Race recording started")
 
@@ -2258,6 +2307,9 @@ class App(tk.Tk):
         if not session.race_recording:
             return
         session.race_samples.append(self._sample_dict(d, session.race_start_t, now))
+        step = getattr(self, "_td_race_step", None)
+        if step is not None:
+            step()
 
         n = len(session.race_samples)
         if n == RACE_SAMPLE_WARN:

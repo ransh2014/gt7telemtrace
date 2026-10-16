@@ -29,7 +29,7 @@ SHARED_NAME = "track_fingerprints_shared.json"
 POS_TOL_M = 15.0          # start point within this of a learned one
 HEADING_TOL_DEG = 30.0    # leaving the line within this of the learned heading
 MIN_DRIVE_M = 20.0        # distance driven before the heading is trustworthy
-LEN_TOL = 0.015           # lap length vs the metadata Length column
+LEN_TOL = 0.02            # lap length vs the metadata Length column (races read ~1.6% short)
 LEARN_LEN_TOL = 0.05      # don't learn from a lap that is >5% off the layout length
 MAX_OBS = 8               # observations kept per layout
 DEDUPE_M, DEDUPE_DEG = 5.0, 10.0
@@ -61,6 +61,40 @@ def fingerprint_of(samples, min_drive_m=MIN_DRIVE_M):
             return {"x": round(x0, 1), "z": round(z0, 1),
                     "heading": round(math.degrees(math.atan2(z - z0, x - x0)) % 360.0, 1)}
     return None
+
+
+def rollover_indexes(samples, limit=3):
+    """Indexes where the lap counter ticks up: the car is crossing the start line
+    there, which is what lets a race (grid start) be recognised too."""
+    out, prev = [], None
+    for i, s in enumerate(samples):
+        try:
+            lap = int(s.get("lap_number"))
+        except (TypeError, ValueError):
+            continue
+        if prev is not None and lap > prev:
+            out.append(i)
+            if len(out) >= limit:
+                break
+        prev = lap
+    return out
+
+
+def race_fingerprints(samples):
+    """Start-line fingerprints taken at the first two line crossings of a race (the
+    first can be the green flag on the grid, so both are tried)."""
+    out = []
+    for i in rollover_indexes(samples, 2):
+        fp = fingerprint_of(samples[i:i + 1500])
+        if fp:
+            out.append(fp)
+    return out
+
+
+def race_lap_lengths(samples):
+    """Measured lengths of the full laps between consecutive line crossings."""
+    idx = rollover_indexes(samples, 3)
+    return [lap_length(samples[a:b]) for a, b in zip(idx, idx[1:])]
 
 
 def lap_length(samples):

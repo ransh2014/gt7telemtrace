@@ -5,6 +5,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-16
+Track auto-detect now works in races.
+
+- Track auto-detect (Live Dashboard) now recognises the track during a race too. A race starts on the grid, so TRACE reads the start point at the first start-line crossings (when the lap counter ticks up) instead, and shows the "Looks like X - use it?" bar about one lap in. The save-time "no track" dropdown now also uses those crossings and the measured lap length for a race.
+
 ## [0.8.1] - 2026-10-15
 Bug-fix release: steadier recordings, the Incidents feature removed, and simpler share cards. Also the first release of TRACE for Android.
 
