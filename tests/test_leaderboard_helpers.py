@@ -11,31 +11,14 @@ from gt7telem import leaderboard
 from gt7telem.leaderboard import _compact_samples, _eq, lap_submission_error
 
 
-def test_eq_quotes_the_value():
-    assert _eq("Suzuka") == 'eq."Suzuka"'
+def test_eq_is_a_plain_filter_value():
+    """PostgREST does not unquote eq."..." values, so quoting matched nothing."""
+    assert _eq("Suzuka") == "eq.Suzuka"
 
 
-def test_eq_survives_a_comma():
-    """Unquoted, PostgREST treats a comma as the end of the filter value, so
-    a name containing one would silently match the wrong rows."""
-    assert _eq("Foo, Bar") == 'eq."Foo, Bar"'
-
-
-def test_eq_leaves_apostrophes_alone():
-    """Real car names are full of these -- GT-R '17, Mine's, 911 GT3 R '22."""
-    assert _eq("GT-R '17") == 'eq."GT-R \'17"'
-
-
-def test_eq_escapes_double_quotes_and_backslashes():
-    assert _eq('a"b') == 'eq."a\\"b"'
-    assert _eq("a\\b") == 'eq."a\\\\b"'
-
-
-@pytest.mark.parametrize("value", ["Suzuka", "Foo, Bar", "GT-R '17", 'a"b', "a\\b", ""])
-def test_eq_always_produces_one_balanced_quoted_token(value):
-    out = _eq(value)
-    assert out.startswith('eq."')
-    assert out.endswith('"')
+@pytest.mark.parametrize("value", ["Foo, Bar", "GT-R '17", "SUGO International Racing Course"])
+def test_eq_leaves_commas_and_apostrophes_alone(value):
+    assert _eq(value) == f"eq.{value}"
 
 
 KEPT = {"track_position", "speed_kmh", "throttle", "brake", "steering", "gear"}

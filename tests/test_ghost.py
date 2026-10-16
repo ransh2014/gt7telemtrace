@@ -91,7 +91,7 @@ def test_top_lap_ghost_makes_one_request_for_one_lap(monkeypatch):
     assert req.get_method() == "GET" and req.data is None
     q = urllib.parse.parse_qs(urllib.parse.urlparse(req.full_url).query)
     assert q["limit"] == ["1"] and q["order"] == ["lap_time_ms.asc"]
-    assert q["car_name"] == ['eq."Test Car"'] and q["track_name"] == ['eq."Test Circuit"']
+    assert q["car_name"] == ['eq.Test Car'] and q["track_name"] == ['eq.Test Circuit']
     assert q["created_at"][0].startswith("gte.2026-08-20")            # current physics era only
     assert "samples" in q["select"][0]
     assert "authorization" in {k.lower() for k in req.headers}

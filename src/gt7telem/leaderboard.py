@@ -94,14 +94,11 @@ def _headers(prefer=None, access_token=None):
 
 
 def _eq(value: str) -> str:
-    """PostgREST `eq.` filter value, safely quoted.
-
-    Unquoted values terminate at a comma, so a car or track name containing
-    one would silently truncate the filter and match the wrong rows (or
-    nothing). Double quotes make it a literal; inner quotes and backslashes
-    are escaped. urlencode() then percent-encodes the result."""
-    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
-    return f'eq."{escaped}"'
+    """PostgREST `eq.` filter value, used as-is. PostgREST does not unquote
+    double-quoted values for eq (only inside in/or lists), so quoting made every
+    filter match nothing. Commas are fine in a plain eq value; urlencode()
+    percent-encodes the rest."""
+    return f"eq.{value}"
 
 
 def _compact_samples(samples):
