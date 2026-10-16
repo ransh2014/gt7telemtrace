@@ -26,7 +26,7 @@ from matplotlib.patches import Polygon as MplPolygon
 
 warnings.filterwarnings("ignore")
 
-from . import __version__, consistency, corners, leaderboard, share_card  # noqa: E402
+from . import __version__, consistency, corners, leaderboard, share_card, uiscroll  # noqa: E402
 from . import config as runtime_config  # noqa: E402
 
 runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
@@ -1823,8 +1823,7 @@ class AnalystApp(tk.Tk):
 
         body = tk.Frame(self, bg=BG); body.pack(fill="both", expand=True)
 
-        side = tk.Frame(body, bg=PNL2, width=236)
-        side.pack(side="left", fill="y"); side.pack_propagate(False)
+        side = uiscroll.make_scrollable(body, PNL2, 236)
         self._build_sidebar(side)
 
         nb = ttk.Notebook(body); nb.pack(fill="both", expand=True)

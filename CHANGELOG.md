@@ -5,8 +5,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-16
 - Lap Analyst: the lap picker no longer lists race recordings as laps.
 - Leaderboard: removed the server-side "beats the record by more than 20%" hold. Only physically-impossible times (rejected) and suspiciously fast first times for a car and track (held for review) are checked now.
+- Lap Analyst and Race Analyst: the left side panel now scrolls (scrollbar or mouse wheel) when the window is too short to show it all.
 
 ## [0.8.2] - 2026-10-16
 Track auto-detect now works in races.

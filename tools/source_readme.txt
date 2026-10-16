@@ -78,6 +78,7 @@ gt7telem/         The TRACE package itself (same source that ships on
                     off with NOTIFICATIONS in the Live Dashboard header
   trackdetect.py    Track auto-detect: learns each layout's start-line position +
                     heading (and lap length) and suggests the track for you to confirm
+  uiscroll.py       Scrollable left side panel for the Lap and Race Analyst windows
   voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS
                     voice (Windows SAPI, macOS say, Linux spd-say/espeak);
                     falls back to the notify.py sound. Mute with VOICE ALERTS.

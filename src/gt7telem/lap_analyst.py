@@ -17,7 +17,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import __version__, auth, corners, lapclean, leaderboard, records, share_card, theoretical, tracks
+from . import __version__, auth, corners, lapclean, leaderboard, records, share_card, theoretical, tracks, uiscroll
 from . import config as runtime_config
 
 matplotlib.use("TkAgg")
@@ -2085,8 +2085,7 @@ class AnalystApp(tk.Tk):
 
         body = tk.Frame(self, bg=BG); body.pack(fill="both", expand=True)
 
-        side = tk.Frame(body, bg=PNL2, width=236)
-        side.pack(side="left", fill="y"); side.pack_propagate(False)
+        side = uiscroll.make_scrollable(body, PNL2, 236)
         self._build_sidebar(side)
 
         nb = ttk.Notebook(body); nb.pack(fill="both", expand=True)
