@@ -67,9 +67,10 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Lap history table with alerts
 
 ### Lap Analyst
-- **19 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus, Style, Corners, Theoretical
+- **20 chart groups**: Inputs, Engine, Tyres, Dynamics, Maps, G-Force, Fuel, Braking, Sectors, Traction, Tele Diff, Ratings, Heat Maps, Timeline, Extended, Consensus, Style, Corners, Theoretical, Dyno & Tune
 - A/B lap comparison across every chart group
 - **Theoretical tab** — stitches the fastest ~25 m micro-sector from each lap you've driven in this car on this track (Lap A, Lap B, any overlays, and your other saved laps) into the lap you *could* drive, and shows the zones where your best real lap is held back, and by whom. It's an optimistic ceiling: a faster exit carries into the next sector, so the real gain from fixing a weak zone is usually smaller
+- **Dyno & Tune tab** — drive one lap and it rebuilds what GT7 never shows: the engine's power and torque curve (real hp and Nm once you enter the car's weight, hp/tonne otherwise), every gear's ratio, km/h per 1000 rpm and true top speed, and the best shift rpm for each gear against the one you actually use. It then reads the lap for tuning hints: understeer or oversteer on entry, mid-corner and exit, wheelspin, brake lock-ups, gearing that is too long or too short, unused gears and rear-vs-front tyre heat, each with the direction to try on the tuning sheet. Load a second lap as Lap B after changing a part or a setting to overlay the before/after curves. The curve shape and shift points are solid; absolute power is an estimate (about ±10%)
 - **Corners tab** — finds every corner on the lap and, with your PB loaded as lap B, scores each one against the same corner on the PB: brake point, minimum speed, throttle-on point and time gained or lost, and a line naming the three corners that cost the most time
 - **Style tab** — classifies the lap as Smooth / Balanced / Aggressive and reads cornering balance (understeer- vs oversteer-leaning) from front vs rear tyre slip
 - **3+ lap overlay** — add any number of extra saved laps on top of A/B as dotted lines on the Inputs tab

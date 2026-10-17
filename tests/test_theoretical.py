@@ -115,4 +115,4 @@ def test_theoretical_chart_draws_and_explains_when_there_is_nothing_to_stitch():
 
 def test_lap_analyst_registers_the_theoretical_group():
     from gt7telem import lap_analyst as la
-    assert la.GROUPS[-1][0] == "Theoretical"
+    assert "Theoretical" in [g[0] for g in la.GROUPS]

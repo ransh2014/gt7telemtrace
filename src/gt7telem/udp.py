@@ -711,6 +711,7 @@ def _parse(data):
             "clutch_engaged":   clutch_engaged,
             "rpm_after_clutch": rpm_after_clutch,
             "gear_ratios":      gear_ratios,
+            "tyre_radius_m":    tyre_diam_rl,    # GT7's "diameter" field times rad/s gives m/s, so it is a radius
             "transmission_top_speed": transmission_top_speed,
             "total_laps":       total_laps,
             "current_position": current_pos,

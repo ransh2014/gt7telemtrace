@@ -37,7 +37,7 @@ gt7telem/         The TRACE package itself (same source that ships on
   dashboard.py      Live telemetry dashboard (includes the Track Map panel
                     and the RECORD_RATE_OPTIONS list, if you want to add
                     your own recording sample rates)
-  lap_analyst.py    Lap analysis — 19 chart groups, A/B compare, replay,
+  lap_analyst.py    Lap analysis — 20 chart groups, A/B compare, replay,
                     CSV export, micro-sector heatmap, track boundary
                     overlay, leaderboard/ghost/consensus panel
   race_analyst.py   Race analysis — 17 chart groups, race-oriented (incl. per-lap
@@ -64,6 +64,8 @@ gt7telem/         The TRACE package itself (same source that ships on
   consistency.py    Lap-time spread, trend and 0-100 consistency score (Race
                     Analyst Consistency tab)
   share_card.py     Shared 1200x630 PNG renderer behind the lap card and race card
+  dyno.py           Dyno & Tune: power/torque curve, gearbox, shift points and tuning
+                    hints rebuilt from one lap (Dyno & Tune chart group in Lap Analyst)
   theoretical.py    Theoretical best lap: stitches the fastest micro-sectors of
                     your laps (Theoretical chart group in Lap Analyst)
   ghost.py          Live gap to the leaderboard's fastest lap in the Live Dashboard
@@ -78,7 +80,8 @@ gt7telem/         The TRACE package itself (same source that ships on
                     off with NOTIFICATIONS in the Live Dashboard header
   trackdetect.py    Track auto-detect: learns each layout's start-line position +
                     heading (and lap length) and suggests the track for you to confirm
-  uiscroll.py       Scrollable left side panel for the Lap and Race Analyst windows
+  uiscroll.py       Scrolling for the Lap and Race Analyst windows: side panel,
+                    chart area (both ways) and the chart tab row
   voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS
                     voice (Windows SAPI, macOS say, Linux spd-say/espeak);
                     falls back to the notify.py sound. Mute with VOICE ALERTS.

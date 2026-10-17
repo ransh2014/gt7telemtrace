@@ -1932,7 +1932,7 @@ class AnalystApp(tk.Tk):
                                    padx=10, pady=2, cursor="hand2")
         self._base_btn.pack(side="right", padx=4)
 
-        snb = ttk.Notebook(parent); snb.pack(fill="both", expand=True)
+        snb = ttk.Notebook(parent, style="Plain.TNotebook"); snb.pack(fill="both", expand=True)
         self._snb = snb
         self._ctabs = {}
         for name, fn, shape, fs in GROUPS:
@@ -1942,6 +1942,7 @@ class AnalystApp(tk.Tk):
             self._cfigs[name] = None
             self._group_names.append(name)
         snb.bind("<<NotebookTabChanged>>", lambda e: self._draw_active_chart())
+        uiscroll.tab_strip(parent, snb, self._group_names, BG, PNL, DIM, PNL2, CYN, FONTB)
 
     def _toggle_compare(self):
         self._compare_mode = not self._compare_mode
@@ -1991,7 +1992,10 @@ class AnalystApp(tk.Tk):
             tk.Label(f, text=f"Couldn't draw this chart:\n{type(e).__name__}: {e}",
                      fg=ACC, bg=BG, font=FONT, justify="left").pack(padx=20, pady=20)
             return
-        cv = FigureCanvasTkAgg(fig, master=f)
+        # The figure keeps a readable minimum size and the pane scrolls when the window is smaller.
+        host = uiscroll.scroll_view(f, BG, int(fig.get_figwidth() * fig.dpi * 0.8),
+                                    int(fig.get_figheight() * fig.dpi * 0.8))
+        cv = FigureCanvasTkAgg(fig, master=host)
         cv.draw(); cv.get_tk_widget().pack(fill="both", expand=True)
         self._cfigs[name] = fig
 

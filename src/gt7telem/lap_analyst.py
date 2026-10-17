@@ -17,7 +17,19 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import __version__, auth, corners, lapclean, leaderboard, records, share_card, theoretical, tracks, uiscroll
+from . import (
+    __version__,
+    auth,
+    corners,
+    dyno,
+    lapclean,
+    leaderboard,
+    records,
+    share_card,
+    theoretical,
+    tracks,
+    uiscroll,
+)
 from . import config as runtime_config
 
 matplotlib.use("TkAgg")
@@ -160,6 +172,12 @@ def load_lap_data(data):
         df["track_position"] = (speed_ms * dtp).cumsum().to_numpy(dtype=float)
         df.attrs["pos_derived"] = True
     df.attrs["compact"] = bool(compact)
+    # Per-car constants for the Dyno & Tune tab (the lap file stores them once, not per sample).
+    df.attrs["car"] = str(data.get("car_display") or data.get("car") or "")
+    _gr = data.get("gear_ratios")
+    df.attrs["gear_ratios"] = [_num(x) for x in _gr] if isinstance(_gr, list) else []
+    _tr = _num(data.get("tyre_radius_m"))
+    df.attrs["tyre_radius_m"] = _tr if _tr > 0 else None
 
     # GT7 sends suspension height in metres; every chart labels it mm.
     for _c in ("susp_fl", "susp_fr", "susp_rl", "susp_rr"):
@@ -1526,6 +1544,125 @@ def draw_theoretical(fig, df, dfb=None, pool=None):
             transform=ax.transAxes)
     ax.set_title("Theoretical best lap", color=FG, fontsize=9)
 
+def _blank(fig, msg):
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_facecolor(PNL2); ax.set_xticks([]); ax.set_yticks([])
+    for s in ax.spines.values(): s.set_visible(False)
+    ax.text(0.5, 0.5, msg, ha="center", va="center", color=DIM, fontsize=10, transform=ax.transAxes)
+
+
+def draw_dyno(fig, df, dfb=None):
+    """Dyno & Tune: the engine's power and torque curve, the gearbox (ratios, top
+    speed per gear, best shift points) and tuning hints, all rebuilt from this
+    lap's telemetry -- see dyno.py for how, and why the absolute numbers are an
+    estimate while the curve shape and shift points are solid."""
+    import textwrap
+    if is_compact(df):
+        _blank(fig, "A leaderboard ghost only carries driver inputs.\nLoad one of your own saved laps.")
+        return
+    gr = df.attrs.get("gear_ratios") or []
+    res = dyno.analyse(df, gr, df.attrs.get("mass_kg"), df.attrs.get("tyre_radius_m"))
+    if not res["ok"]:
+        _blank(fig, "Can't build the dyno from this lap.\n\n" + textwrap.fill(res["msg"], 70))
+        return
+    resb = None
+    if dfb is not None and not is_compact(dfb):
+        resb = dyno.analyse(dfb, dfb.attrs.get("gear_ratios") or [], dfb.attrs.get("mass_kg"),
+                            dfb.attrs.get("tyre_radius_m"))
+        resb = resb if resb["ok"] else None
+    palette = [CYN, ACC, YLW, GRN, PRP, ORG, "#8899ff", "#ff9ecb"]
+    axs = fig.subplots(2, 2)
+    fig.subplots_adjust(hspace=0.36, wspace=0.34, left=0.07, right=0.93, top=0.93, bottom=0.07)
+
+    # power + torque (+ boost)
+    ax = axs[0, 0]
+    r = res["rpm"]
+    ax.fill_between(r, res["q1_disp"], res["q3_disp"], color=ACC, alpha=0.15)
+    ax.plot(r, res["p_disp"], color=ACC, lw=2.0, label=f"Power ({res['unit_p']})")
+    ax.plot([res["peak_rpm"]], [res["peak_p_disp"]], "o", color=ACC)
+    ax.annotate(f"{res['peak_p_disp']:.0f} {res['unit_p']} @ {res['peak_rpm']:.0f}",
+                (res["peak_rpm"], res["peak_p_disp"]), xytext=(6, -14), textcoords="offset points",
+                color=ACC, fontsize=8)
+    if resb:
+        ax.plot(resb["rpm"], resb["p_disp"], color=CYN, lw=1.6, ls="--", label="Power, Lap B")
+    ax.set_ylim(bottom=0)
+    ax2 = ax.twinx()
+    ax2.plot(r, res["t_disp"], color=YLW, lw=1.5, label=f"Torque ({res['unit_t']})")
+    if resb:
+        ax2.plot(resb["rpm"], resb["t_disp"], color=YLW, lw=1.2, ls="--", alpha=0.6)
+    ax2.set_ylim(bottom=0)
+    ax2.tick_params(colors=YLW, labelsize=7)
+    ax2.spines["right"].set_visible(True); ax2.spines["right"].set_color(YLW)
+    h1, l1 = ax.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, fontsize=7, loc="lower center", ncol=2)
+    _ax(ax, "Power & torque at the wheels (shaded = spread of the samples)", xl="Engine rpm",
+        yl=res["unit_p"])
+
+    # pull in each gear
+    ax = axs[0, 1]
+    for g, (vv, th) in sorted(res["curves"].items()):
+        ax.plot(vv, th, color=palette[(g - 1) % len(palette)], lw=1.3, label=str(g))
+    for gd in res["gears"]:
+        if gd["opt_shift"]:
+            vs = gd["opt_shift"] / gd["k"]
+            ax.plot([vs * 3.6], [res["P_edge"](gd["opt_shift"]) / vs / dyno.G], "v", color=FG, ms=5)
+    ax.set_ylim(bottom=0)
+    ax.legend(title="Gear", fontsize=6, title_fontsize=7, ncol=2, loc="upper right")
+    _ax(ax, "Pull in each gear: dots = best shift points", xl="Speed (km/h)", yl="thrust (g)")
+
+    # gearbox table
+    ax = axs[1, 0]
+    ax.axis("off")
+    top = res["top"]
+    lines = [f"Peak power    {res['peak_p_disp']:.0f} {res['unit_p']} at {res['peak_rpm']:.0f} rpm"
+             + (f"   ({res['hp_per_tonne']:.0f} hp/t)" if res["mass"] else ""),
+             f"Peak torque   {res['peak_t_disp']:.0f} {res['unit_t']} at {res['peak_tq_rpm']:.0f} rpm",
+             f"Rev limiter   ~{res['rev_lim']:.0f} rpm",
+             f"True top speed {top['kmh']:.0f} km/h  (limited by {top['by']}, gear {top['gear']})",
+             "" if res["mass"] else "Enter the car's weight to see real hp and Nm.", "",
+             "Gear  Ratio  km/h/1000  Top km/h  Lap%   Shift: best  yours"]
+    for gd in res["gears"]:
+        s_ratio = "%.3f" % gd["ratio"] if gd["ratio"] else "-"
+        s_best = "%.0f" % gd["opt_shift"] if gd["opt_shift"] else "-"
+        s_mine = "%.0f" % gd["your_shift"] if gd["your_shift"] else "-"
+        star = "*" if gd["src"] != "measured" else " "
+        lines.append(f"{gd['g']:>3}{star}  {s_ratio:>6}  {gd['kmh_per_1000rpm']:>8.1f}  "
+                     f"{gd['top_kmh']:>8.0f}  {gd['share'] * 100:>4.0f}   {s_best:>10}  {s_mine:>5}")
+    rs = res["resist"]
+    lines += ["", f"Drag model {rs['src']}  (rolling {rs['c0']:.3f}, aero {rs['c1'] * 1e4:.2f}e-4)",
+              f"Built from {res['n_samples']} clean full-throttle samples. * = gear inferred from its ratio."]
+    if any("final_drive" in gd for gd in res["gears"]):
+        fd = float(np.median([gd["final_drive"] for gd in res["gears"] if "final_drive" in gd]))
+        lines.append(f"Final drive ~{fd:.2f}")
+    ax.text(0.0, 1.0, "\n".join(lines), ha="left", va="top", color=FG, fontsize=8.8, family="monospace",
+            transform=ax.transAxes)
+    ax.set_title("Engine & gearbox", color=FG, fontsize=9)
+
+    # tuning hints
+    ax = axs[1, 1]
+    ax.axis("off")
+    hints = dyno.advise(df, res, gr)
+    out = []
+    if resb:
+        dp = (resb["peak_wkg"] / res["peak_wkg"] - 1.0) * 100.0
+        out += [f"Lap B vs Lap A: peak power-to-weight {dp:+.1f}%,",
+                f"peak at {resb['peak_rpm']:.0f} rpm (A: {res['peak_rpm']:.0f}).", ""]
+    if hints:
+        for h in hints[:8]:
+            tag = "!!!" if h["sev"] >= 3 else "!!" if h["sev"] == 2 else "!"
+            out += textwrap.wrap(f"[{tag}] {h['area']}: {h['finding']}", 66)
+            out += textwrap.wrap("-> " + h["fix"], 66, initial_indent="    ", subsequent_indent="       ")
+            out.append("")
+    else:
+        out += ["Nothing stands out: balance, gearing and shift points look healthy for this lap."]
+    out += textwrap.wrap("Change one thing at a time, then drive again. These point a direction; the "
+                         "right amount depends on the car. (GTPlanet, Coach Dave, racinggames.gg)", 66)
+    out = out[:30]
+    ax.text(0.0, 1.0, "\n".join(out), ha="left", va="top", color=FG, fontsize=8.0, family="monospace",
+            transform=ax.transAxes)
+    ax.set_title("Tuning hints from this lap", color=FG, fontsize=9)
+
+
 # ── Groups registry ────────────────────────────────────────────────────────────
 GROUPS = [
     ("Inputs",    draw_inputs,          (3,3), (13,10)),
@@ -1547,6 +1684,7 @@ GROUPS = [
     ("Style",     draw_style,           (2,2), (12, 8)),
     ("Corners",   draw_corners,         (2,1), (12, 9)),
     ("Theoretical", draw_theoretical,   (2,2), (12, 9)),
+    ("Dyno & Tune", draw_dyno,          (2,2), (13,10)),
 ]
 
 # ── Replay ────────────────────────────────────────────────────────────────────
@@ -2399,7 +2537,7 @@ class AnalystApp(tk.Tk):
                                    padx=10, pady=2, cursor="hand2")
         self._cmp_btn.pack(side="right", padx=10)
 
-        snb = ttk.Notebook(parent); snb.pack(fill="both", expand=True)
+        snb = ttk.Notebook(parent, style="Plain.TNotebook"); snb.pack(fill="both", expand=True)
         self._snb = snb
         self._ctabs = {}
         for name, fn, shape, fs in GROUPS:
@@ -2409,6 +2547,7 @@ class AnalystApp(tk.Tk):
             self._cfigs[name] = None
             self._group_names.append(name)
         snb.bind("<<NotebookTabChanged>>", lambda e: self._draw_active_chart())
+        uiscroll.tab_strip(parent, snb, self._group_names, BG, PNL, DIM, PNL2, CYN, FONTB)
 
     def _toggle_compare(self):
         self._compare_mode = not self._compare_mode
@@ -2441,6 +2580,8 @@ class AnalystApp(tk.Tk):
             tk.Label(f, text="Looking through your saved laps for this car and track...", fg=DIM, bg=BG,
                      font=FONT).pack(expand=True)
             return
+        if name == "Dyno & Tune":
+            self._ensure_mass()
         fig = plt.figure(figsize=fs, facecolor=BG)
         dfb = self._dfb if self._compare_mode else None
         try:
@@ -2458,9 +2599,33 @@ class AnalystApp(tk.Tk):
             tk.Label(f, text=f"Couldn't draw this chart:\n{e}", fg=ACC, bg=BG, font=FONT,
                      justify="center").pack(expand=True)
             return
-        cv = FigureCanvasTkAgg(fig, master=f)
+        # The figure keeps a readable minimum size and the pane scrolls when the window is smaller.
+        keep = 1.0 if name == "Dyno & Tune" else 0.8
+        host = uiscroll.scroll_view(f, BG, int(fig.get_figwidth() * fig.dpi * keep),
+                                    int(fig.get_figheight() * fig.dpi * keep))
+        cv = FigureCanvasTkAgg(fig, master=host)
         cv.draw(); cv.get_tk_widget().pack(fill="both", expand=True)
         self._cfigs[name] = fig
+
+    def _ensure_mass(self):
+        """The car's weight turns the dyno's power-to-weight into real hp and
+        Nm. Asked once per car and remembered; Cancel keeps the hp/tonne view."""
+        asked = self.__dict__.setdefault("_mass_asked", set())
+        for df in (self._dfa, self._dfb if self._compare_mode else None):
+            if df is None:
+                continue
+            car = df.attrs.get("car") or ""
+            kg = dyno.load_weight(car) if car else None
+            if kg is None and car and car.lower() not in asked:
+                asked.add(car.lower())
+                kg = simpledialog.askfloat(
+                    "Car weight",
+                    f"Weight of the {car} in kg?\n(on the car's info screen or tuning sheet)\n\n"
+                    "Cancel to see power-to-weight (hp/tonne) instead.",
+                    parent=self, minvalue=300, maxvalue=5000)
+                if kg:
+                    dyno.save_weight(car, kg)
+            df.attrs["mass_kg"] = kg
 
     # ── theoretical best: the other laps on this car and track ────────────────
     THEORY_MAX_LAPS = 10

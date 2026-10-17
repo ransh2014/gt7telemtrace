@@ -2760,6 +2760,7 @@ class App(tk.Tk):
                 "physics_era":    leaderboard.PHYSICS_ERA,
                 # Per-car constant, so it lives here rather than on every sample.
                 "gear_ratios":    gear_ratios,
+                "tyre_radius_m":  round(float(telem.get("tyre_radius_m") or 0.0), 4),
                 "samples":        samples,
             }
             # Only a lap timed by GT7 itself can be a PB / reference: the
