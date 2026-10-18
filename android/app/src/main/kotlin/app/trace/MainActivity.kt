@@ -33,8 +33,8 @@ class MainActivity : ComponentActivity() {
             var tool by remember { mutableStateOf<Tool?>(null) }
             var light by remember { mutableStateOf(false) }
             val a = if (light) AP.Light else AP.Dark
-            LaunchedEffect(live.online) {
-                if (live.online) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            LaunchedEffect(live.online, live.keepAwake) {
+                if (live.online || live.keepAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
             var records by remember { mutableStateOf(false) }
             LaunchedEffect(tool) {

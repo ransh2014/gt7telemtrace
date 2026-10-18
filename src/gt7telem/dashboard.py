@@ -341,6 +341,7 @@ class App(tk.Tk):
         telem.register_event("pause",      self._on_pause)
         telem.register_event("resume",     self._on_resume)
         telem.register_event("debug_state", self._on_debug_state)
+        keepawake.set_awake(bool(runtime_config.KEEP_AWAKE_ENABLED))   # awake from launch until the window closes
         self._start_telem()
         self.after(200, self._poll)
         self.after(_RECORD_TICK_MS, self._record_tick)
@@ -481,6 +482,12 @@ class App(tk.Tk):
         self.auto_lap_var = tk.BooleanVar(value=bool(runtime_config.AUTO_LAP_ENABLED))
         tk.Checkbutton(hdr3, text="AUTO LAP", variable=self.auto_lap_var,
                        command=self._on_auto_lap_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+
+        self.keep_awake_var = tk.BooleanVar(value=bool(runtime_config.KEEP_AWAKE_ENABLED))
+        tk.Checkbutton(hdr3, text="KEEP AWAKE", variable=self.keep_awake_var,
+                       command=self._on_keep_awake_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
@@ -1234,6 +1241,16 @@ class App(tk.Tk):
         else:
             self.log_msg("Auto lap off")
 
+    def _on_keep_awake_toggle(self):
+        runtime_config.KEEP_AWAKE_ENABLED = self.keep_awake_var.get()
+        runtime_config.save(KEEP_AWAKE_ENABLED=runtime_config.KEEP_AWAKE_ENABLED)
+        if runtime_config.KEEP_AWAKE_ENABLED:
+            keepawake.set_awake(True)
+            self.log_msg("Keep awake on -- the PC won't sleep or hibernate while the Dashboard is open")
+        else:
+            keepawake.set_awake(False)   # _poll turns it back on while telemetry is flowing
+            self.log_msg("Keep awake off -- the PC stays awake only while telemetry is flowing")
+
     def _on_rate_change(self):
         try:
             rate = int(self.rate_var.get().split()[0])
@@ -1327,7 +1344,7 @@ class App(tk.Tk):
                     self.log_msg(f"WARNING: packets stopped mid-{what} -- the recording will be "
                                  "incomplete. If your PC went to sleep/hibernate, turn that off "
                                  "(Power & sleep -> Never) while you race.")
-            keepawake.set_awake(False)
+            keepawake.set_awake(bool(runtime_config.KEEP_AWAKE_ENABLED))
             self._was_connected = False
             for _a in (self.alert_hot, self.alert_cold, self.alert_fuel):
                 _a.grid_remove()

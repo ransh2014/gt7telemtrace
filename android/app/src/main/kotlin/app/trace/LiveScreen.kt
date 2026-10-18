@@ -81,6 +81,13 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
             Text(if (online) "● LIVE" else "● OFFLINE", color = if (online) D.good else D.dim, fontFamily = Mono, fontSize = 11.sp)
         }
 
+        c.battWarn?.let { pct ->
+            Row(Modifier.fillMaxWidth().background(Color(0xFFc0392b)).padding(10.dp, 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("LOW BATTERY ($pct%) - plug in your charger now, or this lap/race will be lost when the phone dies", Modifier.weight(1f), color = Color.White, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                DBtn("OK, I'll charge", Modifier.width(120.dp)) { c.onBatteryAck() }
+            }
+        }
+
         Grid(2, 6.dp) {
             DBtn(if (c.raceRec) "Stop Race Recording" else "Record Race", bg = if (c.raceRec) D.acc else D.tile, fg = if (c.raceRec) Color.White else D.fg) { c.toggleRace() }
             DBtn(when (c.recLapState) { 1 -> "Waiting for start line..."; 2 -> "Stop Recording"; else -> "Record Lap" },
@@ -110,6 +117,7 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
             Grid(2, 8.dp) {
                 Check("VOICE ALERTS", c.voiceOn) { c.onVoice(it) }; Check("NOTIFICATIONS", c.notifyOn) { c.onNotify(it) }; Check("TOP-LAP GHOST", c.ghostEnabled) { c.onGhostToggle(it) }
                 Check("CHECK FOR UPDATES", c.updateOn) { c.onUpdate(it) }; Check("SHARE USAGE DATA", c.analyticsOn) { c.onAnalytics(it) }; Check("DEBUG LOG", c.debugOn) { c.onDebug(it) }
+                Check("KEEP AWAKE", c.keepAwake) { c.onKeepAwake(it) }
             }
         }
 

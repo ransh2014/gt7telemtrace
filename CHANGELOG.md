@@ -5,6 +5,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-10-18
+- **Keep awake.** New **KEEP AWAKE** checkbox in the Live Dashboard header (on by default). The PC no longer idle-sleeps or hibernates the whole time the Dashboard is open, even before the console connects, and goes back to normal the moment you close it. It now works on Linux too (through `systemd-inhibit`), as well as Windows and macOS. Untick it to keep the old behaviour of staying awake only while telemetry is flowing.
+- **Android: keep awake.** The same KEEP AWAKE switch is in the phone Dashboard's preferences. The screen stays on and a CPU wake lock is held while TRACE is open, so a recording isn't cut short when the phone dozes. Both are released when you close the app or switch it off.
+- **Android: low-battery alert.** Matches the desktop Dashboard: if the battery drops below 20% while a lap or race is recording and the phone isn't charging, a red "plug in your charger" bar appears with a notification, and a loud siren repeats until you charge or tap OK. At 10% it asks again once.
+
 ## [0.9.2] - 2026-10-18
 Bug-fix release.
 

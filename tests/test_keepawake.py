@@ -26,3 +26,37 @@ def test_macos_caffeinate_is_tied_to_this_process(monkeypatch):
     assert len(calls) == 1
     keepawake.set_awake(False)
     assert calls[-1] == "terminate"
+
+
+def test_linux_inhibit_ends_with_this_process():
+    cmd = keepawake._linux_inhibit_cmd(4242, which=lambda name: "/usr/bin/" + name)
+    assert cmd[0] == "systemd-inhibit" and "--what=idle:sleep" in cmd
+    # the loop only runs while the TRACE pid exists, so a crash can't leave the PC unable to sleep
+    assert "kill -0 4242" in cmd[-1]
+
+
+def test_linux_without_systemd_inhibit_does_nothing():
+    assert keepawake._linux_inhibit_cmd(1, which=lambda name: None) is None
+
+
+def test_linux_set_awake_spawns_and_stops(monkeypatch):
+    calls = []
+
+    class FakeProc:
+        def terminate(self):
+            calls.append("terminate")
+
+    monkeypatch.setattr(keepawake.sys, "platform", "linux")
+    monkeypatch.setattr(keepawake, "_linux_inhibit_cmd", lambda pid, which=None: ["systemd-inhibit", "x"])
+    monkeypatch.setattr(keepawake.subprocess, "Popen", lambda cmd, **kw: calls.append(cmd) or FakeProc())
+    monkeypatch.setattr(keepawake, "_on", False)
+    monkeypatch.setattr(keepawake, "_proc", None)
+    keepawake.set_awake(True)
+    assert calls == [["systemd-inhibit", "x"]]
+    keepawake.set_awake(False)
+    assert calls[-1] == "terminate"
+
+
+def test_keep_awake_setting_defaults_on():
+    from gt7telem import config
+    assert config._DEFAULTS["KEEP_AWAKE_ENABLED"] is True

@@ -1,6 +1,10 @@
 package app.trace
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.PowerManager
 import androidx.compose.runtime.*
 import app.trace.telemetry.*
 import java.io.File
@@ -41,7 +45,12 @@ class LiveController(private val appCtx: Context) {
     var updateOn by mutableStateOf(prefs.getBoolean("update", true))
     var analyticsOn by mutableStateOf(prefs.getBoolean("analytics", true))
     var debugOn by mutableStateOf(prefs.getBoolean("debug", false))
+    var keepAwake by mutableStateOf(prefs.getBoolean("keep_awake", true))
+    var battWarn by mutableStateOf<Int?>(null)       // charge % shown on the red low-battery bar; null = hidden
     val alerts = Alerts(appCtx)
+    private val battery = BatteryGuard()
+    private var battNext = 0.0
+    private var wake: PowerManager.WakeLock? = null
     private val announcer = AlertAnnouncer()
     private val metrics = MetricsServer()
     private var lastDebug = 0.0
@@ -51,6 +60,46 @@ class LiveController(private val appCtx: Context) {
         voiceOn = v; pref("voice", v)
         if (v) { alerts.prepareVoice(); announcer.reset(); say("Voice alerts on -- fuel and tyre alerts will be spoken") } else say("Voice alerts muted")
     }
+    fun onKeepAwake(v: Boolean) {
+        keepAwake = v; pref("keep_awake", v); applyWake()
+        say(if (v) "Keep awake on -- the phone won't sleep while TRACE is open" else "Keep awake off -- the screen stays on only while telemetry is flowing")
+    }
+    /** CPU wake lock for as long as TRACE is open (the screen flag is set by MainActivity). Released on off and on stop. */
+    private fun applyWake() {
+        try {
+            if (!keepAwake) { releaseWake(); return }
+            if (wake == null) {
+                val pm = appCtx.getSystemService(Context.POWER_SERVICE) as PowerManager
+                wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "trace:telemetry").apply { setReferenceCounted(false); acquire() }
+            }
+        } catch (_: Exception) {}
+    }
+    private fun releaseWake() { try { wake?.let { if (it.isHeld) it.release() } } catch (_: Exception) {}; wake = null }
+
+    private fun readBattery(): Pair<Int, Boolean>? = try {
+        val i = appCtx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = i?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = i?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        if (i == null || level < 0 || scale <= 0) null else (level * 100 / scale) to (i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0)
+    } catch (_: Exception) { null }
+
+    /** dashboard._battery_step: warn (bar, then siren if ignored) while a lap or race is recording on a low battery. */
+    private fun batteryStep(now: Double) {
+        if (now < battNext) return
+        battNext = now + BatteryGuard.CHECK_S
+        val b = readBattery()
+        val active = recorder.recording || recorder.waiting || recorder.raceRecording
+        val st = battery.step(b?.first, b?.second ?: true, active, now)
+        battWarn = if (st.show) b?.first else null
+        val pct = b?.first ?: 0
+        for (e in st.events) when (e) {
+            BatteryGuard.Event.WARN -> { say("WARNING: battery at $pct% and not charging -- plug in so the recording isn't lost"); alerts.notify("Low battery", "TRACE is recording and the battery is at $pct% -- plug in") }
+            BatteryGuard.Event.CRITICAL -> say("CRITICAL: battery at $pct% -- charge NOW")
+            BatteryGuard.Event.ALARM -> alerts.siren()
+        }
+    }
+    fun onBatteryAck() { battery.ack(); battWarn = null }
+
     fun onNotify(v: Boolean) { notifyOn = v; pref("notify", v); say(if (v) "Notifications on" else "Notifications off") }
     private fun startMetrics() {
         if (!metrics.start(9109, remoteOn)) { say("Metrics export: failed to bind port 9109 (already in use?)"); metricsOn = false; pref("metrics", false) }
@@ -112,13 +161,14 @@ class LiveController(private val appCtx: Context) {
     fun start() {
         if (running) return
         running = true
+        applyWake()
         client.start()
         log.add("[${SimpleDateFormat("HH:mm:ss", Locale.ROOT).format(Date())}] Heartbeat -> $ip:${TelemetryClient.SEND_PORT}  |  Listening on :${TelemetryClient.RECV_PORT}")
         thread(isDaemon = true, name = "trace-poll") { while (running) { try { poll() } catch (_: Exception) {}; Thread.sleep(50) } }
         thread(isDaemon = true, name = "trace-rec") { while (running) { try { synchronized(lock) { recorder.tick(client.latest, client.isConnected(), ctx()) }; recLapState = if (recorder.recording) 2 else if (recorder.waiting) 1 else 0; raceRec = recorder.raceRecording } catch (_: Exception) {}; Thread.sleep(16) } }
     }
 
-    fun stop() { running = false; client.stop() }
+    fun stop() { running = false; releaseWake(); client.stop() }
 
     fun onIpChange(force: Boolean = false) { val v = ip.trim(); client.ip = v; prefs.edit().putString("ip", v).apply() }
     fun onRate(r: Int) { rate = r; recorder.recordRate = r; prefs.edit().putInt("rate", r).apply() }
@@ -132,6 +182,7 @@ class LiveController(private val appCtx: Context) {
     fun discover(done: (String?) -> Unit) { thread { val f = TelemetryClient.discoverPsIp(); if (f != null) { ip = f; onIpChange() }; done(f) } }
 
     private fun poll() {
+        batteryStep(System.nanoTime() / 1e9)
         val p = client.latest; val ok = client.isConnected()
         online = ok
         if (!ok) {

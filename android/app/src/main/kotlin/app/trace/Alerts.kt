@@ -90,6 +90,17 @@ class Alerts(private val ctx: Context) {
         } catch (_: Exception) {}
     }
 
+    /** Loud repeating siren on the alarm stream, for a low-battery warning nobody has acknowledged. */
+    fun siren() {
+        thread(isDaemon = true, name = "trace-siren") {
+            try {
+                val tg = ToneGenerator(AudioManager.STREAM_ALARM, 100)
+                repeat(3) { tg.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 300); Thread.sleep(450) }
+                tg.release()
+            } catch (_: Exception) {}
+        }
+    }
+
     /** notify.notify: a phone notification plus the alert sound. Never throws. */
     fun notify(title: String, message: String) {
         beep()

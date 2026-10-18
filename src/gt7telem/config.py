@@ -19,7 +19,7 @@ __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_R
            "ANALYTICS_ENABLED", "PSN_NAME",
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL",
-           "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "GHOST_ENABLED", "UPDATE_CHECK_ENABLED", "AUTO_LAP_ENABLED", "backup_laps",
+           "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "GHOST_ENABLED", "UPDATE_CHECK_ENABLED", "AUTO_LAP_ENABLED", "KEEP_AWAKE_ENABLED", "backup_laps",
            "ensure_ca_bundle", "explain_error", "MONO", "install_mac_buttons"]
 
 _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
@@ -248,6 +248,10 @@ _DEFAULTS = {
     # start/finish crossing is saved with no button press. Off by default. Switch:
     # the AUTO LAP checkbox in the Dashboard header. Races already auto-start.
     "AUTO_LAP_ENABLED": False,
+    # Keep the PC awake (no idle sleep or hibernate) the whole time the Dashboard is open, and let
+    # it sleep again the moment you close it. Off = only stay awake while telemetry is flowing.
+    # Switch: the KEEP AWAKE checkbox in the Dashboard header.
+    "KEEP_AWAKE_ENABLED": True,
 }
 
 def remember_good_ip(ip: str) -> list:
@@ -395,6 +399,7 @@ VOICE_ENABLED = _cfg["VOICE_ENABLED"]
 GHOST_ENABLED = _cfg["GHOST_ENABLED"]
 UPDATE_CHECK_ENABLED = _cfg["UPDATE_CHECK_ENABLED"]
 AUTO_LAP_ENABLED = _cfg["AUTO_LAP_ENABLED"]
+KEEP_AWAKE_ENABLED = _cfg["KEEP_AWAKE_ENABLED"]
 
 
 def backup_laps() -> "Path | None":

@@ -72,8 +72,9 @@ gt7telem/         The TRACE package itself (same source that ships on
                     (one read-only request per car and track; TOP-LAP GHOST switch)
   records.py        Records table (best lap per car and track from your saved
                     laps) -- the Records link on the launcher menu
-  keepawake.py      Keeps the PC from idle-sleeping/hibernating while telemetry
-                    is arriving (Windows/macOS), so races don't end up incomplete
+  keepawake.py      Keeps the PC from idle-sleeping/hibernating (Windows, macOS,
+                    Linux) while the Dashboard is open (KEEP AWAKE switch), so
+                    races don't end up incomplete; lets go when it closes
   lapclean.py       Junk-lap guards (too short / parked / double save) and the
                     duplicate-lap finder (extras move to _duplicates, never deleted)
   notify.py         Desktop toast + sound alerts (new PB, race end); switch it
