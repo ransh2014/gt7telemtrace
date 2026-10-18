@@ -2601,6 +2601,13 @@ class AnalystApp(tk.Tk):
             return
         # The figure keeps a readable minimum size and the pane scrolls when the window is smaller.
         keep = 1.0 if name == "Dyno & Tune" else 0.8
+        if name == "Dyno & Tune":
+            bar = tk.Frame(f, bg=BG)
+            bar.pack(side="top", fill="x")
+            kg = self._dfa.attrs.get("mass_kg")
+            tk.Button(bar, text="Set weight" + (f" ({kg:.0f} kg)" if kg else ""),
+                      command=self._set_weight, bg=PNL, fg=FG, relief="flat", font=FONT,
+                      padx=10, pady=2).pack(side="right", padx=6, pady=3)
         host = uiscroll.scroll_view(f, BG, int(fig.get_figwidth() * fig.dpi * keep),
                                     int(fig.get_figheight() * fig.dpi * keep))
         cv = FigureCanvasTkAgg(fig, master=host)
@@ -2626,6 +2633,23 @@ class AnalystApp(tk.Tk):
                 if kg:
                     dyno.save_weight(car, kg)
             df.attrs["mass_kg"] = kg
+
+    def _set_weight(self):
+        """Set or change the car's weight any time (the one-time prompt may have been skipped)."""
+        for df in (self._dfa, self._dfb if self._compare_mode else None):
+            if df is None:
+                continue
+            car = df.attrs.get("car") or ""
+            if not car:
+                continue
+            cur = dyno.load_weight(car)
+            kg = simpledialog.askfloat(
+                "Car weight", f"Weight of the {car} in kg?", parent=self,
+                initialvalue=cur, minvalue=300, maxvalue=5000)
+            if kg:
+                dyno.save_weight(car, kg)
+        self._ensure_mass()
+        self._draw_chart("Dyno & Tune")
 
     # ── theoretical best: the other laps on this car and track ────────────────
     THEORY_MAX_LAPS = 10

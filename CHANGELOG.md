@@ -5,6 +5,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-18
+- Lap Analyst, Dyno & Tune tab: new **Set weight** button to enter or change the car's weight any time, so skipping the first-time prompt no longer leaves you on hp/tonne until you restart.
+
 ## [0.9.0] - 2026-10-17
 - Lap Analyst and Race Analyst: the chart area now scrolls both ways (scrollbars, mouse wheel, Shift+wheel for sideways) when a chart is bigger than the window, instead of being cut off, and the row of chart tabs scrolls sideways instead of squeezing its labels away. Charts keep a readable minimum size and still stretch to fill a big window.
 - **Lap Analyst: Dyno & Tune tab.** Rebuilds the engine's power and torque curve from a single lap, plus every gear's ratio, km/h per 1000 rpm, true top speed and the best shift rpm for each gear (against the shifts you actually made). Enter the car's weight once (remembered per car) for real hp and Nm; without it the tab shows hp/tonne. It also reads the lap for tuning hints (entry/mid/exit understeer or oversteer, wheelspin, brake lock-ups, gearing too long or short, unused gears, tyre heat balance) with the direction to try on the tuning sheet, and Lap B overlays a before/after curve. New module `dyno.py`; lap files now also store the tyre radius so the final drive can be shown.
