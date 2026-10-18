@@ -44,9 +44,9 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.26,<3",
-    "pandas>=2.0,<3",
+    "pandas>=2.0,<4",
     "matplotlib>=3.7,<4",
-    "pycryptodome>=3.19,<4",
+    "pycryptodome>=3.19,<5",
     "prometheus_client>=0.20,<1",
 ]
 
