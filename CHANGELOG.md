@@ -5,6 +5,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-18
+Bug-fix release.
+
+- Launcher: if a tool failed to start, the error box was followed by a crash instead of returning to the menu.
+- Race Analyst: the refuel markers on the Race tab were missed at recording rates of 20 Hz and up. The Race Analyst also keeps a chart once drawn instead of rebuilding it on every tab switch.
+- Lap Analyst and Race Analyst: the Ratings steering score no longer changes with the recording rate. Downloading a leaderboard ghost now refreshes the Theoretical tab.
+- Linux: the Lap and Race Analyst side panels and chart tab row now scroll with the mouse wheel.
+- Console connection: switching to a hostname that doesn't resolve no longer drops the new console's packets.
+- Track auto-detect: a lap save at the same moment as a match could rarely crash it.
+- Backup Laps: a symlink pointing outside the laps folder no longer makes the whole backup fail.
+- Dependencies: pandas 3 and pycryptodome 4 are now allowed (tested).
+
 ## [0.9.1] - 2026-10-18
 - Lap Analyst, Dyno & Tune tab: new **Set weight** button to enter or change the car's weight any time, so skipping the first-time prompt no longer leaves you on hp/tonne until you restart.
 

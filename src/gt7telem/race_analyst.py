@@ -907,9 +907,10 @@ def draw_race(fig, df, dfb=None):
     _ax(axs[0,1], f"Pit Stops (A: {count_pit_stops(df)})", yl="In Pit")
 
     _L(axs[1,0], df, x, "fuel_remaining", GRN, fill=True)
-    refuels = df[df["fuel_remaining"].diff() > 1]
-    if len(refuels):
-        axs[1,0].scatter(refuels[x], refuels["fuel_remaining"], c=YLW, s=18, zorder=5)
+    _spans = _refuel_spans(df["fuel_remaining"].to_numpy(dtype=float))
+    if _spans:
+        _ii = [e for _, e in _spans]
+        axs[1,0].scatter(df[x].iloc[_ii], df["fuel_remaining"].iloc[_ii], c=YLW, s=18, zorder=5)
     if dfb is not None: _Lb(axs[1,0], dfb, x, "fuel_remaining")
     _ax(axs[1,0], "Fuel Over Race", yl="% (GT7)")
 
@@ -1038,7 +1039,11 @@ def draw_ratings(fig, df, dfb=None):
     ax4 = fig.add_subplot(gs[1, 1])
 
     def compute_scores(d):
-        steer_smooth = max(0.0, 1.0 - min(1.0, d["steering"].diff().fillna(0).std() * 5)) * 100
+        # per-sample change shrinks as the recording rate rises: scale to a 10 Hz equivalent
+        _st = d["t"].diff()
+        _st = _st[_st > 1e-4]
+        _k = 0.1 / float(_st.median()) if len(_st) else 1.0
+        steer_smooth = max(0.0, 1.0 - min(1.0, _num(d["steering"].diff().fillna(0).std() * _k) * 5)) * 100
         braking = d[d["brake"] > 0.1]
         brk_eff = (min(100.0, braking["speed_kmh"].mean() / max(1.0, d["speed_kmh"].mean()) * 100)
                    if len(braking) > 10 else 50.0)
@@ -1775,7 +1780,7 @@ class Replay:
 
     def _scrub(self, val):
         if self._df is None or self._in_update: return
-        self._idx = int(int(val)/1000*(len(self._df)-1))
+        self._idx = int(int(float(val))/1000*(len(self._df)-1))
         self._update()
 
 # ── Main App ──────────────────────────────────────────────────────────────────
@@ -1971,6 +1976,8 @@ class AnalystApp(tk.Tk):
         if self._dfa is None: return
         idx  = self._snb.index("current")
         name = self._group_names[idx]
+        if self._cfigs.get(name) is not None:
+            return      # already drawn for the current races; switching tabs shouldn't rebuild it
         self._draw_chart(name)
 
     def _draw_chart(self, name):

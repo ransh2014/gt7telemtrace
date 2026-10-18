@@ -368,11 +368,14 @@ def sanitize(name: str) -> str:
     if safe in _WIN_RESERVED: safe = f"{safe}_"
     return safe or "unknown"
 
+_parse_lock = threading.Lock()   # _parse() keeps running state (position, distance); reset_lap() must not interleave
+
 def reset_lap() -> None:
     global _prev_x, _prev_z, _prev_heading, _cum_dist
-    with _lock:
+    with _parse_lock:
         _prev_x = _prev_z = _prev_heading = None
         _cum_dist = 0.0
+    with _lock:
         _latest.pop("track_position", None)
 
 # ── Salsa20 decrypt — IV method from Bornhall/gt7telemetry ───────────────────
@@ -805,7 +808,8 @@ def _ingest(raw):
     if dec is None:
         _diag_incr("decrypt_failures")
         return
-    parsed = _parse(dec)
+    with _parse_lock:
+        parsed = _parse(dec)
     if parsed is None:
         _diag_incr("parse_failures")
         return
@@ -880,7 +884,9 @@ def _expected_ps4_ip():
             _ps4_ip_resolved = socket.gethostbyname(_ps4_ip)
             _ps4_ip_resolved_for = _ps4_ip
         except OSError:
-            pass  # keep the last-known-good value (if any) until this succeeds
+            # A different host than the cached one: its IP is no use here, and
+            # keeping it would drop the new console's packets as "unexpected".
+            _ps4_ip_resolved = None
     return _ps4_ip_resolved
 
 BIND_RETRY_EVERY = 5.0   # seconds between re-bind attempts after a bind failure

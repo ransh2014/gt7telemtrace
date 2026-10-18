@@ -21,9 +21,12 @@ def make_scrollable(parent, bg, width):
     inner.bind("<Configure>", lambda e: cv.configure(scrollregion=cv.bbox("all")))
     cv.bind("<Configure>", lambda e: cv.itemconfigure(win, width=e.width))
 
-    def wheel(e):
+    def move(step):
         if inner.winfo_reqheight() > cv.winfo_height():
-            cv.yview_scroll(-1 if e.delta > 0 else 1, "units")
+            cv.yview_scroll(step, "units")
+
+    def wheel(e):
+        move(-1 if e.delta > 0 else 1)
 
     def leave(e):
         try:
@@ -31,9 +34,15 @@ def make_scrollable(parent, bg, width):
         except (KeyError, tk.TclError):
             w = None
         if w is None or not str(w).startswith(str(outer)):
-            cv.unbind_all("<MouseWheel>")
+            for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                cv.unbind_all(seq)
 
-    outer.bind("<Enter>", lambda e: cv.bind_all("<MouseWheel>", wheel))
+    def enter(_e):
+        cv.bind_all("<MouseWheel>", wheel)
+        cv.bind_all("<Button-4>", lambda e: move(-1))     # Linux
+        cv.bind_all("<Button-5>", lambda e: move(1))
+
+    outer.bind("<Enter>", enter)
     outer.bind("<Leave>", leave)
     return inner
 
@@ -129,9 +138,12 @@ def tab_strip(parent, nb, names, bg, tab_bg, fg, sel_bg, sel_fg, font):
 
     def sideways(e):
         if inner.winfo_reqwidth() > cv.winfo_width():
-            cv.xview_scroll(-2 if e.delta > 0 else 2, "units")
+            up = e.num == 4 if e.num in (4, 5) else e.delta > 0   # Button-4/5 on Linux
+            cv.xview_scroll(-2 if up else 2, "units")
     for w in [cv, inner, *btns]:
         w.bind("<MouseWheel>", sideways)
+        w.bind("<Button-4>", sideways)
+        w.bind("<Button-5>", sideways)
 
     def sync(_e=None):
         try:

@@ -1042,7 +1042,11 @@ def draw_ratings(fig, df, dfb=None):
     ax4 = fig.add_subplot(gs[1, 1])
 
     def compute_scores(d):
-        steer_smooth = max(0.0, 1.0 - min(1.0, _num(d["steering"].diff().fillna(0).std()) * 5)) * 100
+        # per-sample change shrinks as the recording rate rises: scale to a 10 Hz equivalent
+        _st = d["t"].diff()
+        _st = _st[_st > 1e-4]
+        _k = 0.1 / float(_st.median()) if len(_st) else 1.0
+        steer_smooth = max(0.0, 1.0 - min(1.0, _num(d["steering"].diff().fillna(0).std() * _k) * 5)) * 100
         braking = d[d["brake"] > 0.1]
         brk_eff = (min(100.0, braking["speed_kmh"].mean() / max(1.0, d["speed_kmh"].mean()) * 100)
                    if len(braking) > 10 else 50.0)
@@ -2970,6 +2974,10 @@ class AnalystApp(tk.Tk):
             for k in list(self._cfigs):
                 if self._cfigs[k]: plt.close(self._cfigs[k])
                 self._cfigs[k] = None
+            self._draw_active_chart()
+        elif self._cfigs.get("Theoretical"):     # Lap B is one of the laps it stitches
+            plt.close(self._cfigs["Theoretical"])
+            self._cfigs["Theoretical"] = None
             self._draw_active_chart()
 
     def _submit_leaderboard(self):

@@ -416,7 +416,7 @@ def backup_laps() -> "Path | None":
         backups_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         dest = backups_dir / f"laps_backup_{ts}.zip"
-        src_r, backups_r = src.resolve(), backups_dir.resolve()
+        backups_r = backups_dir.resolve()
         tmp = dest.with_name(dest.name + ".part")
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in src.rglob("*"):
@@ -427,7 +427,7 @@ def backup_laps() -> "Path | None":
                 # archive the backups (or the archive being written).
                 if backups_r == fr or backups_r in fr.parents:
                     continue
-                zf.write(f, fr.relative_to(src_r))
+                zf.write(f, f.relative_to(src))   # f, not fr: a symlink resolving outside src would raise
         os.replace(tmp, dest)
         return dest
     except Exception as e:

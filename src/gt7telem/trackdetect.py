@@ -231,8 +231,8 @@ class FingerprintStore:
 
     def _all(self):
         """(name, obs) pairs, local + shared, plus the reverse-direction twin of each."""
-        with self._lock:
-            sources = [self.local, self.shared]
+        with self._lock:   # copy: add() can run on a save thread while the UI thread matches
+            sources = [{n: list(o) for n, o in src.items()} for src in (self.local, self.shared)]
         for src in sources:
             for name, obs in src.items():
                 for o in obs:

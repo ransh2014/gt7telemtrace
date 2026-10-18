@@ -155,8 +155,10 @@ def _center(win, w, h):
 
 
 def _launch(tool, app_cls):
+    global _content, _banner
     analytics.track_launch(tool)
     root.destroy()
+    _content = _banner = None   # widgets of the destroyed root; main() builds fresh ones
     try:
         app = app_cls()
     except Exception as e:
