@@ -123,6 +123,12 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 ```bash
 pip install gt7tracetelem
 ```
+
+Or with [uv](https://docs.astral.sh/uv/):
+```bash
+uv tool install gt7tracetelem   # then run: gt7telem
+uvx --from gt7tracetelem gt7telem   # one-off, no install
+```
 The importable module is **`gt7telem`** (not `gt7tracetelem`) — the PyPI distribution name and the import name are different:
 ```python
 import gt7telem
