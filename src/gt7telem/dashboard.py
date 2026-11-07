@@ -18,7 +18,18 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from . import __version__, ghost, keepawake, lapclean, leaderboard, metrics_server, notify, trackdetect, voice
+from . import (
+    __version__,
+    ghost,
+    keepawake,
+    lapclean,
+    leaderboard,
+    metrics_server,
+    notify,
+    trackdetect,
+    voice,
+    webui_server,
+)
 from . import cars as car_db
 from . import config as runtime_config
 from . import tracks as track_db
@@ -334,6 +345,10 @@ class App(tk.Tk):
             if not self._safe_metrics_start(addr):
                 self.log_msg(f"Metrics export: failed to bind port {runtime_config.METRICS_PORT} (already in use?)")
 
+        if runtime_config.WEBUI_ENABLED and not self._webui_start():
+            runtime_config.WEBUI_ENABLED = False
+            self.webui_var.set(False)
+
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         telem.register_event("race_start", self._on_race_start)
@@ -500,6 +515,21 @@ class App(tk.Tk):
         self.metrics_bind_var = tk.BooleanVar(value=bool(runtime_config.METRICS_BIND_ALL))
         tk.Checkbutton(hdr2, text="ALLOW REMOTE", variable=self.metrics_bind_var,
                        command=self._on_metrics_bind_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+
+        self.webui_url_lbl = tk.Label(hdr2, text="", fg=ACC, bg="#0f3460", cursor="hand2",
+                                      font=(runtime_config.MONO, 8, "underline"))
+        self.webui_url_lbl.bind("<Button-1>", lambda _e: self._copy_webui_url())
+        self.webui_url_lbl.pack(side="right", padx=(4, 4))
+        self.webui_bind_var = tk.BooleanVar(value=bool(runtime_config.WEBUI_BIND_ALL))
+        tk.Checkbutton(hdr2, text="ALLOW REMOTE", variable=self.webui_bind_var,
+                       command=self._on_webui_bind_toggle, bg="#0f3460", fg=DIM,
+                       selectcolor="#16213e", activebackground="#0f3460",
+                       font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
+        self.webui_var = tk.BooleanVar(value=bool(runtime_config.WEBUI_ENABLED))
+        tk.Checkbutton(hdr2, text=f"WEB UI :{runtime_config.WEBUI_PORT}", variable=self.webui_var,
+                       command=self._on_webui_toggle, bg="#0f3460", fg=DIM,
                        selectcolor="#16213e", activebackground="#0f3460",
                        font=(runtime_config.MONO, 8)).pack(side="right", padx=(4, 4))
 
@@ -1002,6 +1032,70 @@ class App(tk.Tk):
         except Exception as e:
             self.log_msg(f"Metrics export error: {type(e).__name__}: {e}")
             return False
+
+    # ── LAN web dashboard (see webui_server.py) ──────────────────────────────
+    def _webui_start(self):
+        """Start the web UI; update the URL label and log. True if running."""
+        addr = "0.0.0.0" if runtime_config.WEBUI_BIND_ALL else "127.0.0.1"
+        port = runtime_config.WEBUI_PORT
+        try:
+            ok = bool(webui_server.start(port, addr=addr, hz=runtime_config.WEBUI_HZ))
+        except Exception as e:
+            self.log_msg(f"Web UI error: {type(e).__name__}: {e}")
+            ok = False
+        if not ok:
+            why = webui_server.last_error[0]
+            try:
+                import websockets  # noqa: F401
+                reason = f"port {port} unavailable ({why})" if why else f"could not start on port {port}"
+            except Exception:
+                reason = "the 'websockets' package is not installed (pip install websockets)"
+            self.log_msg(f"Web UI: failed to start -- {reason}")
+            self.webui_url_lbl.config(text="")
+            return False
+        host = (webui_server.lan_ip() or "this-pc-ip") if runtime_config.WEBUI_BIND_ALL else "127.0.0.1"
+        self._webui_url = f"http://{host}:{port}"
+        self.webui_url_lbl.config(text=self._webui_url + "  (click to copy)")
+        self.log_msg(f"Web UI on {self._webui_url}" + (
+            " -- no password: anyone on your network can see live telemetry" if runtime_config.WEBUI_BIND_ALL
+            else " -- this PC only (tick ALLOW REMOTE to open it from a phone)"))
+        return True
+
+    def _copy_webui_url(self):
+        url = getattr(self, "_webui_url", "")
+        if url:
+            try:
+                self.clipboard_clear()
+                self.clipboard_append(url)
+                self.log_msg(f"Copied {url}")
+            except tk.TclError:
+                pass
+
+    def _on_webui_toggle(self):
+        runtime_config.WEBUI_ENABLED = self.webui_var.get()
+        runtime_config.save(WEBUI_ENABLED=runtime_config.WEBUI_ENABLED)
+        if runtime_config.WEBUI_ENABLED:
+            if not self._webui_start():
+                self.webui_var.set(False)
+                runtime_config.WEBUI_ENABLED = False
+                runtime_config.save(WEBUI_ENABLED=False)
+        else:
+            webui_server.stop()
+            self.webui_url_lbl.config(text="")
+            self.log_msg("Web UI disabled")
+
+    def _on_webui_bind_toggle(self):
+        runtime_config.WEBUI_BIND_ALL = self.webui_bind_var.get()
+        runtime_config.save(WEBUI_BIND_ALL=runtime_config.WEBUI_BIND_ALL)
+        if runtime_config.WEBUI_ENABLED:
+            webui_server.stop()
+            if not self._webui_start():
+                self.webui_var.set(False)
+                runtime_config.WEBUI_ENABLED = False
+                runtime_config.save(WEBUI_ENABLED=False)
+        else:
+            self.log_msg("Web UI will bind to your LAN next time it's enabled" if runtime_config.WEBUI_BIND_ALL
+                         else "Web UI will bind to localhost only next time it's enabled")
 
     def _on_new_tyres(self):
         """[ NEW TYRES ] -- start a fresh tyre stint (a refuel already does this)."""
@@ -1638,6 +1732,7 @@ class App(tk.Tk):
         self.cur_lbl.config(text=ms_to_laptime(int(cur_elapsed * 1000)) if cur_elapsed > 0 else "--")
 
         delta_text, delta_color = "--", FG
+        _delta_val = None
         track_name = self.track_var.get().strip()
         if track_name and cur_elapsed > 0.5 and cur_track_pos > 0:
             ref_samples = self._get_reference_samples(
@@ -1652,6 +1747,7 @@ class App(tk.Tk):
                 ref_t = nearest.get("t")
                 if ref_t is not None:
                     delta = cur_elapsed - ref_t
+                    _delta_val  = delta
                     delta_text  = f"{delta:+.2f}s"
                     delta_color = "#e74c3c" if delta > 0 else "#2ecc71"
         self.delta_lbl.config(text=delta_text, fg=delta_color)
@@ -1660,6 +1756,19 @@ class App(tk.Tk):
         top = self._ghosts.get(self._ghost_key()) if runtime_config.GHOST_ENABLED else None
         gap = top.gap(cur_track_pos, cur_elapsed) if top is not None and cur_elapsed > 0.5 else None
         self.ghost_lbl.config(text=ghost.format_gap(gap)[0], fg=ghost.format_gap(gap)[1])
+
+        if runtime_config.WEBUI_ENABLED:
+            try:
+                _diag = telem.get_diagnostics()
+                _rx = _diag.get("packets_received") or 0
+                _bad = (_diag.get("decrypt_failures") or 0) + (_diag.get("parse_failures") or 0)
+                webui_server.update(d, {
+                    "connected": True, "cur_ms": int(cur_elapsed * 1000) if cur_elapsed > 0 else None,
+                    "delta": _delta_val, "vs_top": gap, "strategy": _st,
+                    "car": self.car_var.get().strip(), "track": track_name,
+                    "packet_loss": (100.0 * _bad / (_rx + _bad)) if (_rx + _bad) else 0.0})
+            except Exception:
+                pass   # the web UI is optional: never let it break the Dashboard poll
 
     # ─────────────────────────────────────────────────────────────────────────
     # Shutdown
@@ -1731,6 +1840,10 @@ class App(tk.Tk):
             metrics_server.stop()
         except Exception:
             pass  # never block the close on exporter teardown
+        try:
+            webui_server.stop()
+        except Exception:
+            pass
         self._closing = True
         self.destroy()
 

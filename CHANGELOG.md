@@ -5,6 +5,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-07
+- **LAN web dashboard.** New **`WEB UI :8080`** switch in the Live Dashboard console row (off by default) serves a live, read-only dashboard to any phone, tablet or PC on your Wi-Fi/LAN. Five pages (HUD, Inputs & G, Tyres & Fuel, Timing, Full) with speedo, tacho and shift lights, gear, throttle/brake/steering trace, G-force circle, tyre temp and slip, fuel and strategy estimates, lap timing, delta, `VS TOP` and a live track map. Telemetry is pushed over a WebSocket on the same port; km/h or mph, dark or light theme, fullscreen and keep-screen-awake, with auto-reconnect. It uses the same look and fonts as the website, and everything is built into TRACE, so it works with no internet. It listens on this PC only until you tick **`ALLOW REMOTE`** next to it; there is no password, so only do that on a network you trust. Nothing is sent to the internet. New module `webui_server.py` (plus `webui_page.py` and `webui_fonts.py`); new dependency `websockets`.
+
 ## [0.9.3] - 2026-10-18
 - **Keep awake.** New **KEEP AWAKE** checkbox in the Live Dashboard header (on by default). The PC no longer idle-sleeps or hibernates the whole time the Dashboard is open, even before the console connects, and goes back to normal the moment you close it. It now works on Linux too (through `systemd-inhibit`), as well as Windows and macOS. Untick it to keep the old behaviour of staying awake only while telemetry is flowing.
 - **Android: keep awake.** The same KEEP AWAKE switch is in the phone Dashboard's preferences. The screen stays on and a CPU wake lock is held while TRACE is open, so a recording isn't cut short when the phone dozes. Both are released when you close the app or switch it off.

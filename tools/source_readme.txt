@@ -45,7 +45,7 @@ gt7telem/         The TRACE package itself (same source that ships on
   udp.py            UDP capture, Salsa20 decrypt, packet parsing
   config.py         Settings persistence (IP, laps folder, sample rate,
                     analytics opt-out, update-check, notification, voice-alert and
-                    top-lap-ghost switches, Prometheus metrics opt-in and remote-access opt-in)
+                    top-lap-ghost switches, Prometheus metrics and web UI opt-ins and their remote-access opt-ins)
   auth.py           Optional free account — Supabase anonymous sign-in,
                     display name only, no email or password
   leaderboard.py    Global lap leaderboard, ghost-lap download, and
@@ -59,6 +59,15 @@ gt7telem/         The TRACE package itself (same source that ships on
                     for Grafana or any Prometheus-compatible scraper.
                     Binds to localhost only unless you tick "ALLOW
                     REMOTE" in the Live Dashboard header.
+  webui_server.py   Optional LAN web dashboard (off by default) -- serves a live,
+                    read-only gauges page to phones/tablets/PCs on your network
+                    (HTTP + WebSocket on one port, default 8080). Localhost only
+                    unless you tick "ALLOW REMOTE" next to WEB UI in the Live
+                    Dashboard. Needs the `websockets` package. Nothing leaves
+                    your LAN.
+  webui_page.py     The web dashboard's page (HTML/CSS/JS in one string, no CDN)
+  webui_fonts.py    The website's fonts (Anton, Sora, Manrope, JetBrains Mono;
+                    SIL OFL) embedded so the web dashboard works offline
   corners.py        Corner detection and per-corner analysis (the Corners chart
                     group in Lap Analyst)
   consistency.py    Lap-time spread, trend and 0-100 consistency score (Race

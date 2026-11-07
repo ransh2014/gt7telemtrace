@@ -71,7 +71,7 @@ jobs:
           pyinstaller --onefile --windowed --name TRACE \
             --add-data "$PKG_DIR/car_ids.csv:gt7telem" \
             --add-data "$PKG_DIR/course_ids.csv:gt7telem" \
-            entrypoint.py
+            --collect-submodules websockets \n            entrypoint.py
 
       - name: Ad-hoc sign TRACE.app
         run: |

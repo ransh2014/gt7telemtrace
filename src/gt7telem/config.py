@@ -19,6 +19,7 @@ __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_R
            "ANALYTICS_ENABLED", "PSN_NAME",
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL",
+           "WEBUI_ENABLED", "WEBUI_PORT", "WEBUI_BIND_ALL", "WEBUI_HZ",
            "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "GHOST_ENABLED", "UPDATE_CHECK_ENABLED", "AUTO_LAP_ENABLED", "KEEP_AWAKE_ENABLED", "backup_laps",
            "ensure_ca_bundle", "explain_error", "MONO", "install_mac_buttons"]
 
@@ -225,6 +226,15 @@ _DEFAULTS = {
     # on the same Wi-Fi/LAN, not just this machine. Turn on only if you're
     # scraping from a remote Grafana/Prometheus on a network you trust.
     "METRICS_BIND_ALL": False,
+    # LAN web dashboard (see webui_server.py) -- off by default. Serves the
+    # gauges page + a WebSocket telemetry feed on WEBUI_PORT, read-only.
+    # Binds localhost-only unless WEBUI_BIND_ALL is on (then 0.0.0.0, so a
+    # phone/tablet on the same Wi-Fi can open it; there is no password).
+    # WEBUI_HZ is the push rate, capped to 5-60 by the server.
+    "WEBUI_ENABLED": False,
+    "WEBUI_PORT": 8080,
+    "WEBUI_BIND_ALL": False,
+    "WEBUI_HZ": 30,
     # UI color theme -- "dark" (default) or "light". Applied by each GUI
     # tool (launcher/dashboard/lap_analyst/race_analyst) at startup; switch
     # takes effect the next time a tool window is opened.
@@ -393,6 +403,10 @@ ONBOARDING_DONE = _cfg["ONBOARDING_DONE"]
 METRICS_ENABLED = _cfg["METRICS_ENABLED"]
 METRICS_PORT = _cfg["METRICS_PORT"]
 METRICS_BIND_ALL = _cfg["METRICS_BIND_ALL"]
+WEBUI_ENABLED = _cfg["WEBUI_ENABLED"]
+WEBUI_PORT = _cfg["WEBUI_PORT"]
+WEBUI_BIND_ALL = _cfg["WEBUI_BIND_ALL"]
+WEBUI_HZ = _cfg["WEBUI_HZ"]
 THEME = _cfg["THEME"]
 NOTIFY_ENABLED = _cfg["NOTIFY_ENABLED"]
 VOICE_ENABLED = _cfg["VOICE_ENABLED"]
