@@ -303,3 +303,7 @@ MIT — see [LICENSE](https://github.com/ransh2014/gt7telemtrace/blob/main/LICEN
 ## Support
 
 TRACE is free and always will be. If it's improved your GT7 sessions, a coffee is appreciated: **[ko-fi.com/ransh](https://ko-fi.com/ransh)**.
+
+## Status
+
+Won't be around much for the next few months, so replies and updates may be slow. TRACE will still be here when I'm back.
