@@ -38,15 +38,15 @@ config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
 
 # ── Theme (matches the analysis tools) ──────────────────────────────────
 if config.THEME == "light":
-    BG     = "#f4f5fa"
+    BG     = "#f4f2ee"
     PANEL  = "#ffffff"
-    PANEL2 = "#eceef5"
-    CYN    = "#0088aa"
-    PRP    = "#6a3fd6"
-    PINK   = "#c72d5c"
-    FG     = "#14162a"
-    DIM    = "#7a7f9a"
-    DIM2   = "#d7dae6"
+    PANEL2 = "#ebe8e2"
+    CYN    = "#1c5c58"
+    PRP    = "#c8102e"
+    PINK   = "#c8102e"
+    FG     = "#16161a"
+    DIM    = "#55535c"
+    DIM2   = "#e2dfd8"
 else:
     BG     = "#08080a"
     PANEL  = "#0e0e11"

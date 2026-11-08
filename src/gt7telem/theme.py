@@ -181,30 +181,37 @@ def fit_window(win, width: int, height: int, min_w: int = 0, min_h: int = 0) -> 
     win.geometry(f"{w}x{h}+{max(0, (sw - w) // 2)}+{max(0, (sh - h - px(60)) // 2)}")
 
 
-def style_ttk(root) -> None:
-    """Dark TRACE look for ttk widgets (progress bars, scrollbars, combo boxes, tables). The native Windows/macOS
-    ttk themes ignore colours, which is why bars and tables showed up white; 'clam' honours them."""
+def style_ttk(root, light: bool = False) -> None:
+    """Dark (or, with light=True, light) TRACE look for ttk widgets: progress bars, scrollbars, combo boxes and
+    tables. The native Windows/macOS ttk themes ignore colours, which is why bars and tables showed up white;
+    'clam' honours them. The light values are the website's light palette."""
     from tkinter import ttk
 
+    if light:
+        c = dict(bg1="#ebe8e2", bg3="#e2dfd8", cbg="#ffffff", line="#d4d1ca", line2="#bdbab3", txt="#16161a",
+                 mid="#55535c", dim="#7a7880", red="#c8102e", head="#c8102e")
+    else:
+        c = dict(bg1=BG1, bg3=BG3, cbg=CBG, line=LINE, line2=LINE2, txt=TXT, mid=MID, dim=DIM, red=RED, head=RED_2)
     s = ttk.Style(root)
     s.theme_use("clam")
     for orient in ("Vertical", "Horizontal"):
-        s.configure(f"{orient}.TScrollbar", troughcolor=BG1, background=BG3, bordercolor=BG1,
-                    lightcolor=BG3, darkcolor=BG3, arrowcolor=MID, relief="flat")
-        s.map(f"{orient}.TScrollbar", background=[("active", DIM)])
-    s.configure("Horizontal.TProgressbar", troughcolor=BG3, background=RED, bordercolor=BG3,
-                lightcolor=RED, darkcolor=RED)
-    s.configure("TCombobox", fieldbackground=BG3, background=BG3, foreground=TXT, arrowcolor=MID,
-                bordercolor=LINE2, lightcolor=BG3, darkcolor=BG3, selectbackground=BG3, selectforeground=TXT)
-    s.map("TCombobox", fieldbackground=[("readonly", BG3)], foreground=[("readonly", TXT)],
-          selectbackground=[("readonly", BG3)], selectforeground=[("readonly", TXT)])
-    s.configure("Treeview", background=CBG, fieldbackground=CBG, foreground=TXT, bordercolor=LINE,
-                lightcolor=CBG, darkcolor=CBG)
-    s.configure("Treeview.Heading", background=BG1, foreground=RED_2, relief="flat", bordercolor=LINE)
-    root.option_add("*TCombobox*Listbox.background", BG3)
-    root.option_add("*TCombobox*Listbox.foreground", TXT)
-    root.option_add("*TCombobox*Listbox.selectBackground", RED)
-    root.option_add("*TCombobox*Listbox.selectForeground", TXT)
+        s.configure(f"{orient}.TScrollbar", troughcolor=c["bg1"], background=c["bg3"], bordercolor=c["bg1"],
+                    lightcolor=c["bg3"], darkcolor=c["bg3"], arrowcolor=c["mid"], relief="flat")
+        s.map(f"{orient}.TScrollbar", background=[("active", c["dim"])])
+    s.configure("Horizontal.TProgressbar", troughcolor=c["bg3"], background=c["red"], bordercolor=c["bg3"],
+                lightcolor=c["red"], darkcolor=c["red"])
+    s.configure("TCombobox", fieldbackground=c["bg3"], background=c["bg3"], foreground=c["txt"], arrowcolor=c["mid"],
+                bordercolor=c["line2"], lightcolor=c["bg3"], darkcolor=c["bg3"], selectbackground=c["bg3"],
+                selectforeground=c["txt"])
+    s.map("TCombobox", fieldbackground=[("readonly", c["bg3"])], foreground=[("readonly", c["txt"])],
+          selectbackground=[("readonly", c["bg3"])], selectforeground=[("readonly", c["txt"])])
+    s.configure("Treeview", background=c["cbg"], fieldbackground=c["cbg"], foreground=c["txt"], bordercolor=c["line"],
+                lightcolor=c["cbg"], darkcolor=c["cbg"])
+    s.configure("Treeview.Heading", background=c["bg1"], foreground=c["head"], relief="flat", bordercolor=c["line"])
+    root.option_add("*TCombobox*Listbox.background", c["bg3"])
+    root.option_add("*TCombobox*Listbox.foreground", c["txt"])
+    root.option_add("*TCombobox*Listbox.selectBackground", c["red"])
+    root.option_add("*TCombobox*Listbox.selectForeground", "#ffffff" if light else c["txt"])
 
 
 def bar_style(root, name: str, colour: str) -> str:

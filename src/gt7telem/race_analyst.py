@@ -41,18 +41,18 @@ runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op els
 
 # ── Theme (matches lap_analyst.py) ─────────────────────────────────────────────
 if runtime_config.THEME == "light":
-    BG   = "#f4f5fa"
+    BG   = "#f4f2ee"
     PNL  = "#ffffff"
-    PNL2 = "#eceef5"
-    ACC  = "#d1004a"
-    CYN  = "#00897a"
-    GRN  = "#1c8a45"
-    YLW  = "#a67d00"
-    ORG  = "#c0621a"
-    PRP  = "#7a3fd6"
-    FG   = "#14162a"
-    DIM  = "#7a7f9a"
-    DIM2 = "#d7dae6"
+    PNL2 = "#ebe8e2"
+    ACC  = "#c8102e"
+    CYN  = "#1c5c58"
+    GRN  = "#23743f"
+    YLW  = "#8a6a1c"
+    ORG  = "#8c0c22"
+    PRP  = "#55535c"
+    FG   = "#16161a"
+    DIM  = "#7a7880"
+    DIM2 = "#e2dfd8"
 else:
     BG   = "#08080a"
     PNL  = "#0e0e11"
@@ -1823,7 +1823,7 @@ class AnalystApp(tk.Tk):
         plt.close("all"); self.destroy()
 
     def _build(self):
-        theme.style_ttk(self)
+        theme.style_ttk(self, light=runtime_config.THEME == "light")
         style = ttk.Style(); style.theme_use("clam")
         style.configure("TNotebook", background=BG, borderwidth=0)
         style.configure("TNotebook.Tab", background=PNL, foreground=DIM,

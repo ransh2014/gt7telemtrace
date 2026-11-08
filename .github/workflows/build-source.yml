@@ -64,8 +64,13 @@ jobs:
           path: gt7telem-source.zip
           retention-days: 30
 
+      - name: Release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python tools/release_notes.py "$GITHUB_REF_NAME" > release-notes.md
+
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           files: gt7telem-source.zip

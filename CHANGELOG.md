@@ -5,9 +5,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **Light theme matches the website.** The Launcher, Lap Analyst, Race Analyst and Records windows (and the Android app) now use the website's light palette in light mode instead of the old blue-grey one. Design only; nothing else changed.
+- **Release notes.** The GitHub release text is now copied from this changelog by the release workflow (`tools/release_notes.py`), so the release page and this file can't disagree.
+
 ## [1.0.1] - 2026-11-08
 **A full design overhaul. No new features were added** -- everything TRACE does is unchanged; it just looks and feels like the website now.
-- **Same look as the website.** The desktop windows (Launcher, Live Dashboard, Lap Analyst, Race Analyst, Records and the notification toasts) and the Android app use the website's exact dark palette -- obsidian surfaces, the signature red, petrol teal, racing green and gold -- in place of the old navy/neon colours. New module `theme.py` holds the shared colours and fonts. The light theme is unchanged.
+- **Same look as the website.** The desktop windows (Launcher, Live Dashboard, Lap Analyst, Race Analyst, Records and the notification toasts) and the Android app use the website's exact palette -- obsidian surfaces, the signature red, petrol teal, racing green and gold -- in place of the old navy/neon colours. New module `theme.py` holds the shared colours and fonts. The light theme is unchanged.
 - **Same fonts as the website.** Anton (big speed/gear numerals), Sora (titles), Manrope (launcher text) and JetBrains Mono (data and labels) are bundled with the app (all SIL Open Font License) and loaded for TRACE only on Windows, macOS and Linux -- nothing is installed system-wide. Android gets them too. If a font can't load, TRACE falls back to the system font and works as before.
 - **Fits any screen.** Windows now size themselves to the screen (a 1280x920 dashboard no longer hangs off a scaled laptop display), the header rows wrap instead of clipping, and TRACE draws at the screen's real resolution on Windows -- crisp at 125%/150%/175% scaling instead of blurry.
 - **Dark everywhere.** Progress bars, tables, scrollbars, drop-downs, the log box and panel borders are dark and match the theme instead of showing up white.
