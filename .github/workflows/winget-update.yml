@@ -138,6 +138,18 @@ jobs:
           }
           echo "INSTALLER_URL=$installerUrl" >> $env:GITHUB_ENV
 
+      - name: Sync the winget-pkgs fork with upstream
+        if: steps.pkgcheck.outputs.published == 'true'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          # Fast-forward ransh2014/winget-pkgs to microsoft/winget-pkgs so the
+          # manifest branch wingetcreate pushes starts from current upstream.
+          # Non-fatal: a failed sync only warns, the submission still runs.
+          gh repo sync ransh2014/winget-pkgs --source microsoft/winget-pkgs --branch master
+
       - name: Submit updated manifest via wingetcreate
         if: steps.pkgcheck.outputs.published == 'true'
         shell: pwsh
