@@ -5,6 +5,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-08
+**A small design follow-up to 1.0.2. No new features.**
 - **Matching window titles.** The Live Dashboard, Lap Analyst and Race Analyst headers show `GT7 TRACE` with the tool name stacked under it in the top-left corner (the Menu button moved to the right). The analysts' tab pages no longer show a pale default border.
 
 ## [1.0.2] - 2026-11-08
