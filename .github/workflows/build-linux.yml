@@ -81,7 +81,8 @@ jobs:
             --collect-data certifi \
             --add-data "$PKG_DIR/car_ids.csv:gt7telem" \
             --add-data "$PKG_DIR/course_ids.csv:gt7telem" \
-            --collect-submodules websockets \n            entrypoint.py
+            --collect-submodules websockets \
+            entrypoint.py
 
       - name: Zip the binary
         run: |
