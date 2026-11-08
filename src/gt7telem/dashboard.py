@@ -84,18 +84,18 @@ def ms_to_laptime(ms):
     return f"{m}:{s:06.3f}"
 
 def temp_color(val, cold=60, good=80, hot=100):
-    if val <= 0:   return "#605e68"
-    if val < cold: return "#5fb3a8"
-    if val < good: return "#3c9a5f"
-    if val < hot:  return "#c9a24b"
-    return "#e2455a"
+    if val <= 0:   return theme.DIM
+    if val < cold: return theme.TEAL_2
+    if val < good: return theme.GREEN
+    if val < hot:  return theme.GOLD
+    return theme.RED_2
 
 def slip_color(val):
-    if val <= 0:   return "#605e68"
-    if val < 0.95: return "#e2455a"
-    if val < 1.05: return "#3c9a5f"
-    if val < 1.15: return "#c9a24b"
-    return "#e2455a"
+    if val <= 0:   return theme.DIM
+    if val < 0.95: return theme.RED_2
+    if val < 1.05: return theme.GREEN
+    if val < 1.15: return theme.GOLD
+    return theme.RED_2
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Recording state
@@ -270,7 +270,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"TRACE {__version__} - Live Dashboard")
-        self.configure(bg="#08080a")
+        self.configure(bg=theme.BG)
         theme.fit_window(self, 1280, 920, 1100, 700)
         self._fuel_per_lap      = 0.0
         self._fuel_at_lap_start = 0.0
@@ -369,61 +369,61 @@ class App(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
     def _build(self):
         theme.style_ttk(self)
-        BG  = "#08080a"
-        PNL = "#0e0e11"
-        ACC = "#e2455a"
-        HI  = "#5fb3a8"
-        FG  = "#f2f0ec"
-        DIM = "#605e68"
+        BG  = theme.BG
+        PNL = theme.BG1
+        ACC = theme.RED_2
+        HI  = theme.TEAL_2
+        FG  = theme.TXT
+        DIM = theme.DIM
 
         # ── Header ───────────────────────────────────────────────────────────
-        hdr = tk.Frame(self, bg="#17171b", pady=6)
+        hdr = tk.Frame(self, bg=theme.BG2, pady=6)
         hdr.pack(fill="x")
 
         if FROM_MENU:
-            tk.Button(hdr, text="\u2190 Menu", command=self._go_menu, bg="#202024", fg=FG, relief="flat", activebackground="#2f2f31", activeforeground=FG, highlightthickness=1, highlightbackground="#2f2f31", bd=0,
+            tk.Button(hdr, text="\u2190 Menu", command=self._go_menu, bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                       font=(theme.MONO, 10), padx=10, pady=3, cursor="hand2").pack(side="left", padx=(12, 0))
-        tk.Label(hdr, text="TRACE  LIVE DASHBOARD", fg=ACC, bg="#17171b",
+        tk.Label(hdr, text="TRACE  LIVE DASHBOARD", fg=ACC, bg=theme.BG2,
                  font=(theme.DISPLAY, 14, "bold")).pack(side="left", padx=16)
-        self.conn_dot = tk.Label(hdr, text="● OFFLINE", fg=DIM, bg="#17171b",
+        self.conn_dot = tk.Label(hdr, text="● OFFLINE", fg=DIM, bg=theme.BG2,
                                  font=(theme.MONO, 10))
         self.conn_dot.pack(side="left", padx=8)
 
         tk.Button(hdr, text="Export Session",
                   command=self._export_session,
-                  bg="#202024", fg=FG, relief="flat", activebackground="#2f2f31", activeforeground=FG, highlightthickness=1, highlightbackground="#2f2f31", bd=0,
+                  bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                   font=(theme.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
         tk.Button(hdr, text="Session Summary",
                   command=self._show_session_summary,
-                  bg="#202024", fg=FG, relief="flat", activebackground="#2f2f31", activeforeground=FG, highlightthickness=1, highlightbackground="#2f2f31", bd=0,
+                  bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                   font=(theme.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
 
         self.rec_btn = tk.Button(hdr, text="Record Lap",
                                  command=self._toggle_record,
-                                 bg="#202024", fg=FG, relief="flat", activebackground="#2f2f31", activeforeground=FG, highlightthickness=1, highlightbackground="#2f2f31", bd=0,
+                                 bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                                  font=(theme.MONO, 10, "bold"), padx=12, pady=3)
         self.rec_btn.pack(side="right", padx=6)
 
         self.race_btn = tk.Button(hdr, text="Record Race",
                                   command=self._toggle_record_race,
-                                  bg="#202024", fg=FG, relief="flat", activebackground="#2f2f31", activeforeground=FG, highlightthickness=1, highlightbackground="#2f2f31", bd=0,
+                                  bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                                   font=(theme.MONO, 10, "bold"), padx=12, pady=3)
         self.race_btn.pack(side="right", padx=6)
 
         # ── Header row 2: IP / Track / Car ── own row so it can never get
         # squeezed off-window by the button row above growing wider.
-        hdr2 = tk.Frame(self, bg="#17171b", pady=4)
+        hdr2 = tk.Frame(self, bg=theme.BG2, pady=4)
         hdr2.pack(fill="x")
 
-        tk.Label(hdr2, text="CONSOLE IP", fg=DIM, bg="#17171b",
+        tk.Label(hdr2, text="CONSOLE IP", fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 8)).pack(side="left", padx=(16, 2))
         self.ip_var = tk.StringVar(value=PS4_IP)
         _ip_values = list(KNOWN_IPS)
         if PS4_IP and PS4_IP not in _ip_values:
             _ip_values.insert(0, PS4_IP)
         st_ip = ttk.Style()
-        st_ip.configure("Ip.TCombobox", fieldbackground="#202024",
-                        background="#202024", foreground=HI)
+        st_ip.configure("Ip.TCombobox", fieldbackground=theme.BG3,
+                        background=theme.BG3, foreground=HI)
         ip_entry = ttk.Combobox(hdr2, textvariable=self.ip_var, values=_ip_values,
                                 font=(theme.MONO, 9), width=15, style="Ip.TCombobox")
         ip_entry.pack(side="left", padx=(0, 12))
@@ -434,123 +434,123 @@ class App(tk.Tk):
 
         self.discover_btn = tk.Button(hdr2, text="Auto-Detect",
                                        command=self._on_discover_ip,
-                                       bg="#202024", fg=HI, relief="flat",
+                                       bg=theme.BG3, fg=HI, relief="flat",
                                        font=(theme.MONO, 8), padx=6, pady=1)
         self.discover_btn.pack(side="left", padx=(0, 12))
 
-        tk.Label(hdr2, text="TRACK", fg=DIM, bg="#17171b",
+        tk.Label(hdr2, text="TRACK", fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 9)).pack(side="left", padx=(8, 2))
         self.track_var = tk.StringVar(value="")
         st_track = ttk.Style()
-        st_track.configure("Track.TCombobox", fieldbackground="#202024",
-                           background="#202024", foreground=FG)
+        st_track.configure("Track.TCombobox", fieldbackground=theme.BG3,
+                           background=theme.BG3, foreground=FG)
         track_entry = ttk.Combobox(hdr2, textvariable=self.track_var,
                                    values=track_db.all_track_names(),
                                    font=(theme.MONO, 10), width=20,
                                    style="Track.TCombobox")
         track_entry.pack(side="left", padx=(0, 12))
 
-        tk.Label(hdr2, text="CAR", fg=DIM, bg="#17171b",
+        tk.Label(hdr2, text="CAR", fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 9)).pack(side="left", padx=(8, 2))
         self.car_var = tk.StringVar(value="")
-        tk.Entry(hdr2, textvariable=self.car_var, bg="#202024", fg=FG,
+        tk.Entry(hdr2, textvariable=self.car_var, bg=theme.BG3, fg=FG,
                  font=(theme.MONO, 10), width=18, relief="flat",
                  insertbackground=FG).pack(side="left", padx=(0, 4))
 
         # ── Header row 3: preferences. Their own row, so the console / track / car
         # row above never loses its controls to a window that is too narrow.
-        hdr3 = tk.Frame(self, bg="#17171b", pady=2)
+        hdr3 = tk.Frame(self, bg=theme.BG2, pady=2)
         hdr3.pack(fill="x")
-        tk.Label(hdr3, text="PREFERENCES", fg=DIM, bg="#17171b",
+        tk.Label(hdr3, text="PREFERENCES", fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 8)).pack(side="left", padx=(16, 2))
 
         self.debug_var = tk.BooleanVar(value=bool(runtime_config.DEBUG_LOG))
         tk.Checkbutton(hdr3, text="DEBUG LOG", variable=self.debug_var,
-                       command=self._on_debug_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_debug_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 16))
 
         self.analytics_var = tk.BooleanVar(value=bool(runtime_config.ANALYTICS_ENABLED))
         tk.Checkbutton(hdr3, text="SHARE USAGE DATA", variable=self.analytics_var,
-                       command=self._on_analytics_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_analytics_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.update_var = tk.BooleanVar(value=bool(runtime_config.UPDATE_CHECK_ENABLED))
         tk.Checkbutton(hdr3, text="CHECK FOR UPDATES", variable=self.update_var,
-                       command=self._on_update_check_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_update_check_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.ghost_var = tk.BooleanVar(value=bool(runtime_config.GHOST_ENABLED))
         tk.Checkbutton(hdr3, text="TOP-LAP GHOST", variable=self.ghost_var,
-                       command=self._on_ghost_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_ghost_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.notify_var = tk.BooleanVar(value=bool(runtime_config.NOTIFY_ENABLED))
         tk.Checkbutton(hdr3, text="NOTIFICATIONS", variable=self.notify_var,
-                       command=self._on_notify_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_notify_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.voice_var = tk.BooleanVar(value=bool(runtime_config.VOICE_ENABLED))
         tk.Checkbutton(hdr3, text="VOICE ALERTS", variable=self.voice_var,
-                       command=self._on_voice_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_voice_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.auto_lap_var = tk.BooleanVar(value=bool(runtime_config.AUTO_LAP_ENABLED))
         tk.Checkbutton(hdr3, text="AUTO LAP", variable=self.auto_lap_var,
-                       command=self._on_auto_lap_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_auto_lap_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.keep_awake_var = tk.BooleanVar(value=bool(runtime_config.KEEP_AWAKE_ENABLED))
         tk.Checkbutton(hdr3, text="KEEP AWAKE", variable=self.keep_awake_var,
-                       command=self._on_keep_awake_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_keep_awake_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.metrics_var = tk.BooleanVar(value=bool(runtime_config.METRICS_ENABLED))
         tk.Checkbutton(hdr2, text=f"METRICS :{runtime_config.METRICS_PORT}", variable=self.metrics_var,
-                       command=self._on_metrics_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_metrics_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.metrics_bind_var = tk.BooleanVar(value=bool(runtime_config.METRICS_BIND_ALL))
         tk.Checkbutton(hdr2, text="ALLOW REMOTE (METRICS)", variable=self.metrics_bind_var,
-                       command=self._on_metrics_bind_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_metrics_bind_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
-        self.webui_url_lbl = tk.Label(hdr2, text="", fg=ACC, bg="#17171b", cursor="hand2",
+        self.webui_url_lbl = tk.Label(hdr2, text="", fg=ACC, bg=theme.BG2, cursor="hand2",
                                       font=(theme.MONO, 8, "underline"))
         self.webui_url_lbl.bind("<Button-1>", lambda _e: self._copy_webui_url())
         self.webui_url_lbl.pack(side="right", padx=(4, 4))
         self.webui_bind_var = tk.BooleanVar(value=bool(runtime_config.WEBUI_BIND_ALL))
         tk.Checkbutton(hdr2, text="ALLOW REMOTE (WEB UI)", variable=self.webui_bind_var,
-                       command=self._on_webui_bind_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_webui_bind_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
         self.webui_var = tk.BooleanVar(value=bool(runtime_config.WEBUI_ENABLED))
         tk.Checkbutton(hdr2, text=f"WEB UI :{runtime_config.WEBUI_PORT}", variable=self.webui_var,
-                       command=self._on_webui_toggle, bg="#17171b", fg=DIM,
-                       selectcolor="#202024", activebackground="#17171b",
+                       command=self._on_webui_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         # ── Recording sample rate ────────────────────────────────────────────
         self.rate_var = tk.StringVar(value=f"{self._record_rate} Hz")
         st_rate = ttk.Style()
-        st_rate.configure("Rate.TCombobox", fieldbackground="#202024",
-                          background="#202024", foreground=HI)
+        st_rate.configure("Rate.TCombobox", fieldbackground=theme.BG3,
+                          background=theme.BG3, foreground=HI)
         rate_combo = ttk.Combobox(hdr2, textvariable=self.rate_var,
                                   values=[f"{r} Hz" for r in RECORD_RATE_OPTIONS],
                                   font=(theme.MONO, 9), width=6, state="readonly",
                                   style="Rate.TCombobox")
         rate_combo.pack(side="right", padx=(0, 4))
         rate_combo.bind("<<ComboboxSelected>>", lambda e: self._on_rate_change())
-        tk.Label(hdr2, text="REC RATE", fg=DIM, bg="#17171b",
+        tk.Label(hdr2, text="REC RATE", fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 8)).pack(side="right", padx=(8, 2))
 
         for _row in (hdr, hdr2, hdr3):
@@ -606,10 +606,10 @@ class App(tk.Tk):
         sg_mid = tk.Frame(sg, bg=PNL)
         sg_mid.pack(side="left", expand=True)
         tk.Label(sg_mid, text="SUGGEST", fg=DIM, bg=PNL, font=(theme.MONO, 8)).pack()
-        self.sug_gear_lbl = tk.Label(sg_mid, text="--", fg="#c9a24b", bg=PNL,
+        self.sug_gear_lbl = tk.Label(sg_mid, text="--", fg=theme.GOLD, bg=PNL,
                                      font=(theme.MONO, 20, "bold"))
         self.sug_gear_lbl.pack()
-        self.gear_lbl = tk.Label(sg, text="N", fg="#c9a24b", bg=PNL,
+        self.gear_lbl = tk.Label(sg, text="N", fg=theme.GOLD, bg=PNL,
                                  font=(theme.IMPACT, 64))
         self.gear_lbl.pack(side="right", padx=20)
         tk.Label(sg, text="gear", fg=DIM, bg=PNL,
@@ -620,7 +620,7 @@ class App(tk.Tk):
         lap_f.pack(fill="x", pady=(0, 4))
         for attr, label, col in [
             ("lap_lbl", "LAP", FG), ("cur_lbl", "CURRENT", HI),
-            ("best_lbl", "BEST", "#3c9a5f"), ("last_lbl", "LAST", FG),
+            ("best_lbl", "BEST", theme.GREEN), ("last_lbl", "LAST", FG),
             ("pos_lbl", "GRID", FG), ("topspd_lbl", "TOP SPD", HI),
             ("delta_lbl", "DELTA", FG), ("ghost_lbl", "VS TOP", FG),
         ]:
@@ -646,14 +646,14 @@ class App(tk.Tk):
             setattr(self, av, var)
             setattr(self, al, lbl)
 
-        bar_row(left, "RPM",      "rpm_var", "rpm_lbl", "#e2455a")
-        bar_row(left, "THROTTLE", "thr_var", "thr_lbl", "#3c9a5f")
-        bar_row(left, "BRAKE",    "brk_var", "brk_lbl", "#e2455a")
-        bar_row(left, "CLUTCH",   "clt_var", "clt_lbl", "#c9a24b")
+        bar_row(left, "RPM",      "rpm_var", "rpm_lbl", theme.RED_2)
+        bar_row(left, "THROTTLE", "thr_var", "thr_lbl", theme.GREEN)
+        bar_row(left, "BRAKE",    "brk_var", "brk_lbl", theme.RED_2)
+        bar_row(left, "CLUTCH",   "clt_var", "clt_lbl", theme.GOLD)
 
         # ── Tyres ─────────────────────────────────────────────────────────────
         tyre_f = tk.LabelFrame(left, text=" TYRES ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         tyre_f.pack(fill="x", pady=4, padx=2)
         for label, ta, sa in [("FL", "tyre_fl", "slip_fl"), ("FR", "tyre_fr", "slip_fr"),
                                ("RL", "tyre_rl", "slip_rl"), ("RR", "tyre_rr", "slip_rr")]:
@@ -669,7 +669,7 @@ class App(tk.Tk):
 
         # ── Suspension ────────────────────────────────────────────────────────
         susp_f = tk.LabelFrame(left, text=" SUSPENSION (mm) ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         susp_f.pack(fill="x", pady=4, padx=2)
         for label, attr in [("FL", "susp_fl_lbl"), ("FR", "susp_fr_lbl"),
                              ("RL", "susp_rl_lbl"), ("RR", "susp_rr_lbl")]:
@@ -682,7 +682,7 @@ class App(tk.Tk):
 
         # ── Driver aids ───────────────────────────────────────────────────────
         aids_f = tk.LabelFrame(left, text=" DRIVER AIDS ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         aids_f.pack(fill="x", pady=4, padx=2)
         self._aid_lbls = {}
         for key, label in [
@@ -699,7 +699,7 @@ class App(tk.Tk):
 
         # ── Engine and Fluids ─────────────────────────────────────────────────
         eng_f = tk.LabelFrame(left, text=" ENGINE AND FLUIDS ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         eng_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("FUEL", "fuel_lbl"), ("FUEL LAPS", "fuellaps_lbl"),
                              ("BOOST bar", "boost_lbl"), ("OIL C*", "oil_lbl"),
@@ -718,7 +718,7 @@ class App(tk.Tk):
         # GT7 doesn't send tyre wear, so the tyre figures are estimates built
         # from lap-time drop-off (see udp.StintTracker); fuel is measured.
         strat_f = tk.LabelFrame(left, text=" STRATEGY (est.) ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         strat_f.pack(fill="x", pady=4, padx=2)
         for row_items in (
             [("FUEL/LAP", "st_fpl_lbl"), ("FUEL LAPS", "st_laps_lbl"),
@@ -748,7 +748,7 @@ class App(tk.Tk):
         new_tyres.bind("<Button-1>", lambda _e: self._on_new_tyres())
         # ── Dynamics ─────────────────────────────────────────────────────────
         dyn_f = tk.LabelFrame(left, text=" DYNAMICS ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         dyn_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("VEL X", "velx_lbl"), ("VEL Y", "vely_lbl"),
                              ("VEL Z", "velz_lbl"), ("ANG X", "angx_lbl"),
@@ -763,7 +763,7 @@ class App(tk.Tk):
 
         # ── Position ──────────────────────────────────────────────────────────
         pos_f = tk.LabelFrame(left, text=" POSITION ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         pos_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("WORLD X", "wx_lbl"), ("WORLD Y", "wy_lbl"),
                              ("WORLD Z", "wz_lbl"), ("TRACK POS", "tpos_lbl")]:
@@ -776,7 +776,7 @@ class App(tk.Tk):
 
         # ── Drivetrain extras ─────────────────────────────────────────────────
         drv_f = tk.LabelFrame(left, text=" DRIVETRAIN EXTRAS ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         drv_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("STEERING", "steer_lbl"), ("CLUTCH ENG", "clteng_lbl"),
                              ("RPM WARN", "rpmwarn_lbl"), ("RPM LIM", "rpmlim_lbl"),
@@ -796,7 +796,7 @@ class App(tk.Tk):
 
         # ── Extended (Packet B/~/C) ───────────────────────────────────────────
         ext_f = tk.LabelFrame(left, text=" EXTENDED (B/~/C) ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         ext_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("CUR LAP", "extcurlap_lbl"), ("CATEGORY", "extcat_lbl"),
                              ("WHEELBASE", "extwb_lbl"), ("SWAY", "extsway_lbl"),
@@ -810,7 +810,7 @@ class App(tk.Tk):
             setattr(self, attr, lbl)
 
         surf_f = tk.LabelFrame(left, text=" SURFACE (per tyre) ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         surf_f.pack(fill="x", pady=4, padx=2)
         self._surf_lbls = {}
         for label, key in [("FL", "fl"), ("FR", "fr"), ("RL", "rl"), ("RR", "rr")]:
@@ -822,7 +822,7 @@ class App(tk.Tk):
             self._surf_lbls[key] = lbl
 
         steer_f = tk.LabelFrame(left, text=" WHEEL STEERING ANGLE ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         steer_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("FRONT L", "extsteerl_lbl"), ("FRONT R", "extsteerr_lbl")]:
             col_f = tk.Frame(steer_f, bg=BG)
@@ -834,7 +834,7 @@ class App(tk.Tk):
 
         # ── Session misc ──────────────────────────────────────────────────────
         misc_f = tk.LabelFrame(left, text=" SESSION / MISC ", fg=ACC, bg=BG, font=(theme.MONO, 9),
-                                   bd=0, relief="flat", highlightthickness=1, highlightbackground="#2f2f31", highlightcolor="#2f2f31")
+                                   bd=0, relief="flat", highlightthickness=1, highlightbackground=theme.LINE2, highlightcolor=theme.LINE2)
         misc_f.pack(fill="x", pady=4, padx=2)
         for title, attr in [("TIME OF DAY", "tod_lbl"), ("IS EV", "isev_lbl"),
                              ("CAR ID", "carid_lbl"), ("FLAG 8E", "f8e_lbl"),
@@ -854,11 +854,11 @@ class App(tk.Tk):
         af = tk.Frame(right, bg=BG)
         af.pack(fill="x", pady=(0, 4))
 
-        self.alert_hot  = tk.Label(af, text="TYRE HOT",  bg="#e2455a", fg="#fff",
+        self.alert_hot  = tk.Label(af, text="TYRE HOT",  bg=theme.RED_2, fg="#fff",
                                    font=(theme.MONO, 8, "bold"), padx=5, pady=2)
-        self.alert_cold = tk.Label(af, text="TYRE COLD", bg="#1c5c58", fg="#5fb3a8",
+        self.alert_cold = tk.Label(af, text="TYRE COLD", bg=theme.TEAL, fg=theme.TEAL_2,
                                    font=(theme.MONO, 8, "bold"), padx=5, pady=2)
-        self.alert_fuel = tk.Label(af, text="FUEL LOW",  bg="#c9a24b", fg="#000",
+        self.alert_fuel = tk.Label(af, text="FUEL LOW",  bg=theme.GOLD, fg="#000",
                                    font=(theme.MONO, 8, "bold"), padx=5, pady=2)
         # hidden until triggered — _poll calls grid / grid_remove
         self.alert_hot.grid( in_=af, row=0, column=0, padx=2, pady=1)
@@ -871,11 +871,11 @@ class App(tk.Tk):
         # ── Track map ────────────────────────────────────────────────────────
         tk.Label(right, text="TRACK MAP", fg=ACC, bg=BG,
                  font=(theme.MONO, 9, "bold")).pack(anchor="w", padx=2)
-        self.map_canvas = tk.Canvas(right, bg="#050506", width=theme.px(240), height=theme.px(180),
+        self.map_canvas = tk.Canvas(right, bg=theme.CBG, width=theme.px(240), height=theme.px(180),
                                     highlightthickness=1, highlightbackground=DIM)
         self.map_canvas.pack(pady=(0, 4))
         self.map_canvas.create_text(theme.px(120), theme.px(90), text="WAITING FOR DATA",
-                                    fill="#202024", font=(theme.MONO, 9))
+                                    fill=theme.BG3, font=(theme.MONO, 9))
 
         # ── Lap history ──────────────────────────────────────────────────────
         tk.Label(right, text="LAP HISTORY", fg=ACC, bg=BG,
@@ -886,15 +886,15 @@ class App(tk.Tk):
 
         st = ttk.Style()
         st.configure("Hist.Treeview",
-                     background="#050506", foreground="#f2f0ec",
-                     fieldbackground="#050506",
+                     background=theme.CBG, foreground=theme.TXT,
+                     fieldbackground=theme.CBG,
                      font=(theme.MONO, 8), rowheight=theme.px(18))
         st.configure("Hist.Treeview.Heading",
-                     background="#0e0e11", foreground=ACC,
+                     background=theme.BG1, foreground=ACC,
                      font=(theme.MONO, 8, "bold"))
         st.map("Hist.Treeview",
-               background=[("selected", "#8c0c22")],
-               foreground=[("selected", "#5fb3a8")])
+               background=[("selected", theme.RED_DIM)],
+               foreground=[("selected", theme.TEAL_2)])
 
         self.hist_tree = ttk.Treeview(
             hist_outer,
@@ -924,7 +924,7 @@ class App(tk.Tk):
         log_box.pack(fill="both", expand=True)
         log_sb = ttk.Scrollbar(log_box, orient="vertical")
         log_sb.pack(side="right", fill="y")
-        self.log = tk.Text(log_box, bg="#050506", fg="#5fb3a8", font=(theme.MONO, 8), relief="flat",
+        self.log = tk.Text(log_box, bg=theme.CBG, fg=theme.TEAL_2, font=(theme.MONO, 8), relief="flat",
                            wrap="word", yscrollcommand=log_sb.set, highlightthickness=0)
         log_sb.configure(command=self.log.yview)
         self.log.pack(side="left", fill="both", expand=True)
@@ -939,7 +939,7 @@ class App(tk.Tk):
 
         if len(pts) < 2:
             c.create_text(theme.px(120), theme.px(90), text="WAITING FOR DATA",
-                          fill="#202024", font=(theme.MONO, 9))
+                          fill=theme.BG3, font=(theme.MONO, 9))
             return
 
         W, H, PAD = theme.px(240), theme.px(180), theme.px(14)
@@ -965,7 +965,7 @@ class App(tk.Tk):
             coords = []
             for x, z in sparse:
                 coords.extend(to_cv(x, z))
-            c.create_line(*coords, fill="#8c0c22", width=2, smooth=True)
+            c.create_line(*coords, fill=theme.RED_DIM, width=2, smooth=True)
 
         # Recent 80 pts in bright cyan
         recent = pts[-80:]
@@ -973,12 +973,12 @@ class App(tk.Tk):
             rc = []
             for x, z in recent:
                 rc.extend(to_cv(x, z))
-            c.create_line(*rc, fill="#5fb3a8", width=2, smooth=True)
+            c.create_line(*rc, fill=theme.TEAL_2, width=2, smooth=True)
 
         # Current position dot
         cx, cy = to_cv(*pts[-1])
         c.create_oval(cx - theme.px(5), cy - theme.px(5), cx + theme.px(5), cy + theme.px(5),
-                      fill="#e2455a", outline="#fff", width=1)
+                      fill=theme.RED_2, outline="#fff", width=1)
 
     # ─────────────────────────────────────────────────────────────────────────
     # IP change
@@ -1131,8 +1131,8 @@ class App(tk.Tk):
     def _update_strategy_labels(self, st, cur_lap, unit):
         """Paint the STRATEGY panel from a StintTracker snapshot. A leading
         '~' marks a figure based on fewer than 3 laps of data."""
-        GRN, AMB, RED = "#3c9a5f", "#c9a24b", "#e2455a"
-        FGC, DIMC = "#f2f0ec", "#605e68"
+        GRN, AMB, RED = theme.GREEN, theme.GOLD, theme.RED_2
+        FGC, DIMC = theme.TXT, theme.DIM
         rough = "~" if st["fuel_basis_laps"] < 3 else ""
 
         fpl = st["fuel_per_lap"]
@@ -1242,7 +1242,7 @@ class App(tk.Tk):
             self.log_msg("Top-lap ghost on -- fetches the leaderboard's fastest lap for your car and track")
         else:
             self.log_msg("Top-lap ghost off -- no leaderboard requests from the Dashboard")
-            self.ghost_lbl.config(text="--", fg="#f2f0ec")
+            self.ghost_lbl.config(text="--", fg=theme.TXT)
 
     def _ghost_key(self):
         car, track = self.car_var.get().strip(), self.track_var.get().strip()
@@ -1448,7 +1448,7 @@ class App(tk.Tk):
 
         self.conn_dot.config(
             text="● LIVE" if ok else "● OFFLINE",
-            fg="#3c9a5f" if ok else "#605e68"
+            fg=theme.GREEN if ok else theme.DIM
         )
 
         if not ok:
@@ -1476,7 +1476,7 @@ class App(tk.Tk):
         if runtime_config.METRICS_ENABLED:
             metrics_server.update(d)
 
-        FG = "#f2f0ec"
+        FG = theme.TXT
 
         # Speed / Gear
         spd  = float(d.get("speed_kmh") or 0)
@@ -1498,7 +1498,7 @@ class App(tk.Tk):
         for key, lbl in self._aid_lbls.items():
             active = bool(d.get(key))
             lbl.config(text="YES" if active else "NO",
-                       fg="#e2455a" if active else "#605e68")
+                       fg=theme.RED_2 if active else theme.DIM)
 
         self.rpm_var.set(min(100, rpm / mrpm * 100))
         self.rpm_lbl.config(text=f"{rpm:.0f} / {int(mrpm)}")
@@ -1631,7 +1631,7 @@ class App(tk.Tk):
         self.tod_lbl.config(text=f"{tod_h:02d}:{tod_m:02d}:{tod_s:02d}")
         self.isev_lbl.config(
             text="YES" if d.get("is_ev") else "no",
-            fg="#3c9a5f" if d.get("is_ev") else FG)
+            fg=theme.GREEN if d.get("is_ev") else FG)
         _car_id_val = int(d.get("car_id") or 0)
         self.carid_lbl.config(text=str(_car_id_val))
         _auto_name = car_box_autofill(_car_id_val, self.car_var.get(), self._last_autofilled_car_id)
@@ -1675,7 +1675,7 @@ class App(tk.Tk):
             code = surface[i] if surface and i < len(surface) else None
             self._surf_lbls[key].config(
                 text=surf_names.get(code, code or "--"),
-                fg="#3c9a5f" if code == "T" else ("#c9a24b" if code else FG))
+                fg=theme.GREEN if code == "T" else (theme.GOLD if code else FG))
 
         wsa = d.get("wheel_steering_angle")
         if wsa:
@@ -1694,19 +1694,19 @@ class App(tk.Tk):
         has_fuel = _fuel_laps_num < 2
 
         if has_hot:
-            self.alert_hot.config(bg="#e2455a" if self._flash_on else "#8c0c22")
+            self.alert_hot.config(bg=theme.RED_2 if self._flash_on else theme.RED_DIM)
             self.alert_hot.grid()
         else:
             self.alert_hot.grid_remove()
 
         if has_cold:
-            self.alert_cold.config(bg="#1c5c58" if self._flash_on else "#17171b")
+            self.alert_cold.config(bg=theme.TEAL if self._flash_on else theme.BG2)
             self.alert_cold.grid()
         else:
             self.alert_cold.grid_remove()
 
         if has_fuel:
-            self.alert_fuel.config(bg="#c9a24b" if self._flash_on else "#3a2f14")
+            self.alert_fuel.config(bg=theme.GOLD if self._flash_on else theme.GOLD_DIM)
             self.alert_fuel.grid()
         else:
             self.alert_fuel.grid_remove()
@@ -1775,7 +1775,7 @@ class App(tk.Tk):
                     delta = cur_elapsed - ref_t
                     _delta_val  = delta
                     delta_text  = f"{delta:+.2f}s"
-                    delta_color = "#e2455a" if delta > 0 else "#3c9a5f"
+                    delta_color = theme.RED_2 if delta > 0 else theme.GREEN
         self.delta_lbl.config(text=delta_text, fg=delta_color)
 
         # ── Live gap to the leaderboard's fastest lap ────────────────────────
@@ -1907,12 +1907,12 @@ class App(tk.Tk):
 
         dlg = tk.Toplevel(self)
         dlg.title("Session Recap")
-        dlg.configure(bg="#08080a")
+        dlg.configure(bg=theme.BG)
         dlg.resizable(False, False)
         dlg.transient(self)
         _grab_when_visible(dlg)
 
-        tk.Label(dlg, text=_tk_text("🏁 Session Recap"), fg="#e2455a", bg="#08080a",
+        tk.Label(dlg, text=_tk_text("🏁 Session Recap"), fg=theme.RED_2, bg=theme.BG,
                  font=(theme.MONO, 12, "bold")).pack(pady=(14, 10), padx=24)
 
         rows = [
@@ -1921,17 +1921,17 @@ class App(tk.Tk):
             ("Average lap",    avg_str),
             ("Fuel used",      f"{fuel_used:.1f}%" if fuel_used > 0 else "--"),
         ]
-        body = tk.Frame(dlg, bg="#08080a")
+        body = tk.Frame(dlg, bg=theme.BG)
         body.pack(padx=24, pady=(0, 10))
         for label, value in rows:
-            r = tk.Frame(body, bg="#08080a")
+            r = tk.Frame(body, bg=theme.BG)
             r.pack(fill="x", pady=2)
-            tk.Label(r, text=label, fg="#96949c", bg="#08080a",
+            tk.Label(r, text=label, fg=theme.MID, bg=theme.BG,
                      font=(theme.MONO, 10), width=15, anchor="w").pack(side="left")
-            tk.Label(r, text=value, fg="#f2f0ec", bg="#08080a",
+            tk.Label(r, text=value, fg=theme.TXT, bg=theme.BG,
                      font=(theme.MONO, 10, "bold"), anchor="w").pack(side="left")
 
-        tk.Button(dlg, text="Close", command=dlg.destroy, bg="#e2455a", fg="#000",
+        tk.Button(dlg, text="Close", command=dlg.destroy, bg=theme.RED_2, fg="#000",
                   font=(theme.MONO, 10, "bold"), relief="flat", padx=16, pady=4,
                   cursor="hand2").pack(pady=(6, 16))
 
@@ -2035,12 +2035,12 @@ class App(tk.Tk):
 
     def _show_battery_bar(self, pct):
         if self._batt_bar is None:
-            bar = tk.Frame(self, bg="#c8102e")
-            self._batt_lbl = tk.Label(bar, text="", bg="#c8102e", fg="white",
+            bar = tk.Frame(self, bg=theme.RED)
+            self._batt_lbl = tk.Label(bar, text="", bg=theme.RED, fg="white",
                                       font=(theme.MONO, 11, "bold"), pady=4)
             self._batt_lbl.pack(side="left", padx=10)
             tk.Button(bar, text="OK, I'll charge", command=self._battery_ack, relief="flat",
-                      bg="#202024", fg="white", font=(theme.MONO, 9),
+                      bg=theme.BG3, fg="white", font=(theme.MONO, 9),
                       padx=8).pack(side="right", padx=10, pady=3)
             self._batt_bar = bar
         self._batt_lbl.config(text=f"LOW BATTERY ({pct:.0f}%) - plug in your charger now, "
@@ -2178,15 +2178,15 @@ class App(tk.Tk):
     def _show_track_offer(self, name):
         self._td_guess = name
         if self._td_bar is None:
-            bar = tk.Frame(self, bg="#1c5c58")
-            self._td_lbl = tk.Label(bar, text="", bg="#1c5c58", fg="white",
+            bar = tk.Frame(self, bg=theme.TEAL)
+            self._td_lbl = tk.Label(bar, text="", bg=theme.TEAL, fg="white",
                                     font=(theme.MONO, 11, "bold"), pady=4)
             self._td_lbl.pack(side="left", padx=10)
             tk.Button(bar, text="Not this", command=self._td_decline, relief="flat",
-                      bg="#202024", fg="white", font=(theme.MONO, 9),
+                      bg=theme.BG3, fg="white", font=(theme.MONO, 9),
                       padx=8).pack(side="right", padx=(0, 10), pady=3)
             tk.Button(bar, text="Use it", command=self._td_accept, relief="flat",
-                      bg="#3c9a5f", fg="white", font=(theme.MONO, 9, "bold"),
+                      bg=theme.GREEN, fg="white", font=(theme.MONO, 9, "bold"),
                       padx=8).pack(side="right", padx=4, pady=3)
             self._td_bar = bar
         self._td_lbl.config(text=f"Looks like {name} - use it as the track?")
@@ -2255,21 +2255,21 @@ class App(tk.Tk):
                 hint = []
         dlg = tk.Toplevel(self)
         dlg.title("No track selected")
-        dlg.configure(bg="#202024")
+        dlg.configure(bg=theme.BG3)
         dlg.transient(self)
         choice = {"v": ""}
         tk.Label(dlg, text=f"No track is selected, so this {what} would be saved as 'unknown'.\n"
                            "Are you sure? Pick the track you drove on:",
-                 bg="#202024", fg="white", justify="left",
+                 bg=theme.BG3, fg="white", justify="left",
                  font=(theme.MONO, 10)).pack(padx=16, pady=(14, 8))
         var = tk.StringVar(value=hint[0] if hint else "")
         names = track_db.all_track_names()
         ttk.Combobox(dlg, textvariable=var, values=hint + [n for n in names if n not in hint],
                      width=40).pack(padx=16, pady=4)
         if hint:
-            tk.Label(dlg, text="Best guesses are listed first.", bg="#202024", fg="#96949c",
+            tk.Label(dlg, text="Best guesses are listed first.", bg=theme.BG3, fg=theme.MID,
                      font=(theme.MONO, 8)).pack()
-        row = tk.Frame(dlg, bg="#202024")
+        row = tk.Frame(dlg, bg=theme.BG3)
         row.pack(pady=12)
 
         def use():
@@ -2279,9 +2279,9 @@ class App(tk.Tk):
         def unknown():
             choice["v"] = ""
             dlg.destroy()
-        tk.Button(row, text="Save to this track", command=use, bg="#3c9a5f", fg="white",
+        tk.Button(row, text="Save to this track", command=use, bg=theme.GREEN, fg="white",
                   relief="flat", padx=10).pack(side="left", padx=6)
-        tk.Button(row, text="Save as unknown", command=unknown, bg="#202024", fg="white",
+        tk.Button(row, text="Save as unknown", command=unknown, bg=theme.BG3, fg="white",
                   relief="flat", padx=10).pack(side="left", padx=6)
         dlg.protocol("WM_DELETE_WINDOW", unknown)
         dlg.update_idletasks()
@@ -2306,7 +2306,7 @@ class App(tk.Tk):
         session.samples   = []
         self._auto_lap_active = False
         self._auto_lap_since = self._auto_lap_off_since = None
-        self.rec_btn.config(text="Record Lap", bg="#202024")
+        self.rec_btn.config(text="Record Lap", bg=theme.BG3)
         self.log_msg(f"Auto lap: {why}" + (f" -- partial lap ({n} samples) discarded" if n else ""))
 
     def _auto_lap_step(self, d, now):
@@ -2359,7 +2359,7 @@ class App(tk.Tk):
         session.samples   = []
         session.cur_lap   = telem.get_int("lap_number")
         session.prev_lap  = session.cur_lap
-        self.rec_btn.config(text="Waiting for start line...", bg="#c9a24b")
+        self.rec_btn.config(text="Waiting for start line...", bg=theme.GOLD)
         self.log_msg("Armed -- cross the start line to begin recording")
 
     def _stop_record(self):
@@ -2369,7 +2369,7 @@ class App(tk.Tk):
             self._auto_lap_block = True
         session.recording = False
         session.waiting   = False
-        self.rec_btn.config(text="Record Lap", bg="#202024")
+        self.rec_btn.config(text="Record Lap", bg=theme.BG3)
         samples, session.samples = session.samples, []
         if samples:
             self._save_lap(samples, lap_time_ms=None, incomplete=True)
@@ -2452,12 +2452,12 @@ class App(tk.Tk):
         self._rec_due_race = 0.0
         session.race_recording = True
         self._td_race_reset()
-        self.race_btn.config(text="Stop Race Recording", bg="#e2455a")
+        self.race_btn.config(text="Stop Race Recording", bg=theme.RED_2)
         self.log_msg("Race recording started")
 
     def _stop_record_race(self, notify_end=False):
         session.race_recording = False
-        self.race_btn.config(text="Record Race", bg="#202024")
+        self.race_btn.config(text="Record Race", bg=theme.BG3)
         samples, session.race_samples = session.race_samples, []
         if samples:
             self._save_race(samples, background=True, notify_end=notify_end)
@@ -2629,7 +2629,7 @@ class App(tk.Tk):
 
         dlg = tk.Toplevel(self)
         dlg.title("Session Summary")
-        dlg.configure(bg="#08080a")
+        dlg.configure(bg=theme.BG)
         dlg.geometry(f"{theme.px(760)}x{theme.px(320)}")
 
         cols = ("race", "track", "car", "laps", "duration", "fuel", "pos")
@@ -2638,10 +2638,10 @@ class App(tk.Tk):
 
         st = ttk.Style()
         st.configure("Summary.Treeview",
-                     background="#050506", foreground="#f2f0ec",
-                     fieldbackground="#050506", font=(theme.MONO, 9), rowheight=theme.px(20))
+                     background=theme.CBG, foreground=theme.TXT,
+                     fieldbackground=theme.CBG, font=(theme.MONO, 9), rowheight=theme.px(20))
         st.configure("Summary.Treeview.Heading",
-                     background="#0e0e11", foreground="#e2455a",
+                     background=theme.BG1, foreground=theme.RED_2,
                      font=(theme.MONO, 9, "bold"))
 
         tree = ttk.Treeview(dlg, columns=cols, show="headings", height=10,
@@ -2749,7 +2749,7 @@ class App(tk.Tk):
                 session.recording = True
                 session.start_t   = now
                 session.prev_lap  = lap
-                self.rec_btn.config(text="Stop Recording", bg="#e2455a")
+                self.rec_btn.config(text="Stop Recording", bg=theme.RED_2)
                 self.log_msg(f"Start line crossed -- recording lap {lap}")
             else:
                 session.prev_lap = lap
@@ -2769,7 +2769,7 @@ class App(tk.Tk):
             session.prev_lap  = lap
             session.recording = False
             session.waiting   = True
-            self.rec_btn.config(text="Waiting for start line...", bg="#c9a24b")
+            self.rec_btn.config(text="Waiting for start line...", bg=theme.GOLD)
             return
 
         if lap > session.prev_lap:
@@ -2997,19 +2997,19 @@ class App(tk.Tk):
         if incomplete:
             dlg = tk.Toplevel(self)
             dlg.title("Incomplete Lap")
-            dlg.configure(bg="#08080a")
+            dlg.configure(bg=theme.BG)
             dlg.resizable(False, False)
             tk.Label(dlg,
                      text=f"Incomplete lap ({new_time:.1f}s, {len(samples)} samples) -- save or discard?",
-                     fg="#c9a24b", bg="#08080a", font=(theme.MONO, 11),
+                     fg=theme.GOLD, bg=theme.BG, font=(theme.MONO, 11),
                      pady=12, padx=16).pack()
-            bf = tk.Frame(dlg, bg="#08080a")
+            bf = tk.Frame(dlg, bg=theme.BG)
             bf.pack(pady=(0, 12))
-            tk.Button(bf, text="Save", bg="#c9a24b", fg="#000",
+            tk.Button(bf, text="Save", bg=theme.GOLD, fg="#000",
                       font=(theme.MONO, 10, "bold"), relief="flat", padx=10,
                       command=lambda: [self._run_save(_work, True), dlg.destroy()]
                       ).pack(side="left", padx=8)
-            tk.Button(bf, text="Discard", bg="#202024", fg="#96949c",
+            tk.Button(bf, text="Discard", bg=theme.BG3, fg=theme.MID,
                       font=(theme.MONO, 10), relief="flat", padx=10,
                       command=dlg.destroy).pack(side="left", padx=8)
             return None
@@ -3068,11 +3068,11 @@ class App(tk.Tk):
         display_num = lap_num if lap_num > 0 else self._saved_laps
         row_id = self.hist_tree.insert(
             "", 0, values=(display_num, time_str, track_d, car_d))
-        self.hist_tree.tag_configure("newest", foreground="#5fb3a8")
+        self.hist_tree.tag_configure("newest", foreground=theme.TEAL_2)
         # Gold "pb" tag takes over from "newest" for a PB row -- and, unlike
         # "newest" (cleared below as soon as the next lap comes in), sticks
         # around so the badge stays visible for the rest of the session.
-        self.hist_tree.tag_configure("pb", foreground="#c9a24b")
+        self.hist_tree.tag_configure("pb", foreground=theme.GOLD)
         self.hist_tree.item(row_id, tags=("pb",) if is_pb else ("newest",))
         children = self.hist_tree.get_children()
         if len(children) > 1:

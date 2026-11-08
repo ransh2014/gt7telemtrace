@@ -31,6 +31,7 @@ TEAL     = "#1c5c58"   # --blue
 TEAL_2   = "#5fb3a8"   # --blue-2 (links / data)
 GREEN    = "#3c9a5f"   # --green  (live / throttle)
 GOLD     = "#c9a24b"   # --gold
+GOLD_DIM = "#3a2f14"   # dimmed gold: the off-phase of the FUEL LOW flash
 
 # ── Text ──────────────────────────────────────────────────────────────────────
 TXT = "#f2f0ec"   # --txt
