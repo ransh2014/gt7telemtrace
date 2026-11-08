@@ -20,7 +20,6 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import (
     __version__,
-    delights,
     ghost,
     keepawake,
     lapclean,
@@ -1837,7 +1836,7 @@ class App(tk.Tk):
                     continue
                 for prefix, tip in self._TIPS:
                     if label.startswith(prefix):
-                        delights.tooltip(w, tip)
+                        theme.tooltip(w, tip)
                         break
 
     def _go_menu(self):

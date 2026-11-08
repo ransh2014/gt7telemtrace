@@ -90,9 +90,6 @@ gt7telem/         The TRACE package itself (same source that ships on
                     off with NOTIFICATIONS in the Live Dashboard header
   trackdetect.py    Track auto-detect: learns each layout's start-line position +
                     heading (and lap length) and suggests the track for you to confirm
-  delights.py       Small optional touches for the desktop windows: hover
-                    tooltips, the lights-out sequence, a checkered flag (all
-                    local drawing, nothing sent)
   theme.py          The website's colours and fonts (Anton, Sora, Manrope,
                     JetBrains Mono) for the desktop windows; the font files
                     themselves (and their SIL OFL licence, OFL.txt) are in gt7telem/fonts/
