@@ -37,6 +37,21 @@ class LapController(val lapsDir: File) {
     var consensus by mutableStateOf<List<Map<String, Any?>>?>(null)
     private var top10Gen = 0
 
+    /** Car weights the user typed in (per car, remembered), used by the Dyno & Tune group. */
+    private val weightFile = File(lapsDir.parentFile ?: lapsDir, "car_weights.json")
+    var weightTick by mutableStateOf(0)
+
+    fun carOf(s: Slot?): String = s?.meta?.let { (it["car_display"] ?: it["car"])?.toString() } ?: ""
+    fun massOf(s: Slot?): Double? { val car = carOf(s); return if (car.isEmpty()) null else Dyno.loadWeight(weightFile, car) }
+    fun setWeight(s: Slot?, kg: Double): Boolean {
+        val car = carOf(s)
+        val ok = car.isNotEmpty() && Dyno.saveWeight(weightFile, car, kg)
+        if (ok) { weightTick++; epoch++ }
+        return ok
+    }
+    private fun gearsOf(s: Slot?): List<Double> = (s?.meta?.get("gear_ratios") as? List<*>)?.map { numOf(it) } ?: emptyList()
+    fun dynoIn(useB: Boolean): DynoIn = DynoIn(gearsOf(a), massOf(a), if (useB) gearsOf(b) else null, if (useB) massOf(b) else null)
+
     private fun newA() { top10Gen++; top10 = null; consensus = null }
 
     suspend fun refresh() { rows = withContext(Dispatchers.IO) { LapIndex.scanPicker(lapsDir) } }

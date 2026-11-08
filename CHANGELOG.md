@@ -4,6 +4,7 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+- Android: the **Dyno & Tune** Lap Analyst tab is now in the app too (power and torque curve, per-gear thrust and shift points, gearbox table, tuning hints, Lap B overlay, per-car weight prompt), so the app has all 20 lap chart groups like the desktop.
 
 ## [1.0.3] - 2026-11-08
 **A small design follow-up to 1.0.2. No new features.**

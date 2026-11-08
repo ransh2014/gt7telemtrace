@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -179,6 +180,8 @@ private fun ChartsTab(ctl: LapController, a: AP) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var html by remember { mutableStateOf("") }
+    var weightFor by remember { mutableStateOf(-1) }
+    var weightText by remember { mutableStateOf("") }
     val saveHtml = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { u: Uri? ->
         if (u != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(html.toByteArray()) } }
     }
@@ -188,8 +191,30 @@ private fun ChartsTab(ctl: LapController, a: AP) {
         val extras = ctl.extrasFor()
         val dfb = if (ctl.compare) ctl.b?.df else null
         try {
-            fig = withContext(Dispatchers.Default) { LapCharts.build(ctl.group, LapCharts.Input(a, s.df, dfb, extras, ctl.consensus, pool)) }
+            fig = withContext(Dispatchers.Default) { LapCharts.build(ctl.group, LapCharts.Input(a, s.df, dfb, extras, ctl.consensus, pool, ctl.dynoIn(ctl.compare && ctl.b != null))) }
         } catch (e: Exception) { err = "${e::class.simpleName}: ${e.message}" }
+    }
+    val asked = remember { HashSet<String>() }
+    LaunchedEffect(ctl.group, s) {
+        val car = ctl.carOf(s)
+        if (ctl.group == "Dyno & Tune" && car.isNotEmpty() && ctl.massOf(s) == null && asked.add(car.lowercase())) weightFor = 0
+    }
+    if (weightFor >= 0) {
+        val car = ctl.carOf(s)
+        androidx.compose.ui.window.Dialog(onDismissRequest = { weightFor = -1 }) {
+            Column(Modifier.fillMaxWidth().background(a.bg).border(1.dp, a.dim2).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Lbl(a, "Weight of the $car in kg?", a.cyn, 13, true)
+                Lbl(a, "On the car's info screen or tuning sheet. Skip to see power-to-weight (hp/tonne) instead.", a.dim, 11)
+                Field(a, weightText, "e.g. 1250") { weightText = it }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TBtn(a, "Save", on = true) {
+                        val kg = weightText.trim().toDoubleOrNull()
+                        if (kg != null && ctl.setWeight(s, kg)) { weightFor = -1; weightText = "" }
+                    }
+                    TBtn(a, "Skip") { weightFor = -1 }
+                }
+            }
+        }
     }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -198,6 +223,7 @@ private fun ChartsTab(ctl: LapController, a: AP) {
         Row(Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             TBtn(a, if (ctl.compare) "Compare: ON" else "Compare: OFF", on = ctl.compare) { ctl.compare = !ctl.compare }
             Lbl(a, if (ctl.b == null) "(no Lap B)" else ctl.b!!.label, a.dim, 11, modifier = Modifier.weight(1f))
+            if (ctl.group == "Dyno & Tune") TBtn(a, "Set weight") { weightFor = 0 }
             TBtn(a, "HTML") {
                 val f = fig ?: return@TBtn
                 scope.launch {
