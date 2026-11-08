@@ -6,6 +6,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 - **Light theme matches the website.** The Launcher, Lap Analyst, Race Analyst and Records windows (and the Android app) now use the website's light palette in light mode instead of the old blue-grey one. Design only; nothing else changed.
+- **Shareable PNG cards match the website too.** The lap card and race card (desktop and Android) use the website's palette and JetBrains Mono instead of the old neon colours and a generic monospace font.
+- **Font licences.** The bundled fonts now ship with their SIL Open Font License text and copyright lines (`gt7telem/fonts/OFL.txt`), and the README credits them.
+- **Housekeeping.** The README's dashboard screenshot shows the current design; the Files page lists every file (46 in the source zip) and a new test keeps it in sync; an unused window-centering helper was removed.
 - **Release notes.** The GitHub release text is now copied from this changelog by the release workflow (`tools/release_notes.py`), so the release page and this file can't disagree.
 
 ## [1.0.1] - 2026-11-08

@@ -31,13 +31,13 @@ object ShareCard {
     private const val M = 54f
 
     private fun col(hex: Long) = (0xFF000000 or hex).toInt()
-    private val BG = col(0x07080f)
-    private val PANEL = col(0x0d0e1a)
-    private val GRID = col(0x1c1e30)
-    private val FG = col(0xc8d3f5)
-    private val DIM = col(0x6b7194)
-    private val CYAN = col(0x00f0d4)
-    private val GREEN = col(0x39ff85)
+    private val BG = col(0x08080a)
+    private val PANEL = col(0x0e0e11)
+    private val GRID = col(0x202024)
+    private val FG = col(0xf2f0ec)
+    private val DIM = col(0x96949c)
+    private val CYAN = col(0x5fb3a8)
+    private val GREEN = col(0x3c9a5f)
 
     // ── spec builders ─────────────────────────────────────────────────────────
     private fun Meta.s(k: String): String? = this[k]?.toString()?.takeIf { it.isNotEmpty() }

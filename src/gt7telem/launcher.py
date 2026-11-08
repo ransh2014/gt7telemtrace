@@ -148,12 +148,6 @@ root = None
 _content = None   # the frame currently swapped into root (onboarding or menu)
 
 
-def _center(win, w, h):
-    win.update_idletasks()
-    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-    win.geometry(f"{w}x{h}+{(sw - w) // 2}+{(sh - h) // 2}")
-
-
 def _launch(tool, app_cls):
     global _content, _banner
     analytics.track_launch(tool)

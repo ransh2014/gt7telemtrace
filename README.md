@@ -300,6 +300,8 @@ Full writeup and credits: **[gt7trace.netlify.app/about.html](https://gt7trace.n
 
 MIT — see [LICENSE](https://github.com/ransh2014/gt7telemtrace/blob/main/LICENSE).
 
+The fonts bundled with TRACE (Anton, Sora, Manrope and JetBrains Mono, the same ones the website uses) are licensed under the [SIL Open Font License 1.1](https://github.com/ransh2014/gt7telemtrace/blob/main/src/gt7telem/fonts/OFL.txt); they are loaded for TRACE only and never installed on your system.
+
 ## Support
 
 TRACE is free and always will be. If it's improved your GT7 sessions, a coffee is appreciated: **[ko-fi.com/ransh](https://ko-fi.com/ransh)**.

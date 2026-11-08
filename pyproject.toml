@@ -66,7 +66,7 @@ gt7telem-add-track = "gt7telem.add_track:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-gt7telem = ["*.csv", "py.typed", "fonts/*.ttf"]
+gt7telem = ["*.csv", "py.typed", "fonts/*.ttf", "fonts/OFL.txt"]
 
 [project.optional-dependencies]
 dev = [

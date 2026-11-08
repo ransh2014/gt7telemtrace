@@ -92,7 +92,7 @@ gt7telem/         The TRACE package itself (same source that ships on
                     heading (and lap length) and suggests the track for you to confirm
   theme.py          The website's colours and fonts (Anton, Sora, Manrope,
                     JetBrains Mono) for the desktop windows; the font files
-                    themselves are in gt7telem/fonts/ (SIL OFL)
+                    themselves (and their SIL OFL licence, OFL.txt) are in gt7telem/fonts/
   uiscroll.py       Scrolling for the Lap and Race Analyst windows: side panel,
                     chart area (both ways) and the chart tab row
   voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS

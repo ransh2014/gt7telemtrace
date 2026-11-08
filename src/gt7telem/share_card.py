@@ -26,16 +26,18 @@ import textwrap
 
 import numpy as np
 
+from . import theme
+
 CARD = dict(
-    bg="#07080f",
-    panel="#0d0e1a",
-    grid="#1c1e30",
-    fg="#c8d3f5",
-    dim="#6b7194",
-    cyan="#00f0d4",
-    green="#39ff85",
-    red="#ff2255",
-    yellow="#ffd500",
+    bg="#08080a",
+    panel="#0e0e11",
+    grid="#202024",
+    fg="#f2f0ec",
+    dim="#96949c",
+    cyan="#5fb3a8",
+    green="#3c9a5f",
+    red="#e2455a",
+    yellow="#c9a24b",
 )
 
 # block rectangles in figure coordinates: [left, bottom, width, height]
@@ -43,7 +45,7 @@ _HEADLINE = [0.03, 0.07, 0.31, 0.77]
 _CHART = [0.41, 0.53, 0.56, 0.30]
 _MAP = [0.41, 0.08, 0.56, 0.36]
 
-_MONO = dict(family="monospace")
+_MONO = dict(family=theme.mpl_font_family())
 
 # car name: full size up to this many characters, then smaller, then two lines
 _CAR_FULL_CHARS = 24
