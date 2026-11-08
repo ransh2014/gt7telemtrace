@@ -36,7 +36,7 @@ session or a previously recorded lap.
   zero extra runtime dependencies. Logic that has no UI lives in small
   tkinter-free modules next to them so it can be tested headlessly:
   `corners.py`, `consistency.py`, `theoretical.py`, `dyno.py`, `ghost.py`, `records.py`,
-  `voice.py`, `keepawake.py`, `lapclean.py`, `trackdetect.py`, `uiscroll.py`, `theme.py` (the website's colours/fonts; TTFs in `fonts/`) and `share_card.py` (the lap/race PNG renderer). Every file in
+  `voice.py`, `keepawake.py`, `lapclean.py`, `trackdetect.py`, `uiscroll.py`, `theme.py` (the website's colours/fonts; TTFs in `fonts/`), `delights.py` (tooltips, lights-out, checkered flag) and `share_card.py` (the lap/race PNG renderer). Every file in
   `src/gt7telem/` must be listed in `tools/source_readme.txt` (a test checks)
   and on the website's `totalfiles.html`.
 - `src/gt7telem/cars.py` / `car_ids.csv` and `src/gt7telem/tracks.py` /

@@ -20,6 +20,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import (
     __version__,
+    delights,
     ghost,
     keepawake,
     lapclean,
@@ -555,6 +556,7 @@ class App(tk.Tk):
 
         for _row in (hdr, hdr2, hdr3):
             theme.reflow(_row)
+        self._add_tooltips(hdr, hdr2, hdr3)
 
         # ── Body ─────────────────────────────────────────────────────────────
         body = tk.Frame(self, bg=BG)
@@ -1799,6 +1801,45 @@ class App(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
     # Shutdown
     # ─────────────────────────────────────────────────────────────────────────
+    # Hover help for the header controls. Matched by the start of each control's label.
+    _TIPS = (
+        ("\u2190 Menu", "Back to the launcher to pick another tool. Asks first if a recording is unsaved."),
+        ("Record Race", "Record a whole race. Races with a set number of laps start and stop by themselves; "
+                        "for a timed race press it yourself, and again to stop."),
+        ("Record Lap", "Arm a lap recording: it starts when you cross the start line. Press again to stop."),
+        ("Session Summary", "A table of this session's laps and times."),
+        ("Export Session", "Save this session's laps and results to a JSON file."),
+        ("Auto-Detect", "Find your console on the network automatically."),
+        ("METRICS", "Serve live gauges for Grafana or Prometheus on this PC. Off by default."),
+        ("ALLOW REMOTE (METRICS)", "Let other devices on your network read the metrics. There is no password, "
+                                   "so only do this on a network you trust."),
+        ("ALLOW REMOTE (WEB UI)", "Let phones and tablets on your network open the web dashboard. There is no "
+                                  "password, so only do this on a network you trust."),
+        ("WEB UI", "Serve a live, read-only dashboard to phones and tablets on your Wi-Fi. Off by default."),
+        ("KEEP AWAKE", "Stop this PC from sleeping while the Dashboard is open."),
+        ("AUTO LAP", "In time trial and practice, record laps by themselves from the next start/finish crossing."),
+        ("VOICE ALERTS", "Speak fuel-low and tyre hot/cold warnings out loud."),
+        ("NOTIFICATIONS", "A small pop-up on a new personal best and when a race recording ends."),
+        ("TOP-LAP GHOST", "Show your gap to the fastest public lap for this car and track "
+                          "(one read-only request)."),
+        ("CHECK FOR UPDATES", "Let the Launcher look for a newer TRACE release when it starts."),
+        ("SHARE USAGE DATA", "Send anonymous usage statistics (tool, version, OS). See Privacy."),
+        ("DEBUG LOG", "Show extra diagnostic detail in the log panel."),
+        ("REC RATE", "How many samples per second a recording keeps."),
+    )
+
+    def _add_tooltips(self, *frames):
+        for frame in frames:
+            for w in frame.winfo_children():
+                try:
+                    label = str(w.cget("text"))
+                except tk.TclError:
+                    continue
+                for prefix, tip in self._TIPS:
+                    if label.startswith(prefix):
+                        delights.tooltip(w, tip)
+                        break
+
     def _go_menu(self):
         """Back to the launcher menu (same close path as the window's X: unsaved recordings are asked about)."""
         self._to_menu = True

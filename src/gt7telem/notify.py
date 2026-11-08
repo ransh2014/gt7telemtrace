@@ -101,7 +101,7 @@ def notify(title: str, message: str, sound: bool = True, root=None):
             toast.attributes("-alpha", 0.96)
         except Exception:
             pass
-        w, h = 300, 74
+        w, h = theme.px(300), theme.px(88)
         sw = toast.winfo_screenwidth(); sh = toast.winfo_screenheight()
         x0, y0 = sw - w - 24, sh - h - 60
         try:
@@ -112,15 +112,18 @@ def notify(title: str, message: str, sound: bool = True, root=None):
         except Exception:
             pass
         toast.geometry(f"{w}x{h}+{x0}+{y0}")
-        frame = tk.Frame(toast, bg="#17171b", highlightthickness=1,
-                          highlightbackground="#5fb3a8")
+        frame = tk.Frame(toast, bg=theme.BG2, highlightthickness=1,
+                          highlightbackground=theme.TEAL_2)
         frame.pack(fill="both", expand=True)
-        tk.Label(frame, text=title, fg="#5fb3a8", bg="#17171b",
+        tk.Label(frame, text=title, fg=theme.TEAL_2, bg=theme.BG2,
                  font=(theme.MONO, 10, "bold"), anchor="w",
                  justify="left").pack(fill="x", padx=10, pady=(10, 2))
-        tk.Label(frame, text=message, fg="#f2f0ec", bg="#17171b",
+        tk.Label(frame, text=message, fg=theme.TXT, bg=theme.BG2,
                  font=(theme.MONO, 9), anchor="w", justify="left",
-                 wraplength=280).pack(fill="x", padx=10)
+                 wraplength=theme.px(280)).pack(fill="x", padx=10)
+        if "🏆" in title or "🏁" in title:   # trophy / chequered flag: a drawn flag in the corner
+            from . import delights  # tkinter-only helper, so imported here rather than at module load
+            delights.checker_flag(frame, theme.BG2).place(relx=1.0, x=-12, y=12, anchor="ne")
         toast.after(4200, toast.destroy)
     except Exception:
         # headless / no display -- the beep already fired. Don't leave a

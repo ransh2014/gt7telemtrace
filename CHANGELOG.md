@@ -9,6 +9,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Shareable PNG cards match the website too.** The lap card and race card (desktop and Android) use the website's palette and JetBrains Mono instead of the old neon colours and a generic monospace font.
 - **Font licences.** The bundled fonts now ship with their SIL Open Font License text and copyright lines (`gt7telem/fonts/OFL.txt`), and the README credits them.
 - **Housekeeping.** The README's dashboard screenshot shows the current design; the Files page lists every file (46 in the source zip) and a new test keeps it in sync; an unused window-centering helper was removed.
+- **Small touches.** Hover tooltips on the Live Dashboard's header controls (what each switch does, including the two `ALLOW REMOTE` boxes); a hidden lights-out sequence (five quick clicks on the Launcher title on desktop, a long-press on the TRACE title on Android); and a small drawn checkered flag on the personal-best and race-ended pop-ups. All cosmetic and local; nothing new is recorded or sent. On the website: a scroll progress bar, a lights-out intro on the home page (once per visit, skippable, off with reduced motion), `?` for keyboard shortcuts and a few easter eggs.
 - **Release notes.** The GitHub release text is now copied from this changelog by the release workflow (`tools/release_notes.py`), so the release page and this file can't disagree.
 
 ## [1.0.1] - 2026-11-08

@@ -27,7 +27,7 @@ import threading
 import tkinter as tk
 import webbrowser
 
-from . import __version__, analytics, auth, config, lap_analyst, race_analyst, records, theme
+from . import __version__, analytics, auth, config, delights, lap_analyst, race_analyst, records, theme
 
 # Static imports so PyInstaller's analysis bundles these (and their deps:
 # numpy, pandas, matplotlib, pycryptodome) -- do NOT switch these back to
@@ -359,8 +359,10 @@ def _show_menu():
 
     hdr = tk.Frame(f, bg=BG)
     hdr.pack(fill="x", pady=(50, 8))
-    tk.Label(hdr, text="TRACE", font=(theme.DISPLAY, 30, "bold"),
-              fg=CYN, bg=BG).pack()
+    title = tk.Label(hdr, text="TRACE", font=(theme.DISPLAY, 30, "bold"), fg=CYN, bg=BG)
+    title.pack()
+    # easter egg: five quick clicks on the title and the lights go out
+    delights.click_counter(title, 5, 1800, lambda: delights.lights_out(root))
     tk.Label(hdr, text="GT7 Telemetry Suite", font=(theme.BODY, 11),
               fg=DIM, bg=BG).pack(pady=(0, 4))
     if config.SUPABASE_ACCESS_TOKEN and config.PSN_NAME:

@@ -3,6 +3,7 @@ package app.trace
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -30,6 +32,7 @@ fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, onToggleTheme: () -> 
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var signed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Account.load(ctx).signedIn) }
     var dlg by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var lights by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var msg by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     val saveZip = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) { u: android.net.Uri? ->
         if (u != null) scope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -37,13 +40,16 @@ fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, onToggleTheme: () -> 
             msg = "Backed up $n files."
         }
     }
+    if (lights) LightsOut(a) { lights = false }
     if (dlg) CreateAccountDialog(a, "", { dlg = false; signed = true; msg = "Account created." }) { dlg = false }
     Column(
         Modifier.fillMaxSize().background(a.bg).statusBarsPadding().navigationBarsPadding()
             .verticalScroll(rememberScrollState()).padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("TRACE", Modifier.fillMaxWidth().padding(top = 28.dp), color = a.cyn, fontFamily = Display,
+        Text("TRACE", Modifier.fillMaxWidth().padding(top = 28.dp)
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { lights = true }) },   // easter egg: long-press for the lights-out
+            color = a.cyn, fontFamily = Display,
             fontWeight = FontWeight.Bold, fontSize = 44.sp, textAlign = TextAlign.Center)
         Text("GT7 Telemetry Suite", Modifier.fillMaxWidth().padding(bottom = 8.dp), color = sub,
             fontFamily = Mono, fontSize = 15.sp, textAlign = TextAlign.Center)
