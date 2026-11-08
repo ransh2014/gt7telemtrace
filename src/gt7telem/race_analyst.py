@@ -1825,7 +1825,8 @@ class AnalystApp(tk.Tk):
     def _build(self):
         theme.style_ttk(self, light=runtime_config.THEME == "light")
         style = ttk.Style(); style.theme_use("clam")
-        style.configure("TNotebook", background=BG, borderwidth=0)
+        for _nb_style in ("TNotebook", "Plain.TNotebook"):   # no light default border around the tab pages
+            style.configure(_nb_style, background=BG, borderwidth=0, bordercolor=BG, lightcolor=BG, darkcolor=BG)
         style.configure("TNotebook.Tab", background=PNL, foreground=DIM,
                         padding=[14,5], font=FONTB)
         style.map("TNotebook.Tab",
@@ -1835,11 +1836,12 @@ class AnalystApp(tk.Tk):
         hdr = tk.Frame(self, bg=PNL2, pady=7); hdr.pack(fill="x")
         if FROM_MENU:
             tk.Button(hdr, text="\u2190 Menu", command=self._go_menu, bg=PNL, fg=FG, relief="flat",
-                      font=FONT, padx=10, pady=2, cursor="hand2").pack(side="left", padx=(12, 0))
-        tk.Label(hdr, text="GT7", fg=ACC, bg=PNL2,
-                 font=(theme.DISPLAY,15,"bold")).pack(side="left", padx=(16,2))
-        tk.Label(hdr, text="RACE ANALYST", fg=CYN, bg=PNL2,
-                 font=(theme.DISPLAY,15,"bold")).pack(side="left")
+                      font=FONT, padx=10, pady=2, cursor="hand2").pack(side="right", padx=(4, 12))
+        brand = tk.Frame(hdr, bg=PNL2)   # brand + tool name, stacked in the top-left corner
+        brand.pack(side="left", padx=(10, 12))
+        tk.Label(brand, text="GT7 TRACE", fg=ACC, bg=PNL2, font=(theme.MONO, 8, "bold")).pack(anchor="w")
+        tk.Label(brand, text="RACE ANALYST", fg=CYN, bg=PNL2,
+                 font=(theme.DISPLAY, 15, "bold")).pack(anchor="w")
         self._hdr = tk.Label(hdr, text="", fg=DIM, bg=PNL2, font=FONT)
         self._hdr.pack(side="right", padx=16)
 

@@ -382,9 +382,12 @@ class App(tk.Tk):
 
         if FROM_MENU:
             tk.Button(hdr, text="\u2190 Menu", command=self._go_menu, bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
-                      font=(theme.MONO, 10), padx=10, pady=3, cursor="hand2").pack(side="left", padx=(12, 0))
-        tk.Label(hdr, text="TRACE  LIVE DASHBOARD", fg=ACC, bg=theme.BG2,
-                 font=(theme.DISPLAY, 14, "bold")).pack(side="left", padx=16)
+                      font=(theme.MONO, 10), padx=10, pady=3, cursor="hand2").pack(side="right", padx=(4, 12))
+        brand = tk.Frame(hdr, bg=theme.BG2)   # brand + tool name, stacked in the top-left corner
+        brand.pack(side="left", padx=(10, 12))
+        tk.Label(brand, text="GT7 TRACE", fg=ACC, bg=theme.BG2, font=(theme.MONO, 8, "bold")).pack(anchor="w")
+        tk.Label(brand, text="LIVE DASHBOARD", fg=theme.TEAL_2, bg=theme.BG2,
+                 font=(theme.DISPLAY, 14, "bold")).pack(anchor="w")
         self.conn_dot = tk.Label(hdr, text="● OFFLINE", fg=DIM, bg=theme.BG2,
                                  font=(theme.MONO, 10))
         self.conn_dot.pack(side="left", padx=8)

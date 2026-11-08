@@ -5,6 +5,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **Matching window titles.** The Live Dashboard, Lap Analyst and Race Analyst headers show `GT7 TRACE` with the tool name stacked under it in the top-left corner (the Menu button moved to the right). The analysts' tab pages no longer show a pale default border.
+
 ## [1.0.2] - 2026-11-08
 **More design and housekeeping. No new features** -- TRACE does exactly what it did in 1.0.1; this release finishes the website look and tidies up.
 - **Light theme matches the website.** The Launcher, Lap Analyst, Race Analyst and Records windows (and the Android app) now use the website's light palette in light mode instead of the old blue-grey one. Design only; nothing else changed.
