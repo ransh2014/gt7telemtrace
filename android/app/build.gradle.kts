@@ -9,8 +9,8 @@ android {
         applicationId = "app.trace.gt7"
         minSdk = 26
         targetSdk = 34
-        versionCode = 903
-        versionName = "0.9.3"
+        versionCode = 1001
+        versionName = "1.0.1"
     }
     val ks = System.getenv("TRACE_KEYSTORE")
     signingConfigs {

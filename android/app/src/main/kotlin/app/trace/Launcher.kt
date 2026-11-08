@@ -25,7 +25,7 @@ enum class Tool { LIVE, LAPS, RACE }
 
 @Composable
 fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, onToggleTheme: () -> Unit, onRecords: () -> Unit, onOpen: (Tool) -> Unit) {
-    val sub = Color(0xFF6b7090)
+    val sub = Color(0xFF96949c)
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var signed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Account.load(ctx).signedIn) }
@@ -43,7 +43,7 @@ fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, onToggleTheme: () -> 
             .verticalScroll(rememberScrollState()).padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("TRACE", Modifier.fillMaxWidth().padding(top = 28.dp), color = a.cyn, fontFamily = Mono,
+        Text("TRACE", Modifier.fillMaxWidth().padding(top = 28.dp), color = a.cyn, fontFamily = Display,
             fontWeight = FontWeight.Bold, fontSize = 44.sp, textAlign = TextAlign.Center)
         Text("GT7 Telemetry Suite", Modifier.fillMaxWidth().padding(bottom = 8.dp), color = sub,
             fontFamily = Mono, fontSize = 15.sp, textAlign = TextAlign.Center)
@@ -89,7 +89,7 @@ private fun ToolCard(a: AP, title: String, desc: String, accent: Color, onClick:
         Column {
             Text(title, color = accent, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 22.sp)
             Spacer(Modifier.height(6.dp))
-            Text(desc, color = Color(0xFF6b7090), fontFamily = Mono, fontSize = 13.sp, lineHeight = 18.sp)
+            Text(desc, color = Color(0xFF96949c), fontFamily = Mono, fontSize = 13.sp, lineHeight = 18.sp)
         }
         Text("Launch →", Modifier.padding(top = 14.dp), color = accent, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp)
     }

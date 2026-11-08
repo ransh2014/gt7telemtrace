@@ -27,7 +27,7 @@ import threading
 import tkinter as tk
 import webbrowser
 
-from . import __version__, analytics, auth, config, lap_analyst, race_analyst, records
+from . import __version__, analytics, auth, config, lap_analyst, race_analyst, records, theme
 
 # Static imports so PyInstaller's analysis bundles these (and their deps:
 # numpy, pandas, matplotlib, pycryptodome) -- do NOT switch these back to
@@ -48,15 +48,15 @@ if config.THEME == "light":
     DIM    = "#7a7f9a"
     DIM2   = "#d7dae6"
 else:
-    BG     = "#0a0e1a"
-    PANEL  = "#10152a"
-    PANEL2 = "#161c36"
-    CYN    = "#00e5ff"
-    PRP    = "#7c5cff"
-    PINK   = "#ff5c8a"
-    FG     = "#e8eaf6"
-    DIM    = "#6b7290"
-    DIM2   = "#333a5c"
+    BG     = "#08080a"
+    PANEL  = "#0e0e11"
+    PANEL2 = "#17171b"
+    CYN    = "#5fb3a8"
+    PRP    = "#c8102e"
+    PINK   = "#e2455a"
+    FG     = "#f2f0ec"
+    DIM    = "#96949c"
+    DIM2   = "#202024"
 
 WIN_W, WIN_H = 900, 650
 
@@ -138,7 +138,7 @@ def _show_update_banner(new_version: str):
         return
     bar = tk.Label(
         _content, text=f"  🔔  TRACE {new_version} is available — click to open the release  ",
-        font=("Segoe UI", 9, "bold"), bg=PINK, fg="#ffffff", cursor="hand2")
+        font=(theme.BODY, 9, "bold"), bg=PINK, fg="#ffffff", cursor="hand2")
     bar.place(relx=0.5, rely=0.0, anchor="n")
     bar.lift()
     bar.bind("<Button-1>", lambda e: webbrowser.open(_LATEST_RELEASE_URL))
@@ -159,6 +159,8 @@ def _launch(tool, app_cls):
     analytics.track_launch(tool)
     root.destroy()
     _content = _banner = None   # widgets of the destroyed root; main() builds fresh ones
+    for mod in (gt7telem, lap_analyst, race_analyst):
+        mod.FROM_MENU = True   # tools opened from here get a "Menu" button that comes back
     try:
         app = app_cls()
     except Exception as e:
@@ -175,6 +177,8 @@ def _launch(tool, app_cls):
         main()
         return
     app.mainloop()
+    if getattr(app, "_to_menu", False):
+        main()   # "Menu" button: pick another tool without restarting
 
 
 def launch_dashboard():
@@ -213,41 +217,41 @@ def _show_onboarding(from_menu: bool = False):
     card = tk.Frame(f, bg=BG)
     card.place(relx=0.5, rely=0.46, anchor="center")
 
-    tk.Label(card, text="TRACE", font=("Segoe UI", 34, "bold"),
+    tk.Label(card, text="TRACE", font=(theme.DISPLAY, 34, "bold"),
               fg=CYN, bg=BG).pack()
-    tk.Label(card, text="GT7 Telemetry Suite", font=("Segoe UI", 11),
+    tk.Label(card, text="GT7 Telemetry Suite", font=(theme.BODY, 11),
               fg=DIM, bg=BG).pack(pady=(0, 24))
 
     pitch = ("Want to submit laps to the global leaderboard?\n"
              "Create a free account — just a display name,\n"
              "no email or password needed.")
-    tk.Label(card, text=pitch, font=("Segoe UI", 10), fg=FG, bg=BG,
+    tk.Label(card, text=pitch, font=(theme.BODY, 10), fg=FG, bg=BG,
               justify="center").pack(pady=(0, 18))
 
     name_var = tk.StringVar(value=config.PSN_NAME)
-    entry = tk.Entry(card, textvariable=name_var, font=("Segoe UI", 12),
+    entry = tk.Entry(card, textvariable=name_var, font=(theme.BODY, 12),
                       width=26, bg=PANEL2, fg=FG, insertbackground=CYN,
                       relief="flat", justify="center")
     entry.pack(ipady=7, pady=(0, 12))
     entry.focus_set()
     entry.bind("<Return>", lambda e: do_create())
 
-    status = tk.Label(card, text="", font=("Segoe UI", 9), bg=BG, fg=PINK,
-                       wraplength=340, justify="center")
+    status = tk.Label(card, text="", font=(theme.BODY, 9), bg=BG, fg=PINK,
+                       wraplength=theme.px(340), justify="center")
     status.pack(pady=(0, 6))
 
     btn_row = tk.Frame(card, bg=BG)
     btn_row.pack(pady=(8, 0))
 
     create_btn = tk.Button(
-        btn_row, text="Create Account", font=("Segoe UI", 11, "bold"),
-        bg=CYN, activebackground="#33ecff", fg=BG, activeforeground=BG,
+        btn_row, text="Create Account", font=(theme.BODY, 11, "bold"),
+        bg=CYN, activebackground="#7cc4ba", fg=BG, activeforeground=BG,
         bd=0, width=18, height=2, cursor="hand2")
     create_btn.pack(side="left", padx=6)
 
     skip_btn = tk.Button(
         btn_row, text=("Back" if from_menu else "Skip for now"),
-        font=("Segoe UI", 11), bg=PANEL2, fg=DIM, activebackground=PANEL2,
+        font=(theme.BODY, 11), bg=PANEL2, fg=DIM, activebackground=PANEL2,
         activeforeground=FG, bd=0, width=14, height=2, cursor="hand2")
     skip_btn.pack(side="left", padx=6)
 
@@ -256,7 +260,7 @@ def _show_onboarding(from_menu: bool = False):
         text=("Skipping still lets you view the leaderboard and download\n"
               "ghost laps — only submitting a lap needs an account, and\n"
               "you can always sign up later from the tool menu."),
-        font=("Segoe UI", 8), fg=DIM, bg=BG, justify="center",
+        font=(theme.BODY, 8), fg=DIM, bg=BG, justify="center",
     ).pack(pady=(20, 0))
 
     def set_busy(busy: bool):
@@ -361,13 +365,13 @@ def _show_menu():
 
     hdr = tk.Frame(f, bg=BG)
     hdr.pack(fill="x", pady=(50, 8))
-    tk.Label(hdr, text="TRACE", font=("Segoe UI", 30, "bold"),
+    tk.Label(hdr, text="TRACE", font=(theme.DISPLAY, 30, "bold"),
               fg=CYN, bg=BG).pack()
-    tk.Label(hdr, text="GT7 Telemetry Suite", font=("Segoe UI", 11),
+    tk.Label(hdr, text="GT7 Telemetry Suite", font=(theme.BODY, 11),
               fg=DIM, bg=BG).pack(pady=(0, 4))
     if config.SUPABASE_ACCESS_TOKEN and config.PSN_NAME:
         tk.Label(hdr, text=f"signed in as {config.PSN_NAME}",
-                  font=("Segoe UI", 9), fg=DIM, bg=BG).pack()
+                  font=(theme.BODY, 9), fg=DIM, bg=BG).pack()
 
     cards = tk.Frame(f, bg=BG)
     cards.pack(expand=True)
@@ -379,35 +383,35 @@ def _show_menu():
     foot.pack(side="bottom", fill="x", pady=16)
 
     tk.Label(foot, text="community tool - not affiliated with Polyphony Digital",
-              font=("Segoe UI", 8), fg=DIM2, bg=BG).pack(side="left", padx=24)
+              font=(theme.BODY, 8), fg=DIM2, bg=BG).pack(side="left", padx=24)
 
     theme_lbl = tk.Label(
         foot, text=("☀  Light" if config.THEME == "dark" else "🌙  Dark"),
-        font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG, cursor="hand2")
+        font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG, cursor="hand2")
     theme_lbl.pack(side="right", padx=(0, 24))
     theme_lbl.bind("<Button-1>", lambda e: _toggle_theme())
 
     records_lbl = tk.Label(foot, text="🏁  Records",
-                           font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG,
+                           font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG,
                            cursor="hand2")
     records_lbl.pack(side="right", padx=(0, 24))
     records_lbl.bind("<Button-1>", lambda e: _show_records())
 
     backup_lbl = tk.Label(foot, text="🗄  Backup Laps",
-                           font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG,
+                           font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG,
                            cursor="hand2")
     backup_lbl.pack(side="right", padx=(0, 24))
     backup_lbl.bind("<Button-1>", lambda e: _do_backup_laps())
 
     if not config.SUPABASE_ACCESS_TOKEN:
         link = tk.Label(foot, text="Create Free Account",
-                         font=("Segoe UI", 9, "underline"), fg=CYN, bg=BG,
+                         font=(theme.BODY, 9, "underline"), fg=CYN, bg=BG,
                          cursor="hand2")
         link.pack(side="right", padx=24)
         link.bind("<Button-1>", lambda e: _show_onboarding(from_menu=True))
     else:
         logout_link = tk.Label(foot, text="Log Out",
-                         font=("Segoe UI", 9, "underline"), fg=DIM, bg=BG,
+                         font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG,
                          cursor="hand2")
         logout_link.pack(side="right", padx=24)
         logout_link.bind("<Button-1>", lambda e: _do_logout())
@@ -487,7 +491,7 @@ def _do_logout():
 
 
 def _build_card(parent, title, desc, color, cmd):
-    card = tk.Frame(parent, bg=PANEL, width=250, height=300, cursor="hand2",
+    card = tk.Frame(parent, bg=PANEL, width=theme.px(250), height=theme.px(300), cursor="hand2",
                      highlightthickness=1, highlightbackground=DIM2)
     card.pack(side="left", padx=16, pady=10)
     card.pack_propagate(False)
@@ -497,12 +501,12 @@ def _build_card(parent, title, desc, color, cmd):
     body = tk.Frame(card, bg=PANEL)
     body.pack(fill="both", expand=True, padx=20, pady=20)
 
-    tk.Label(body, text=title, font=("Segoe UI", 15, "bold"), fg=color,
-              bg=PANEL, wraplength=200, justify="left").pack(anchor="w", pady=(4, 10))
-    tk.Label(body, text=desc, font=("Segoe UI", 9), fg=DIM, bg=PANEL,
-              wraplength=190, justify="left").pack(anchor="w")
+    tk.Label(body, text=title, font=(theme.BODY, 15, "bold"), fg=color,
+              bg=PANEL, wraplength=theme.px(200), justify="left").pack(anchor="w", pady=(4, 10))
+    tk.Label(body, text=desc, font=(theme.BODY, 9), fg=DIM, bg=PANEL,
+              wraplength=theme.px(190), justify="left").pack(anchor="w")
 
-    launch_lbl = tk.Label(body, text="Launch  →", font=("Segoe UI", 10, "bold"),
+    launch_lbl = tk.Label(body, text="Launch  →", font=(theme.BODY, 10, "bold"),
                            fg=color, bg=PANEL)
     launch_lbl.pack(anchor="w", side="bottom")
 
@@ -522,12 +526,12 @@ def _build_card(parent, title, desc, color, cmd):
 
 def main():
     global root
+    theme.enable_dpi_awareness()
     root = tk.Tk()
     root.title(f"TRACE {__version__} - GT7 Telemetry Suite")
     root.configure(bg=BG)
     root.resizable(True, True)
-    root.minsize(760, 560)
-    _center(root, WIN_W, WIN_H)
+    theme.fit_window(root, WIN_W, WIN_H, 760, 560)
 
     if config.ONBOARDING_DONE:
         _show_menu()

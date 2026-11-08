@@ -77,12 +77,12 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
 
         Row(Modifier.fillMaxWidth().background(D.hdr).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("‹", Modifier.clickable(onClick = onBack).padding(end = 10.dp), color = D.acc, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            Text("TRACE  LIVE DASHBOARD", Modifier.weight(1f), color = D.acc, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+            Text("TRACE  LIVE DASHBOARD", Modifier.weight(1f), color = D.acc, fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
             Text(if (online) "● LIVE" else "● OFFLINE", color = if (online) D.good else D.dim, fontFamily = Mono, fontSize = 11.sp)
         }
 
         c.battWarn?.let { pct ->
-            Row(Modifier.fillMaxWidth().background(Color(0xFFc0392b)).padding(10.dp, 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().background(Color(0xFFc8102e)).padding(10.dp, 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("LOW BATTERY ($pct%) - plug in your charger now, or this lap/race will be lost when the phone dies", Modifier.weight(1f), color = Color.White, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 DBtn("OK, I'll charge", Modifier.width(120.dp)) { c.onBatteryAck() }
             }
@@ -123,7 +123,7 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
 
         Row(Modifier.fillMaxWidth().background(D.pnl).padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
-                Text("%.0f".format(Locale.ROOT, spd), color = D.hi, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 60.sp, maxLines = 1)
+                Text("%.0f".format(Locale.ROOT, spd), color = D.hi, fontFamily = Impact, fontSize = 60.sp, maxLines = 1)
                 Text("km/h", Modifier.padding(start = 4.dp, bottom = 10.dp), color = D.dim, fontFamily = Mono, fontSize = 12.sp)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -132,7 +132,7 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
             }
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Bottom) {
                 Text("gear", Modifier.padding(end = 4.dp, bottom = 10.dp), color = D.dim, fontFamily = Mono, fontSize = 12.sp)
-                Text(if (gear > 0) gear.toString() else "N", color = D.amb, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 60.sp)
+                Text(if (gear > 0) gear.toString() else "N", color = D.amb, fontFamily = Impact, fontSize = 60.sp)
             }
         }
 
@@ -247,9 +247,9 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
         } }
 
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (online && hasHot) Alert("TYRE HOT", if (c.flashOn) D.red else Color(0xFF6a1010), Color.White, true)
-            if (online && hasCold) Alert("TYRE COLD", if (c.flashOn) D.cold else Color(0xFF0a3040), D.hi, true)
-            if (online && hasFuel) Alert("FUEL LOW", if (c.flashOn) D.amb else Color(0xFF6a3a00), Color.Black, true)
+            if (online && hasHot) Alert("TYRE HOT", if (c.flashOn) D.red else Color(0xFF8c0c22), Color.White, true)
+            if (online && hasCold) Alert("TYRE COLD", if (c.flashOn) D.cold else Color(0xFF17171b), D.hi, true)
+            if (online && hasFuel) Alert("FUEL LOW", if (c.flashOn) D.amb else Color(0xFF3a2f14), Color.Black, true)
         }
 
         Section("TRACK MAP")
@@ -276,7 +276,7 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
 @Composable
 private fun TrackMap(pts: List<Pair<Double, Double>>) {
     Box(Modifier.fillMaxWidth().height(180.dp).background(D.map).border(1.dp, D.dim)) {
-        if (pts.size < 2) { Text("WAITING FOR DATA", Modifier.align(Alignment.Center), color = Color(0xFF333344), fontFamily = Mono, fontSize = 9.sp); return@Box }
+        if (pts.size < 2) { Text("WAITING FOR DATA", Modifier.align(Alignment.Center), color = Color(0xFF202024), fontFamily = Mono, fontSize = 9.sp); return@Box }
         Canvas(Modifier.fillMaxSize()) {
             val pad = 14.dp.toPx(); val w = size.width; val h = size.height
             val minX = pts.minOf { it.first }; val maxX = pts.maxOf { it.first }; val minZ = pts.minOf { it.second }; val maxZ = pts.maxOf { it.second }
@@ -286,7 +286,7 @@ private fun TrackMap(pts: List<Pair<Double, Double>>) {
             fun cv(p: Pair<Double, Double>) = Offset(ox + (p.first - minX).toFloat() * scale, oy + (p.second - minZ).toFloat() * scale)
             val step = maxOf(1, pts.size / 400)
             val full = Path(); pts.filterIndexed { i, _ -> i % step == 0 }.forEachIndexed { i, p -> val o = cv(p); if (i == 0) full.moveTo(o.x, o.y) else full.lineTo(o.x, o.y) }
-            drawPath(full, Color(0xFF1a3a5a), style = Stroke(2.dp.toPx()))
+            drawPath(full, Color(0xFF8c0c22), style = Stroke(2.dp.toPx()))
             val rec = Path(); pts.takeLast(80).forEachIndexed { i, p -> val o = cv(p); if (i == 0) rec.moveTo(o.x, o.y) else rec.lineTo(o.x, o.y) }
             drawPath(rec, D.hi, style = Stroke(2.dp.toPx()))
             val last = cv(pts.last())

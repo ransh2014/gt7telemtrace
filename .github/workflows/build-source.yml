@@ -52,7 +52,7 @@ jobs:
           python - << 'EOF'
           import zipfile
           names = zipfile.ZipFile("gt7telem-source.zip").namelist()
-          for required in ("launcher.py", "README.txt", "requirements.txt", "gt7telem/__init__.py", "gt7telem/car_ids.csv", "gt7telem/course_ids.csv"):
+          for required in ("launcher.py", "README.txt", "requirements.txt", "gt7telem/__init__.py", "gt7telem/car_ids.csv", "gt7telem/course_ids.csv", "gt7telem/theme.py", "gt7telem/fonts/JetBrainsMono-Regular.ttf"):
               assert required in names, f"missing {required}"
           print(f"OK: {len(names)} files")
           EOF

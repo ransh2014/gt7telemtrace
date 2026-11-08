@@ -88,7 +88,7 @@ private fun SetupTab(ctl: LapController, a: AP, scope: kotlinx.coroutines.Corout
     }
     var notes by remember(ctl.a) { mutableStateOf((ctl.a?.meta?.get("notes") as? String) ?: "") }
     var notesSaved by remember(ctl.a) { mutableStateOf(false) }
-    val overlayColors = listOf(a.yel, a.grn, a.prp, a.org, Color(0xFF8899FF), Color(0xFFFF9ECB))
+    val overlayColors = listOf(a.yel, a.grn, a.prp, a.org, Color(0xFF96949c), Color(0xFFf2f0ec))
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Card(a, "LAP A") {
@@ -148,8 +148,8 @@ private fun SetupTab(ctl: LapController, a: AP, scope: kotlinx.coroutines.Corout
                 TBtn(a, "Lap Card (PNG)", Modifier.fillMaxWidth()) {
                     scope.launch {
                         val fonts = CardFonts(
-                            ResourcesCompat.getFont(ctx, R.font.inconsolata_regular) ?: Typeface.MONOSPACE,
-                            ResourcesCompat.getFont(ctx, R.font.inconsolata_bold) ?: Typeface.MONOSPACE,
+                            ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_regular) ?: Typeface.MONOSPACE,
+                            ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_bold) ?: Typeface.MONOSPACE,
                         )
                         png = withContext(Dispatchers.Default) { ShareCard.png(ShareCard.lapSpec(s.meta, s.df), fonts) }
                         saveCard.launch("trace_card_${LapMath.safeName(s.meta.text("car"))}_${LapMath.safeName(s.meta.text("track"))}.png")

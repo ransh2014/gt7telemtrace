@@ -12,7 +12,7 @@ import subprocess
 import sys
 import threading
 
-from . import config
+from . import config, theme
 
 # Linux sound players to try, in order: (command, sound file or None).
 _LINUX_PLAYERS = (
@@ -112,14 +112,14 @@ def notify(title: str, message: str, sound: bool = True, root=None):
         except Exception:
             pass
         toast.geometry(f"{w}x{h}+{x0}+{y0}")
-        frame = tk.Frame(toast, bg="#13141f", highlightthickness=1,
-                          highlightbackground="#00f0d4")
+        frame = tk.Frame(toast, bg="#17171b", highlightthickness=1,
+                          highlightbackground="#5fb3a8")
         frame.pack(fill="both", expand=True)
-        tk.Label(frame, text=title, fg="#00f0d4", bg="#13141f",
-                 font=(config.MONO, 10, "bold"), anchor="w",
+        tk.Label(frame, text=title, fg="#5fb3a8", bg="#17171b",
+                 font=(theme.MONO, 10, "bold"), anchor="w",
                  justify="left").pack(fill="x", padx=10, pady=(10, 2))
-        tk.Label(frame, text=message, fg="#c8d3f5", bg="#13141f",
-                 font=(config.MONO, 9), anchor="w", justify="left",
+        tk.Label(frame, text=message, fg="#f2f0ec", bg="#17171b",
+                 font=(theme.MONO, 9), anchor="w", justify="left",
                  wraplength=280).pack(fill="x", padx=10)
         toast.after(4200, toast.destroy)
     except Exception:

@@ -216,7 +216,7 @@ fun Ctx.theoretical(pool: List<Pair<String, Frame>>?): Fig {
     val r = Theoretical.theoreticalBest(laps)
         ?: return fig(listOf(TextP(null, listOf("Needs at least two complete laps of this car on this track.",
             "Drive more laps in the Live Dashboard, or load a second lap as Lap B."), DIM, bg = true, size = 10f, center = true, aspect = 0.8f)), 1)
-    val palette = listOf(CYN, ACC, YLW, GRN, PRP, ORG, Color(0xFF8899FF), Color(0xFFFF9ECB))
+    val palette = listOf(CYN, ACC, YLW, GRN, PRP, ORG, Color(0xFF96949c), Color(0xFFf2f0ec))
     val cen = r.centers
     val p = ArrayList<Panel>()
     p.add(ax("Time left on the table along the lap (s)", "s", layers = listOf(

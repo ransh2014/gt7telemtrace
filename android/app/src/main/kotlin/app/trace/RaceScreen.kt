@@ -166,8 +166,8 @@ private fun RaceSetup(ctl: RaceController, a: AP, scope: kotlinx.coroutines.Coro
                 TBtn(a, "Race Card (PNG)", Modifier.fillMaxWidth()) {
                     scope.launch {
                         val fonts = CardFonts(
-                            ResourcesCompat.getFont(ctx, R.font.inconsolata_regular) ?: Typeface.MONOSPACE,
-                            ResourcesCompat.getFont(ctx, R.font.inconsolata_bold) ?: Typeface.MONOSPACE,
+                            ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_regular) ?: Typeface.MONOSPACE,
+                            ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_bold) ?: Typeface.MONOSPACE,
                         )
                         png = withContext(Dispatchers.Default) { ShareCard.png(ShareCard.raceSpec(s.meta, s.df), fonts) }
                         saveCard.launch("trace_race_card_${LapMath.safeName(s.meta.text("car"))}_${LapMath.safeName(s.meta.text("track"))}.png")

@@ -15,7 +15,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from . import config, leaderboard
+from . import config, leaderboard, theme
 
 _HEAD_BYTES = 8192
 _SKIP_DIRS = {"races", "_session"}
@@ -160,17 +160,17 @@ def show_records(parent, colors: dict):
     win.configure(bg=colors["bg"])
     win.geometry("820x520")
     win.minsize(600, 360)
-    mono = (config.MONO, 10)
+    mono = (theme.MONO, 10)
 
     top = tk.Frame(win, bg=colors["bg"])
     top.pack(fill="x", padx=16, pady=(14, 6))
-    tk.Label(top, text="Records", font=(config.MONO, 15, "bold"), fg=colors["accent"], bg=colors["bg"]).pack(side="left")
-    status = tk.Label(top, text="Scanning your laps...", font=(config.MONO, 9), fg=colors["dim"], bg=colors["bg"])
+    tk.Label(top, text="Records", font=(theme.MONO, 15, "bold"), fg=colors["accent"], bg=colors["bg"]).pack(side="left")
+    status = tk.Label(top, text="Scanning your laps...", font=(theme.MONO, 9), fg=colors["dim"], bg=colors["bg"])
     status.pack(side="right")
 
     bar = tk.Frame(win, bg=colors["bg"])
     bar.pack(fill="x", padx=16, pady=(0, 6))
-    tk.Label(bar, text="Filter", font=(config.MONO, 9), fg=colors["dim"], bg=colors["bg"]).pack(side="left")
+    tk.Label(bar, text="Filter", font=(theme.MONO, 9), fg=colors["dim"], bg=colors["bg"]).pack(side="left")
     q = tk.StringVar()
     entry = tk.Entry(bar, textvariable=q, bg=colors["panel"], fg=colors["fg"], insertbackground=colors["fg"],
                      relief="flat", font=mono, width=26)
@@ -178,14 +178,14 @@ def show_records(parent, colors: dict):
     old = tk.BooleanVar(value=False)
     chk = tk.Checkbutton(bar, text=f"include pre-{leaderboard.PHYSICS_ERA} laps", variable=old, bg=colors["bg"],
                          fg=colors["dim"], selectcolor=colors["panel"], activebackground=colors["bg"],
-                         font=(config.MONO, 9))
+                         font=(theme.MONO, 9))
     chk.pack(side="left", padx=8)
 
     style = ttk.Style(win)
     style.configure("Records.Treeview", background=colors["panel"], foreground=colors["fg"],
                     fieldbackground=colors["panel"], font=mono, rowheight=24, borderwidth=0)
     style.configure("Records.Treeview.Heading", background=colors["bg"], foreground=colors["accent"],
-                    font=(config.MONO, 9, "bold"))
+                    font=(theme.MONO, 9, "bold"))
     cols = (("track", "Track", 230), ("car", "Car", 260), ("time", "Best lap", 100), ("laps", "Laps", 60),
             ("date", "Set on", 100))
     tree = ttk.Treeview(win, columns=[c[0] for c in cols], show="headings", style="Records.Treeview")

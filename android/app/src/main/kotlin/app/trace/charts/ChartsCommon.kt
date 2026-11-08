@@ -9,7 +9,7 @@ import kotlin.math.*
 open class Ctx(val a: AP, val df: Frame, val dfb: Frame?, val race: Boolean) {
     val ACC = a.acc; val CYN = a.cyn; val GRN = a.grn; val YLW = a.yel; val ORG = a.org; val PRP = a.prp
     val FG = a.fg; val DIM = a.dim; val DIM2 = a.dim2
-    val CLUTCH = Color(0xFF8899FF)
+    val CLUTCH = Color(0xFF96949c)
     val X = if (race) "t" else "track_position"
     val XL = if (race) "Race Time (s)" else "Track Pos (m)"
     val FL get() = ACC; val FR get() = YLW; val RL get() = GRN; val RR get() = CYN

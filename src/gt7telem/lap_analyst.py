@@ -26,6 +26,7 @@ from . import (
     leaderboard,
     records,
     share_card,
+    theme,
     theoretical,
     tracks,
     uiscroll,
@@ -60,25 +61,26 @@ if runtime_config.THEME == "light":
     DIM  = "#7a7f9a"
     DIM2 = "#d7dae6"
 else:
-    BG   = "#07080f"
-    PNL  = "#0d0e1a"
-    PNL2 = "#13141f"
-    ACC  = "#ff2255"
-    CYN  = "#00f0d4"
-    GRN  = "#39ff85"
-    YLW  = "#ffd500"
-    ORG  = "#ff8c00"
-    PRP  = "#b06aff"
-    FG   = "#c8d3f5"
-    DIM  = "#343856"
-    DIM2 = "#232438"
-FONT  = (runtime_config.MONO, 9)
-FONTB = (runtime_config.MONO, 9, "bold")
-FONTL = (runtime_config.MONO, 8)
-FONTH = (runtime_config.MONO, 13, "bold")
+    BG   = "#08080a"
+    PNL  = "#0e0e11"
+    PNL2 = "#17171b"
+    ACC  = "#e2455a"
+    CYN  = "#5fb3a8"
+    GRN  = "#3c9a5f"
+    YLW  = "#c9a24b"
+    ORG  = "#c8102e"
+    PRP  = "#96949c"
+    FG   = "#f2f0ec"
+    DIM  = "#605e68"
+    DIM2 = "#202024"
+FROM_MENU = False   # set by the launcher: the window then offers a "Menu" button to go back
+FONT  = (theme.MONO, 9)
+FONTB = (theme.MONO, 9, "bold")
+FONTL = (theme.MONO, 8)
+FONTH = (theme.MONO, 13, "bold")
 
 C = dict(speed=CYN, throttle=GRN, brake=ACC, gear=YLW, rpm=ORG,
-         steering=PRP, clutch="#8899ff",
+         steering=PRP, clutch="#96949c",
          fl=ACC, fr=YLW, rl=GRN, rr=CYN,
          col_a=CYN, col_b=ACC)
 
@@ -88,7 +90,7 @@ plt.rcParams.update({
     "text.color": FG, "xtick.color": DIM, "ytick.color": DIM,
     "grid.color": DIM2, "grid.alpha": 1.0,
     "legend.facecolor": PNL, "legend.edgecolor": DIM,
-    "font.family": "monospace", "font.size": 8,
+    "font.family": theme.mpl_font_family(), "font.size": 8,
     "axes.spines.top": False, "axes.spines.right": False,
     "axes.titlepad": 6,
 })
@@ -1500,7 +1502,7 @@ def draw_theoretical(fig, df, dfb=None, pool=None):
                           "Drive more laps in the Live Dashboard, or load a second lap as Lap B.",
                 ha="center", va="center", color=DIM, fontsize=10, transform=ax.transAxes)
         return
-    palette = [CYN, ACC, YLW, GRN, PRP, ORG, "#8899ff", "#ff9ecb"]
+    palette = [CYN, ACC, YLW, GRN, PRP, ORG, "#96949c", "#f2f0ec"]
     axs = fig.subplots(2, 2)
     fig.subplots_adjust(hspace=0.45, wspace=0.28, left=0.07, right=0.97, top=0.92, bottom=0.07)
     centers = r["centers"]
@@ -1574,7 +1576,7 @@ def draw_dyno(fig, df, dfb=None):
         resb = dyno.analyse(dfb, dfb.attrs.get("gear_ratios") or [], dfb.attrs.get("mass_kg"),
                             dfb.attrs.get("tyre_radius_m"))
         resb = resb if resb["ok"] else None
-    palette = [CYN, ACC, YLW, GRN, PRP, ORG, "#8899ff", "#ff9ecb"]
+    palette = [CYN, ACC, YLW, GRN, PRP, ORG, "#96949c", "#f2f0ec"]
     axs = fig.subplots(2, 2)
     fig.subplots_adjust(hspace=0.36, wspace=0.34, left=0.07, right=0.93, top=0.93, bottom=0.07)
 
@@ -1779,7 +1781,7 @@ class Replay:
         self._delta_var = tk.StringVar(value="")
         self._delta_lbl = tk.Label(parent, textvariable=self._delta_var,
                                    fg=YLW, bg=BG,
-                                   font=(runtime_config.MONO, 11, "bold"), pady=3)
+                                   font=(theme.MONO, 11, "bold"), pady=3)
         self._delta_lbl.pack(fill="x")
 
         ctrl = tk.Frame(parent, bg=PNL, pady=5)
@@ -1824,7 +1826,7 @@ class Replay:
             self._iv[k] = v
             if k in ("Throttle","Brake"):
                 bar_c = GRN if k == "Throttle" else ACC
-                cv = tk.Canvas(f, width=48, height=6, bg=DIM2, highlightthickness=0); cv.pack(pady=1)
+                cv = tk.Canvas(f, width=theme.px(48), height=theme.px(6), bg=DIM2, highlightthickness=0); cv.pack(pady=1)
                 rect = cv.create_rectangle(0, 0, 0, 6, fill=bar_c, outline="")
                 self._bars[k] = (cv, rect, 48)
 
@@ -1838,7 +1840,7 @@ class Replay:
             self._iv_b[k] = v
             if k in ("Throttle","Brake"):
                 bar_c = GRN if k == "Throttle" else ACC
-                cv2 = tk.Canvas(f, width=48, height=6, bg=DIM2, highlightthickness=0); cv2.pack(pady=1)
+                cv2 = tk.Canvas(f, width=theme.px(48), height=theme.px(6), bg=DIM2, highlightthickness=0); cv2.pack(pady=1)
                 rect2 = cv2.create_rectangle(0, 0, 0, 6, fill=bar_c, outline="")
                 self._bars_b[k] = (cv2, rect2, 48)
 
@@ -2165,8 +2167,7 @@ class AnalystApp(tk.Tk):
         super().__init__()
         self.title(f"TRACE {__version__} - Lap Analyst")
         self.configure(bg=BG)
-        self.geometry("1380x860")
-        self.minsize(1100, 700)
+        theme.fit_window(self, 1380, 860, 1100, 700)
         self._da = self._dfa = None
         self._db = self._dfb = None
         self._path_a = None
@@ -2184,6 +2185,11 @@ class AnalystApp(tk.Tk):
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._quit)
         self.after(100, self._drain_uiq)
+
+    def _go_menu(self):
+        """Back to the launcher menu."""
+        self._to_menu = True
+        self._quit()
 
     def _quit(self):
         self._closing = True
@@ -2209,6 +2215,7 @@ class AnalystApp(tk.Tk):
             self.after(100, self._drain_uiq)
 
     def _build(self):
+        theme.style_ttk(self)
         style = ttk.Style(); style.theme_use("clam")
         style.configure("TNotebook", background=BG, borderwidth=0)
         style.configure("TNotebook.Tab", background=PNL, foreground=DIM,
@@ -2218,16 +2225,19 @@ class AnalystApp(tk.Tk):
                   foreground=[("selected", CYN)])
 
         hdr = tk.Frame(self, bg=PNL2, pady=7); hdr.pack(fill="x")
+        if FROM_MENU:
+            tk.Button(hdr, text="\u2190 Menu", command=self._go_menu, bg=PNL, fg=FG, relief="flat",
+                      font=FONT, padx=10, pady=2, cursor="hand2").pack(side="left", padx=(12, 0))
         tk.Label(hdr, text="GT7", fg=ACC, bg=PNL2,
-                 font=(runtime_config.MONO,15,"bold")).pack(side="left", padx=(16,2))
+                 font=(theme.DISPLAY,15,"bold")).pack(side="left", padx=(16,2))
         tk.Label(hdr, text="LAP ANALYST", fg=CYN, bg=PNL2,
-                 font=(runtime_config.MONO,15,"bold")).pack(side="left")
+                 font=(theme.DISPLAY,15,"bold")).pack(side="left")
         self._hdr = tk.Label(hdr, text="", fg=DIM, bg=PNL2, font=FONT)
         self._hdr.pack(side="right", padx=16)
 
         body = tk.Frame(self, bg=BG); body.pack(fill="both", expand=True)
 
-        side = uiscroll.make_scrollable(body, PNL2, 236)
+        side = uiscroll.make_scrollable(body, PNL2, theme.px(284))
         self._build_sidebar(side)
 
         nb = ttk.Notebook(body); nb.pack(fill="both", expand=True)
@@ -2250,7 +2260,7 @@ class AnalystApp(tk.Tk):
 
         fa = _section("LAP A", CYN)
         self._la = tk.Label(fa, text="not loaded", fg=DIM, bg=PNL, font=FONTL,
-                             wraplength=190, justify="left")
+                             wraplength=theme.px(236), justify="left")
         self._la.pack(anchor="w", padx=8, pady=2)
         tk.Button(fa, text="📂  Browse", command=lambda: self._load("a"),
                   bg=DIM2, fg=CYN, relief="flat", font=FONT, padx=8, pady=2,
@@ -2258,7 +2268,7 @@ class AnalystApp(tk.Tk):
 
         fb = _section("LAP B", ACC)
         self._lb = tk.Label(fb, text="not loaded", fg=DIM, bg=PNL, font=FONTL,
-                             wraplength=190, justify="left")
+                             wraplength=theme.px(236), justify="left")
         self._lb.pack(anchor="w", padx=8, pady=2)
         tk.Button(fb, text="📂  Browse", command=lambda: self._load("b"),
                   bg=DIM2, fg=ACC, relief="flat", font=FONT, padx=8, pady=2,
@@ -2299,7 +2309,7 @@ class AnalystApp(tk.Tk):
         self._top10_f = tk.Frame(fl, bg=PNL)
         self._top10_f.pack(fill="x", padx=8, pady=(0,4))
         tk.Label(self._top10_f, text="load a lap to see the top 10", fg=DIM, bg=PNL,
-                 font=FONTL, wraplength=190, justify="left").pack(anchor="w")
+                 font=FONTL, wraplength=theme.px(236), justify="left").pack(anchor="w")
 
         tk.Label(p, text="SECTORS — LAP A", fg=DIM, bg=PNL2,
                  font=FONTL).pack(anchor="w", padx=12, pady=(6,2))
@@ -2354,7 +2364,7 @@ class AnalystApp(tk.Tk):
             return False
 
     # ── overlay laps (3+ lap comparison) ────────────────────────────────────
-    _OVERLAY_COLORS = [YLW, GRN, PRP, ORG, "#8899ff", "#ff9ecb"]
+    _OVERLAY_COLORS = [YLW, GRN, PRP, ORG, "#96949c", "#f2f0ec"]
 
     def _refresh_overlay_list(self):
         for w in self._ov_list_f.winfo_children(): w.destroy()
@@ -2366,7 +2376,7 @@ class AnalystApp(tk.Tk):
             row = tk.Frame(self._ov_list_f, bg=PNL); row.pack(fill="x", pady=1)
             tk.Label(row, text="●", fg=ov["color"], bg=PNL, font=FONTL).pack(side="left")
             tk.Label(row, text=ov["label"], fg=FG, bg=PNL, font=FONTL,
-                     wraplength=150, justify="left", anchor="w").pack(side="left", padx=4)
+                     wraplength=theme.px(150), justify="left", anchor="w").pack(side="left", padx=4)
             tk.Button(row, text="✕", command=lambda i=i: self._remove_overlay(i),
                       bg=PNL, fg=ACC, relief="flat", font=FONTL, bd=0,
                       cursor="hand2").pack(side="right")
@@ -2463,7 +2473,7 @@ class AnalystApp(tk.Tk):
         dlg = tk.Toplevel(self)
         dlg.title(f"Load {slot_label} — Search")
         dlg.configure(bg=PNL2)
-        dlg.geometry("580x480")
+        dlg.geometry(f"{theme.px(580)}x{theme.px(480)}")
         _modal(dlg, self)
 
         top = tk.Frame(dlg, bg=PNL2); top.pack(fill="x", padx=10, pady=8)
@@ -2757,7 +2767,7 @@ class AnalystApp(tk.Tk):
 
         dlg = tk.Toplevel(self)
         dlg.title("Export CSV"); dlg.configure(bg=PNL2)
-        dlg.geometry("265x155"); dlg.resizable(False, False)
+        dlg.geometry(f"{theme.px(265)}x{theme.px(155)}"); dlg.resizable(False, False)
         _modal(dlg, self)
 
         tk.Label(dlg, text="Export which lap?", fg=FG, bg=PNL2, font=FONTB).pack(pady=(14,8))
@@ -2884,11 +2894,11 @@ class AnalystApp(tk.Tk):
             return      # a newer lap was loaded while this was downloading
         for w in self._top10_f.winfo_children(): w.destroy()
         tk.Label(self._top10_f, text=f"{car} @ {track}", fg=CYN, bg=PNL,
-                 font=FONTL, wraplength=190, justify="left").pack(anchor="w")
+                 font=FONTL, wraplength=theme.px(236), justify="left").pack(anchor="w")
         rows = [r for r in (rows or []) if isinstance(r, dict)]
         if not rows:
             tk.Label(self._top10_f, text="no times yet — be the first!",
-                     fg=DIM, bg=PNL, font=FONTL, wraplength=190,
+                     fg=DIM, bg=PNL, font=FONTL, wraplength=theme.px(236),
                      justify="left").pack(anchor="w", pady=(2,0))
             return
         for i, row in enumerate(rows, 1):
@@ -3086,7 +3096,7 @@ class AnalystApp(tk.Tk):
         entry.focus_set()
 
         status = tk.Label(win, text="", font=FONTL, fg=ACC, bg=PNL,
-                           wraplength=260, justify="center")
+                           wraplength=theme.px(260), justify="center")
         status.pack(padx=24, pady=(0, 6))
 
         btn_row = tk.Frame(win, bg=PNL)
@@ -3202,5 +3212,6 @@ class AnalystApp(tk.Tk):
                                   "Couldn't reach the leaderboard — check your internet connection and try again.")
 
 if __name__ == "__main__":
+    theme.enable_dpi_awareness()
     app = AnalystApp()
     app.mainloop()

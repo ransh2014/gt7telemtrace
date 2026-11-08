@@ -81,6 +81,7 @@ jobs:
             --collect-data certifi \
             --add-data "$PKG_DIR/car_ids.csv:gt7telem" \
             --add-data "$PKG_DIR/course_ids.csv:gt7telem" \
+            --add-data "$PKG_DIR/fonts:gt7telem/fonts" \
             --collect-submodules websockets \
             entrypoint.py
 

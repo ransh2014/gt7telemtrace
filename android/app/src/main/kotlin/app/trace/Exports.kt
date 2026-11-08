@@ -17,8 +17,8 @@ import java.util.zip.ZipOutputStream
 object Exports {
     /** Chart HTML export: the figure rendered to PNG, embedded base64 in a minimal dark page (as the PC apps do). Must run off the main thread. */
     fun chartHtml(ctx: Context, a: AP, f: Fig, title: String): String {
-        val reg = ResourcesCompat.getFont(ctx, R.font.inconsolata_regular) ?: Typeface.MONOSPACE
-        val bold = ResourcesCompat.getFont(ctx, R.font.inconsolata_bold) ?: Typeface.MONOSPACE
+        val reg = ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_regular) ?: Typeface.MONOSPACE
+        val bold = ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_bold) ?: Typeface.MONOSPACE
         val t = RTheme(a, 1.53f, reg, bold)
         val bmp = renderFigBitmap(f, t, 1320, f.cols)
         val bos = ByteArrayOutputStream()

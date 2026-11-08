@@ -27,8 +27,8 @@ fun rememberRTheme(a: AP): RTheme {
     val ctx = LocalContext.current
     val dens = LocalDensity.current.density
     return remember(a, dens) {
-        val reg = ResourcesCompat.getFont(ctx, R.font.inconsolata_regular) ?: Typeface.MONOSPACE
-        val bold = ResourcesCompat.getFont(ctx, R.font.inconsolata_bold) ?: Typeface.MONOSPACE
+        val reg = ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_regular) ?: Typeface.MONOSPACE
+        val bold = ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_bold) ?: Typeface.MONOSPACE
         RTheme(a, dens, reg, bold)
     }
 }

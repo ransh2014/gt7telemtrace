@@ -5,6 +5,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-08
+**A full design overhaul. No new features were added** -- everything TRACE does is unchanged; it just looks and feels like the website now.
+- **Same look as the website.** The desktop windows (Launcher, Live Dashboard, Lap Analyst, Race Analyst, Records and the notification toasts) and the Android app use the website's exact dark palette -- obsidian surfaces, the signature red, petrol teal, racing green and gold -- in place of the old navy/neon colours. New module `theme.py` holds the shared colours and fonts. The light theme is unchanged.
+- **Same fonts as the website.** Anton (big speed/gear numerals), Sora (titles), Manrope (launcher text) and JetBrains Mono (data and labels) are bundled with the app (all SIL Open Font License) and loaded for TRACE only on Windows, macOS and Linux -- nothing is installed system-wide. Android gets them too. If a font can't load, TRACE falls back to the system font and works as before.
+- **Fits any screen.** Windows now size themselves to the screen (a 1280x920 dashboard no longer hangs off a scaled laptop display), the header rows wrap instead of clipping, and TRACE draws at the screen's real resolution on Windows -- crisp at 125%/150%/175% scaling instead of blurry.
+- **Dark everywhere.** Progress bars, tables, scrollbars, drop-downs, the log box and panel borders are dark and match the theme instead of showing up white.
+- **Clearer labels.** The two `ALLOW REMOTE` switches are now `ALLOW REMOTE (WEB UI)` and `ALLOW REMOTE (METRICS)`.
+- **Back to the menu.** A new `Menu` button in the Dashboard and both Analysts returns to the Launcher so you can pick another tool without restarting. (Navigation only -- the same tools, same data.)
+
 ## [1.0.0] - 2026-11-07
 - **LAN web dashboard.** New **`WEB UI :8080`** switch in the Live Dashboard console row (off by default) serves a live, read-only dashboard to any phone, tablet or PC on your Wi-Fi/LAN. Five pages (HUD, Inputs & G, Tyres & Fuel, Timing, Full) with speedo, tacho and shift lights, gear, throttle/brake/steering trace, G-force circle, tyre temp and slip, fuel and strategy estimates, lap timing, delta, `VS TOP` and a live track map. Telemetry is pushed over a WebSocket on the same port; km/h or mph, dark or light theme, fullscreen and keep-screen-awake, with auto-reconnect. It uses the same look and fonts as the website, and everything is built into TRACE, so it works with no internet. It listens on this PC only until you tick **`ALLOW REMOTE`** next to it; there is no password, so only do that on a network you trust. Nothing is sent to the internet. New module `webui_server.py` (plus `webui_page.py` and `webui_fonts.py`); new dependency `websockets`.
 
