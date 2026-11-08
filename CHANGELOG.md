@@ -5,6 +5,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-08
+**More design and housekeeping. No new features** -- TRACE does exactly what it did in 1.0.1; this release finishes the website look and tidies up.
 - **Light theme matches the website.** The Launcher, Lap Analyst, Race Analyst and Records windows (and the Android app) now use the website's light palette in light mode instead of the old blue-grey one. Design only; nothing else changed.
 - **Shareable PNG cards match the website too.** The lap card and race card (desktop and Android) use the website's palette and JetBrains Mono instead of the old neon colours and a generic monospace font.
 - **Font licences.** The bundled fonts now ship with their SIL Open Font License text and copyright lines (`gt7telem/fonts/OFL.txt`), and the README credits them.
