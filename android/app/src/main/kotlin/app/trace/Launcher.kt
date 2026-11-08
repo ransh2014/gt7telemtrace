@@ -3,7 +3,6 @@ package app.trace
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,11 +13,9 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,7 +30,6 @@ fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, onToggleTheme: () -> 
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var signed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Account.load(ctx).signedIn) }
     var dlg by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    var lights by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var msg by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     val saveZip = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) { u: android.net.Uri? ->
         if (u != null) scope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -41,16 +37,13 @@ fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, onToggleTheme: () -> 
             msg = "Backed up $n files."
         }
     }
-    if (lights) StartLights(a) { lights = false }
     if (dlg) CreateAccountDialog(a, "", { dlg = false; signed = true; msg = "Account created." }) { dlg = false }
     Column(
         Modifier.fillMaxSize().background(a.bg).statusBarsPadding().navigationBarsPadding()
             .verticalScroll(rememberScrollState()).padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("TRACE", Modifier.fillMaxWidth().padding(top = 28.dp)
-            .pointerInput(Unit) { detectTapGestures(onLongPress = { lights = true }) },   
-            color = a.cyn, fontFamily = Display,
+        Text("TRACE", Modifier.fillMaxWidth().padding(top = 28.dp), color = a.cyn, fontFamily = Display,
             fontWeight = FontWeight.Bold, fontSize = 44.sp, textAlign = TextAlign.Center)
         Text("GT7 Telemetry Suite", Modifier.fillMaxWidth().padding(bottom = 8.dp), color = sub,
             fontFamily = Mono, fontSize = 15.sp, textAlign = TextAlign.Center)
@@ -99,41 +92,5 @@ private fun ToolCard(a: AP, title: String, desc: String, accent: Color, onClick:
             Text(desc, color = Color(0xFF96949c), fontFamily = Mono, fontSize = 13.sp, lineHeight = 18.sp)
         }
         Text("Launch →", Modifier.padding(top = 14.dp), color = accent, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-    }
-}
-
-@Composable
-private fun StartLights(a: AP, onDone: () -> Unit) {
-    var lit by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0) }
-    var go by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(400)
-        for (i in 1..5) {
-            lit = i
-            kotlinx.coroutines.delay(420)
-        }
-        kotlinx.coroutines.delay(900)
-        lit = 0
-        go = true
-        kotlinx.coroutines.delay(1000)
-        onDone()
-    }
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDone) {
-        Column(
-            Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(a.pnl).clickable(onClick = onDone).padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                for (i in 1..5) {
-                    Box(
-                        Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                            .background(if (i <= lit) Color(0xFFc8102e) else Color(0xFF1a1a1d)),
-                    )
-                }
-            }
-            Spacer(Modifier.height(18.dp))
-            Text(if (go) "LIGHTS OUT" else " ", color = Color(0xFF3c9a5f), fontFamily = Impact, fontSize = 28.sp)
-            Text("tap to skip", color = a.dim, fontFamily = Mono, fontSize = 11.sp)
-        }
     }
 }

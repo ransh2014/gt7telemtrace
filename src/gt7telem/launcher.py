@@ -359,9 +359,8 @@ def _show_menu():
 
     hdr = tk.Frame(f, bg=BG)
     hdr.pack(fill="x", pady=(50, 8))
-    title = tk.Label(hdr, text="TRACE", font=(theme.DISPLAY, 30, "bold"), fg=CYN, bg=BG)
-    title.pack()
-    theme.click_counter(title, 5, 1800, lambda: theme.lights_out(root))
+    tk.Label(hdr, text="TRACE", font=(theme.DISPLAY, 30, "bold"),
+              fg=CYN, bg=BG).pack()
     tk.Label(hdr, text="GT7 Telemetry Suite", font=(theme.BODY, 11),
               fg=DIM, bg=BG).pack(pady=(0, 4))
     if config.SUPABASE_ACCESS_TOKEN and config.PSN_NAME:

@@ -270,7 +270,6 @@ def reflow(frame, pad: int = 6) -> None:
 
 
 # ── Small helpers that draw with tkinter (imported lazily so this module stays headless-safe) ──────────────
-_OFF = "#1a1a1d"   # an unlit lamp (the website's gantry colour)
 
 # ── Tooltips ───────────────────────────────────────────────────────────────────────────────────────────────
 def tooltip(widget, text: str, delay_ms: int = 450) -> None:
@@ -333,121 +332,6 @@ def tooltip(widget, text: str, delay_ms: int = 450) -> None:
     widget.bind("<Destroy>", hide, add="+")
 
 
-def click_counter(widget, count: int, within_ms: int, callback) -> None:
-    import tkinter as tk
-
-    """Call `callback` after `count` clicks on `widget`, each within `within_ms` of the previous one."""
-    state = {"n": 0, "job": None}
-
-    def reset():
-        state["n"] = 0
-        state["job"] = None
-
-    def click(_e=None):
-        try:
-            if state["job"] is not None:
-                widget.after_cancel(state["job"])
-            state["n"] += 1
-            if state["n"] >= count:
-                state["n"] = 0
-                state["job"] = None
-                callback()
-            else:
-                state["job"] = widget.after(within_ms, reset)
-        except tk.TclError:
-            pass
-
-    widget.bind("<Button-1>", click, add="+")
-
-
-def _centred_popup(root, w: int, h: int):
-    import tkinter as tk
-
-    """A borderless popup centred on `root` (hidden until the caller shows it)."""
-    top = tk.Toplevel(root)
-    top.withdraw()
-    top.overrideredirect(True)
-    top.configure(bg=LINE2)
-    try:
-        top.attributes("-topmost", True)
-    except tk.TclError:
-        pass
-    try:
-        root.update_idletasks()
-        x = root.winfo_rootx() + (root.winfo_width() - w) // 2
-        y = root.winfo_rooty() + (root.winfo_height() - h) // 2
-    except tk.TclError:
-        x = y = 100
-    top.geometry(f"{w}x{h}+{max(0, x)}+{max(0, y)}")
-    return top
-
-
-def lights_out(root, on_done=None) -> None:
-    import tkinter as tk
-
-    """Five red lights come on one by one, then go out: LIGHTS OUT. Click or press a key to skip."""
-    w, h = px(440), px(210)
-    top = _centred_popup(root, w, h)
-    inner = tk.Frame(top, bg=BG1)
-    inner.pack(fill="both", expand=True, padx=1, pady=1)
-    cv = tk.Canvas(inner, width=w - 2, height=h - 2, bg=BG1, highlightthickness=0)
-    cv.pack()
-    r, gap = px(26), px(18)
-    total = 5 * 2 * r + 4 * gap
-    x0 = ((w - 2) - total) // 2 + r
-    y = px(82)
-    lamps = [cv.create_oval(x0 + i * (2 * r + gap) - r, y - r, x0 + i * (2 * r + gap) + r, y + r,
-                            fill=_OFF, outline=LINE2, width=1) for i in range(5)]
-    label = cv.create_text((w - 2) // 2, px(158), text="", fill=GREEN, font=(IMPACT, 26))
-    cv.create_text((w - 2) // 2, h - px(18), text="click or press a key to skip", fill=DIM,
-                   font=(MONO, 7))
-    jobs: list = []
-    done = {"v": False}
-
-    def end(_e=None):
-        if done["v"]:
-            return
-        done["v"] = True
-        for j in jobs:
-            try:
-                top.after_cancel(j)
-            except tk.TclError:
-                pass
-        try:
-            top.destroy()
-        except tk.TclError:
-            pass
-        if on_done:
-            on_done()
-
-    def light(i):
-        if not done["v"]:
-            cv.itemconfig(lamps[i], fill=RED, outline=RED_2)
-
-    def lights_off():
-        if done["v"]:
-            return
-        for c in lamps:
-            cv.itemconfig(c, fill=_OFF, outline=LINE2)
-        cv.itemconfig(label, text="LIGHTS OUT")
-
-    for i in range(5):
-        jobs.append(top.after(400 + 420 * i, light, i))
-    t_off = 400 + 420 * 4 + 900
-    jobs.append(top.after(t_off, lights_off))
-    jobs.append(top.after(t_off + 1000, end))
-    for wdg in (top, cv):
-        wdg.bind("<Button-1>", end)
-        wdg.bind("<Key>", end)
-    top.deiconify()
-    top.lift()
-    try:
-        top.focus_force()
-    except tk.TclError:
-        pass
-
-
-# ── Checkered flag ─────────────────────────────────────────────────────────────────────────────────────────
 def checker_flag(parent, bg: str, cols: int = 5, rows: int = 3, cell: int = 7):
     import tkinter as tk
 
