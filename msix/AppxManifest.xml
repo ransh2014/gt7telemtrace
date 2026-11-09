@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Store package manifest for TRACE. The Version attribute is rewritten by
+     .github/workflows/build-msix.yml from the release tag (x.y.z -> x.y.z.0);
+     the Identity values come from Partner Center > Product Identity. -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="ransh2014.GT7traceTelemetryandAnalysisToolforGT7"
+    Publisher="CN=83CE6414-5E46-4D10-8598-0E32A9CE4233"
+    Version="1.0.3.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>GT7trace:Telemetry and Analysis Tool for GT7</DisplayName>
+    <PublisherDisplayName>ransh2014</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="TRACE" Executable="TRACE.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="TRACE"
+        Description="Telemetry Racing Analytics &amp; Comparative Engine: live dashboard, lap analysis and race analysis for Gran Turismo 7."
+        BackgroundColor="#08080B"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Required for any packaged classic desktop (Win32) app. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

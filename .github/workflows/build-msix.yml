@@ -1,0 +1,78 @@
+name: Build MSIX (Microsoft Store)
+
+# Manual: Actions tab -> "Build MSIX (Microsoft Store)" -> Run workflow, and
+# give it an existing release tag (e.g. v1.0.3). It takes that release's
+# TRACE.exe, wraps it in an MSIX and uploads the .msix as a build artifact,
+# plus the 300x300 Store-listing icon. Upload the .msix in Partner Center.
+# The package is unsigned on purpose: Microsoft signs it after certification.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to package (e.g. v1.0.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  msix:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download the release's Windows zip
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ inputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "gt7telem-windows.zip" --dir release
+          7z x release/gt7telem-windows.zip -orelease/unzipped -y
+          test -f release/unzipped/TRACE.exe
+
+      - name: Stage the package folder
+        shell: bash
+        run: |
+          mkdir -p pkg/Assets
+          cp release/unzipped/TRACE.exe pkg/TRACE.exe
+          cp LICENSE pkg/LICENSE.txt
+          cp msix/AppxManifest.xml pkg/AppxManifest.xml
+          python -m pip install pillow
+          python msix/make_assets.py pkg/Assets store-listing-icon-300.png
+
+      - name: Set the package version from the tag (x.y.z -> x.y.z.0)
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.tag }}".TrimStart("v")
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Tag '$v' must look like 1.2.3" }
+          $path = "pkg/AppxManifest.xml"
+          $xml = Get-Content $path -Raw
+          $xml = $xml -replace '(<Identity[^>]*?Version=")[^"]*(")', "`${1}$v.0`$2"
+          Set-Content $path $xml -Encoding UTF8
+          Select-String -Path $path -Pattern 'Version="' | Select-Object -First 1
+
+      - name: Pack MSIX
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\makeappx.exe" |
+                 Sort-Object FullName -Descending | Select-Object -First 1
+          & $sdk.FullName pack /d pkg /p "TRACE-${{ inputs.tag }}.msix" /o
+          if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trace-msix-${{ inputs.tag }}
+          path: |
+            TRACE-${{ inputs.tag }}.msix
+            store-listing-icon-300.png
+          retention-days: 30
