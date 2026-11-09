@@ -1,16 +1,19 @@
 name: Build MSIX (Microsoft Store)
 
-# Manual: Actions tab -> "Build MSIX (Microsoft Store)" -> Run workflow, and
-# give it an existing release tag (e.g. v1.0.3). It takes that release's
-# TRACE.exe, wraps it in an MSIX and uploads the .msix as a build artifact,
-# plus the 300x300 Store-listing icon. Upload the .msix in Partner Center.
+# Runs by itself after "Build Windows Exe" finishes for a release tag: it takes
+# that release's TRACE.exe, wraps it in an MSIX and uploads the .msix (plus the
+# 300x300 Store-listing icon) as a build artifact. Upload the .msix in Partner
+# Center. Can also be run by hand from the Actions tab with any release tag.
 # The package is unsigned on purpose: Microsoft signs it after certification.
 
 on:
+  workflow_run:
+    workflows: ["Build Windows Exe"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to package (e.g. v1.0.3)"
+        description: "Release tag to package (e.g. v1.0.4)"
         required: true
         type: string
 
@@ -19,7 +22,15 @@ permissions:
 
 jobs:
   msix:
+    # Auto runs only for a successful tag build (head_branch is the tag name).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
     runs-on: windows-latest
+    env:
+      TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,7 +43,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "${{ inputs.tag }}" \
+          gh release download "$TAG" \
             --repo "${{ github.repository }}" \
             --pattern "gt7telem-windows.zip" --dir release
           7z x release/gt7telem-windows.zip -orelease/unzipped -y
@@ -51,7 +62,7 @@ jobs:
       - name: Set the package version from the tag (x.y.z -> x.y.z.0)
         shell: pwsh
         run: |
-          $v = "${{ inputs.tag }}".TrimStart("v")
+          $v = "$env:TAG".TrimStart("v")
           if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Tag '$v' must look like 1.2.3" }
           $path = "pkg/AppxManifest.xml"
           $xml = Get-Content $path -Raw
@@ -64,13 +75,13 @@ jobs:
         run: |
           $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\makeappx.exe" |
                  Sort-Object FullName -Descending | Select-Object -First 1
-          & $sdk.FullName pack /d pkg /p "TRACE-${{ inputs.tag }}.msix" /o
+          & $sdk.FullName pack /d pkg /p "TRACE-$env:TAG.msix" /o
           if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }
 
       - uses: actions/upload-artifact@v4
         with:
-          name: trace-msix-${{ inputs.tag }}
+          name: trace-msix-${{ env.TAG }}
           path: |
-            TRACE-${{ inputs.tag }}.msix
+            TRACE-${{ env.TAG }}.msix
             store-listing-icon-300.png
-          retention-days: 30
+          retention-days: 90
