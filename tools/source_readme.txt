@@ -58,11 +58,11 @@ gt7telem/         The TRACE package itself (same source that ships on
                     exposes speed/rpm/throttle/brake/fuel/lap-time gauges
                     for Grafana or any Prometheus-compatible scraper.
                     Binds to localhost only unless you tick "ALLOW
-                    REMOTE" in the Live Dashboard header.
+                    REMOTE (METRICS)" in the Live Dashboard header.
   webui_server.py   Optional LAN web dashboard (off by default) -- serves a live,
                     read-only gauges page to phones/tablets/PCs on your network
                     (HTTP + WebSocket on one port, default 8080). Localhost only
-                    unless you tick "ALLOW REMOTE" next to WEB UI in the Live
+                    unless you tick "ALLOW REMOTE (WEB UI)" next to WEB UI in the Live
                     Dashboard. Needs the `websockets` package. Nothing leaves
                     your LAN.
   webui_page.py     The web dashboard's page (HTML/CSS/JS in one string, no CDN)
@@ -73,6 +73,9 @@ gt7telem/         The TRACE package itself (same source that ships on
   consistency.py    Lap-time spread, trend and 0-100 consistency score (Race
                     Analyst Consistency tab)
   share_card.py     Shared 1200x630 PNG renderer behind the lap card and race card
+  labels.py         Shared UI wording (titles, buttons, preference names) used by
+                    every window; the Android app's strings are generated from it.
+  updates.py        Launcher update check (GitHub latest release, cached, silent on error).
   dyno.py           Dyno & Tune: power/torque curve, gearbox, shift points and tuning
                     hints rebuilt from one lap (Dyno & Tune chart group in Lap Analyst)
   theoretical.py    Theoretical best lap: stitches the fastest micro-sectors of

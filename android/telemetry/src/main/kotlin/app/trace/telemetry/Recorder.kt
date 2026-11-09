@@ -65,6 +65,9 @@ class Recorder(
         else saveLap(s, null, true, ctx)
     }
 
+    /** Drop an armed / in-progress lap without saving (auto lap leaving its session); returns the samples discarded. */
+    fun discardArmed(): Int { val n = samples.size; recording = false; waiting = false; samples = ArrayList(); return n }
+
     fun toggleRace() { if (raceRecording) stopRace(false, null) else startRace() }
     fun startRace() { raceRecording = true; raceSamples = ArrayList(); raceStartT = mono(); recDueRace = 0.0; log("Race recording started") }
 

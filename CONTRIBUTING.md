@@ -51,6 +51,7 @@ session or a previously recorded lap.
   1.71). When a GT7 update changes physics again, bump them there, in
   the website's `leaderboard.html`, and in the `validate_lap_submission` /
   `get_consensus_line` SQL functions.
+- `src/gt7telem/labels.py` — every piece of UI wording the desktop and Android apps share (window titles, headers, buttons, preference names, card text). Change a label **here**, run `python tools/gen_android_strings.py` (writes `android/app/src/main/res/values/strings.xml`) and use `R.string.<name>` in the Kotlin screen; `tests/test_android_parity.py` fails CI until the two agree. `tools/gen_android_webui.py` likewise copies the desktop web-UI page into the Android assets.
 - `android/` — the standalone Android app (Kotlin + Jetpack Compose, built with
   Gradle: `gradlew assembleRelease`). Its packet decoding is checked against golden
   packets made by `android/tools/make_fixtures*.py` from the Python code. `ruff`

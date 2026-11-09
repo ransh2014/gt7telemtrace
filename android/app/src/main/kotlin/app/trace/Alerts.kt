@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import app.trace.telemetry.Versions
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.InetAddress
@@ -192,19 +193,11 @@ object Analytics {
     }
 }
 
-/** launcher._check_for_update: asks GitHub for the latest release tag, silently. */
+/** updates.py: asks GitHub once per process for the latest published release (drafts / pre-releases skipped). Silent on any failure. */
 object Updates {
-    var latest by mutableStateOf<String?>(null)
-    var url = "https://github.com/ransh2014/gt7telemtrace/releases/latest"
+    /** null = nothing to show (still checking, offline, error, or the user ticked "Ignore update checks"). */
+    var status by mutableStateOf<Versions.Status?>(null)
     private var done = false
-
-    private fun ver(s: String) = s.trim().trimStart('v', 'V').split('.').map { it.takeWhile { c -> c.isDigit() }.toIntOrNull() ?: 0 }
-
-    private fun newer(a: String, b: String): Boolean {
-        val x = ver(a); val y = ver(b)
-        for (i in 0 until maxOf(x.size, y.size)) { val p = x.getOrElse(i) { 0 }; val q = y.getOrElse(i) { 0 }; if (p != q) return p > q }
-        return false
-    }
 
     fun check(current: String) {
         if (done) return
@@ -212,12 +205,11 @@ object Updates {
         thread(isDaemon = true, name = "trace-update") {
             try {
                 val c = URL("https://api.github.com/repos/ransh2014/gt7telemtrace/releases/latest").openConnection() as HttpURLConnection
-                c.connectTimeout = 6000; c.readTimeout = 6000
+                c.connectTimeout = 5000; c.readTimeout = 5000
                 c.setRequestProperty("Accept", "application/vnd.github+json"); c.setRequestProperty("User-Agent", "TRACE-updater")
                 if (c.responseCode != 200) return@thread
                 val o = JSONObject(c.inputStream.bufferedReader().readText())
-                val tag = o.optString("tag_name").trimStart('v', 'V')
-                if (tag.isNotEmpty() && newer(tag, current)) { url = o.optString("html_url").ifEmpty { url }; latest = tag }
+                status = Versions.evaluate(o.optString("tag_name"), o.optString("html_url"), o.optBoolean("draft"), o.optBoolean("prerelease"), current)
             } catch (_: Exception) {}
         }
     }

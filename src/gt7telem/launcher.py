@@ -27,7 +27,8 @@ import threading
 import tkinter as tk
 import webbrowser
 
-from . import __version__, analytics, auth, config, lap_analyst, race_analyst, records, theme
+from . import __version__, analytics, auth, config, lap_analyst, race_analyst, records, theme, updates
+from . import labels as L
 
 # Static imports so PyInstaller's analysis bundles these (and their deps:
 # numpy, pandas, matplotlib, pycryptodome) -- do NOT switch these back to
@@ -47,6 +48,7 @@ if config.THEME == "light":
     FG     = "#16161a"
     DIM    = "#55535c"
     DIM2   = "#e2dfd8"
+    LINK   = theme.BLUE_LINK_LIGHT
 else:
     BG     = "#08080a"
     PANEL  = "#0e0e11"
@@ -57,13 +59,14 @@ else:
     FG     = "#f2f0ec"
     DIM    = "#96949c"
     DIM2   = "#202024"
+    LINK   = theme.BLUE_LINK
 
 WIN_W, WIN_H = 900, 650
 
-_LATEST_RELEASE_URL = None  # set by _check_for_update() if a newer tag exists
-_UPDATE_TAG = None          # ... together with the tag name; the Tk thread shows the banner
-_banner = None
 _uiq = queue.SimpleQueue()  # worker threads -> Tk thread (root.after() isn't thread-safe)
+_status_lbl = None          # the "current" / "update available" label on the menu, if shown
+_update_res = None          # last updates.check() result for this process (None = nothing to show)
+_update_done = False
 
 
 def _post(fn, *args):
@@ -81,10 +84,6 @@ def _poll_ui():
                 fn(*args)
             except Exception:
                 pass
-        # (re)show the update banner: swapping screens destroys it
-        if _UPDATE_TAG and _content is not None and not (
-                _banner is not None and _banner.winfo_exists() and _banner.master is _content):
-            _show_update_banner(_UPDATE_TAG)
     finally:
         if root is not None:
             try:
@@ -93,66 +92,58 @@ def _poll_ui():
                 pass
 
 
-def _ver_tuple(s):
-    """'v0.7.10' -> (0, 7, 10); ignores a '-rc1' / '+build' suffix. Compared
-    as ints (not strings), and padded so 0.8 == 0.8.0."""
-    core = re.split(r"[-+]", str(s).strip().lstrip("vV"), maxsplit=1)[0]
-    nums = [int(n) for n in re.findall(r"\d+", core)]
-    return tuple(nums + [0] * (4 - len(nums)))
+def _paint_update_status():
+    """Show the cached check result in the menu's status label (Tk thread only). Nothing on error/offline,
+    and nothing at all while the user has ticked "Ignore update checks"."""
+    lbl = _status_lbl
+    if lbl is None or not lbl.winfo_exists():
+        return
+    res = _update_res if config.UPDATE_CHECK_ENABLED else None
+    lbl.unbind("<Button-1>")
+    if not res:
+        lbl.config(text="", cursor="")
+    elif res[0] == updates.AVAILABLE:
+        lbl.config(text=L.UPDATE_AVAILABLE_FMT.format(version=res[1]), fg=LINK, cursor="hand2",
+                   font=(theme.MONO, 9, "underline"))
+        lbl.bind("<Button-1>", lambda e, u=res[2]: webbrowser.open(u))
+    else:
+        lbl.config(text=L.UPDATE_CURRENT, fg=theme.GREEN, cursor="", font=(theme.MONO, 9))
+
+
+def _got_update_result(res):
+    global _update_res, _update_done
+    _update_res, _update_done = res, True
+    _paint_update_status()
 
 
 def _check_for_update():
-    """Background: compare the installed version against GitHub's latest
-    release tag. Silent on any failure (offline, rate-limited, API shape
-    change) -- an update nag is a nice-to-have, never worth an error dialog.
-    Runs once per launch, only if the user hasn't turned it off."""
+    """Background: compare the installed version against GitHub's latest release. Silent on any failure;
+    runs at most once per process and only if the user hasn't ticked "Ignore update checks"."""
     if not config.UPDATE_CHECK_ENABLED:
         return
-
-    def worker():
-        global _LATEST_RELEASE_URL, _UPDATE_TAG
-        try:
-            import json as _json
-            import urllib.request
-            req = urllib.request.Request(
-                "https://api.github.com/repos/ransh2014/gt7telemtrace/releases/latest",
-                headers={"Accept": "application/vnd.github+json", "User-Agent": "TRACE-updater"})
-            with urllib.request.urlopen(req, timeout=6) as resp:
-                data = _json.loads(resp.read().decode("utf-8"))
-            tag = str(data.get("tag_name", "")).lstrip("vV")
-            if not tag:
-                return
-            if _ver_tuple(tag) > _ver_tuple(__version__):
-                _LATEST_RELEASE_URL = data.get("html_url") or \
-                    "https://github.com/ransh2014/gt7telemtrace/releases/latest"
-                _UPDATE_TAG = tag      # picked up by _poll_ui on the Tk thread
-        except Exception:
-            pass  # offline / rate-limited / API changed -- fail silent
-
-    threading.Thread(target=worker, daemon=True).start()
-
-
-def _show_update_banner(new_version: str):
-    global _banner
-    if _content is None:
+    if _update_done:
+        _paint_update_status()
         return
-    bar = tk.Label(
-        _content, text=f"  🔔  TRACE {new_version} is available — click to open the release  ",
-        font=(theme.BODY, 9, "bold"), bg=PINK, fg="#ffffff", cursor="hand2")
-    bar.place(relx=0.5, rely=0.0, anchor="n")
-    bar.lift()
-    bar.bind("<Button-1>", lambda e: webbrowser.open(_LATEST_RELEASE_URL))
-    _banner = bar
+    updates.check(__version__, lambda res: _post(_got_update_result, res))
+
+
+def _toggle_ignore_updates(var):
+    config.UPDATE_CHECK_ENABLED = not var.get()
+    config.save(UPDATE_CHECK_ENABLED=config.UPDATE_CHECK_ENABLED)
+    if config.UPDATE_CHECK_ENABLED:
+        _check_for_update()
+    _paint_update_status()
+
 
 root = None
 _content = None   # the frame currently swapped into root (onboarding or menu)
 
 
 def _launch(tool, app_cls):
-    global _content, _banner
+    global _content
     analytics.track_launch(tool)
     root.destroy()
-    _content = _banner = None   # widgets of the destroyed root; main() builds fresh ones
+    _content = None   # widgets of the destroyed root; main() builds fresh ones
     for mod in (gt7telem, lap_analyst, race_analyst):
         mod.FROM_MENU = True   # tools opened from here get a "Menu" button that comes back
     try:
@@ -211,9 +202,9 @@ def _show_onboarding(from_menu: bool = False):
     card = tk.Frame(f, bg=BG)
     card.place(relx=0.5, rely=0.46, anchor="center")
 
-    tk.Label(card, text="TRACE", font=(theme.DISPLAY, 34, "bold"),
+    tk.Label(card, text=L.LAUNCHER_TITLE, font=(theme.DISPLAY, 34, "bold"),
               fg=CYN, bg=BG).pack()
-    tk.Label(card, text="GT7 Telemetry Suite", font=(theme.BODY, 11),
+    tk.Label(card, text=L.LAUNCHER_SUBTITLE, font=(theme.BODY, 11),
               fg=DIM, bg=BG).pack(pady=(0, 24))
 
     pitch = ("Want to submit laps to the global leaderboard?\n"
@@ -348,9 +339,9 @@ def _show_onboarding(from_menu: bool = False):
 # ── tool menu ────────────────────────────────────────────────────────────
 
 _TOOLS = [
-    ("Live Dashboard", "Real-time telemetry overlay while you drive.", CYN, launch_dashboard),
-    ("Lap Analyst", "Compare laps, chart every input, submit to the leaderboard.", PRP, launch_lap_analyst),
-    ("Race Analyst", "Full race breakdown and pace review.", PINK, launch_race_analyst),
+    (L.TOOL_LIVE, L.CARD_LIVE_DESC, CYN, launch_dashboard),
+    (L.TOOL_LAP, L.CARD_LAP_DESC, PRP, launch_lap_analyst),
+    (L.TOOL_RACE, L.CARD_RACE_DESC, PINK, launch_race_analyst),
 ]
 
 
@@ -359,13 +350,26 @@ def _show_menu():
 
     hdr = tk.Frame(f, bg=BG)
     hdr.pack(fill="x", pady=(50, 8))
-    tk.Label(hdr, text="TRACE", font=(theme.DISPLAY, 30, "bold"),
+    global _status_lbl
+    tk.Label(hdr, text=L.LAUNCHER_TITLE, font=(theme.DISPLAY, 30, "bold"),
               fg=CYN, bg=BG).pack()
-    tk.Label(hdr, text="GT7 Telemetry Suite", font=(theme.BODY, 11),
-              fg=DIM, bg=BG).pack(pady=(0, 4))
+    ver_row = tk.Frame(hdr, bg=BG)
+    ver_row.pack()
+    tk.Label(ver_row, text=L.VERSION_FMT.format(version=__version__), font=(theme.MONO, 9),
+              fg=DIM, bg=BG).pack(side="left")
+    _status_lbl = tk.Label(ver_row, text="", font=(theme.MONO, 9), fg=DIM, bg=BG)
+    _status_lbl.pack(side="left", padx=(8, 0))
+    ignore_var = tk.BooleanVar(value=not config.UPDATE_CHECK_ENABLED)
+    tk.Checkbutton(hdr, text=L.IGNORE_UPDATE_CHECKS, variable=ignore_var,
+                   command=lambda: _toggle_ignore_updates(ignore_var), bg=BG, fg=DIM,
+                   selectcolor=PANEL2, activebackground=BG, activeforeground=FG,
+                   font=(theme.MONO, 8), bd=0, highlightthickness=0).pack(pady=(2, 0))
+    tk.Label(hdr, text=L.LAUNCHER_SUBTITLE, font=(theme.BODY, 11),
+              fg=DIM, bg=BG).pack(pady=(2, 4))
     if config.SUPABASE_ACCESS_TOKEN and config.PSN_NAME:
-        tk.Label(hdr, text=f"signed in as {config.PSN_NAME}",
+        tk.Label(hdr, text=L.SIGNED_IN_AS_FMT.format(name=config.PSN_NAME),
                   font=(theme.BODY, 9), fg=DIM, bg=BG).pack()
+    _paint_update_status()
 
     cards = tk.Frame(f, bg=BG)
     cards.pack(expand=True)
@@ -376,35 +380,35 @@ def _show_menu():
     foot = tk.Frame(f, bg=BG)
     foot.pack(side="bottom", fill="x", pady=16)
 
-    tk.Label(foot, text="community tool - not affiliated with Polyphony Digital",
+    tk.Label(foot, text=L.FOOTER_NOTE,
               font=(theme.BODY, 8), fg=DIM2, bg=BG).pack(side="left", padx=24)
 
     theme_lbl = tk.Label(
-        foot, text=("☀  Light" if config.THEME == "dark" else "🌙  Dark"),
+        foot, text=(L.THEME_LIGHT if config.THEME == "dark" else L.THEME_DARK),
         font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG, cursor="hand2")
     theme_lbl.pack(side="right", padx=(0, 24))
     theme_lbl.bind("<Button-1>", lambda e: _toggle_theme())
 
-    records_lbl = tk.Label(foot, text="🏁  Records",
+    records_lbl = tk.Label(foot, text=L.RECORDS,
                            font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG,
                            cursor="hand2")
     records_lbl.pack(side="right", padx=(0, 24))
     records_lbl.bind("<Button-1>", lambda e: _show_records())
 
-    backup_lbl = tk.Label(foot, text="🗄  Backup Laps",
+    backup_lbl = tk.Label(foot, text=L.BACKUP_LAPS,
                            font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG,
                            cursor="hand2")
     backup_lbl.pack(side="right", padx=(0, 24))
     backup_lbl.bind("<Button-1>", lambda e: _do_backup_laps())
 
     if not config.SUPABASE_ACCESS_TOKEN:
-        link = tk.Label(foot, text="Create Free Account",
+        link = tk.Label(foot, text=L.CREATE_ACCOUNT,
                          font=(theme.BODY, 9, "underline"), fg=CYN, bg=BG,
                          cursor="hand2")
         link.pack(side="right", padx=24)
         link.bind("<Button-1>", lambda e: _show_onboarding(from_menu=True))
     else:
-        logout_link = tk.Label(foot, text="Log Out",
+        logout_link = tk.Label(foot, text=L.LOG_OUT,
                          font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG,
                          cursor="hand2")
         logout_link.pack(side="right", padx=24)
@@ -500,7 +504,7 @@ def _build_card(parent, title, desc, color, cmd):
     tk.Label(body, text=desc, font=(theme.BODY, 9), fg=DIM, bg=PANEL,
               wraplength=theme.px(190), justify="left").pack(anchor="w")
 
-    launch_lbl = tk.Label(body, text="Launch  →", font=(theme.BODY, 10, "bold"),
+    launch_lbl = tk.Label(body, text=L.LAUNCH, font=(theme.BODY, 10, "bold"),
                            fg=color, bg=PANEL)
     launch_lbl.pack(anchor="w", side="bottom")
 
@@ -522,7 +526,7 @@ def main():
     global root
     theme.enable_dpi_awareness()
     root = tk.Tk()
-    root.title(f"TRACE {__version__} - GT7 Telemetry Suite")
+    root.title(L.window_title(L.LAUNCHER_WINDOW_TOOL, __version__))
     root.configure(bg=BG)
     root.resizable(True, True)
     theme.fit_window(root, WIN_W, WIN_H, 760, 560)
@@ -533,8 +537,7 @@ def main():
         _show_onboarding()
 
     root.after(150, _poll_ui)
-    if config.UPDATE_CHECK_ENABLED:
-        _check_for_update()
+    _check_for_update()
 
     root.mainloop()
 

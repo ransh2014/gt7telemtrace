@@ -32,6 +32,8 @@ TEAL_2   = "#5fb3a8"   # --blue-2 (links / data)
 GREEN    = "#3c9a5f"   # --green  (live / throttle)
 GOLD     = "#c9a24b"   # --gold
 GOLD_DIM = "#3a2f14"   # dimmed gold: the off-phase of the FUEL LOW flash
+BLUE_LINK = "#4da3ff"  # clear blue for links / "update available" (dark theme); not the petrol teal
+BLUE_LINK_LIGHT = "#1f6fd1"  # same, readable on the light theme
 
 # ── Text ──────────────────────────────────────────────────────────────────────
 TXT = "#f2f0ec"   # --txt

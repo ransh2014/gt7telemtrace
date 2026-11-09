@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -63,7 +64,7 @@ class RaceController(val lapsDir: File) {
         if (pbBaseline) RaceLoader.pbFileBaseline(s.meta, lapsDir) else RaceLoader.bestLapBaseline(s.df)
 }
 
-private enum class RTab(val title: String) { SETUP("Races"), CHARTS("Charts"), REPLAY("Replay") }
+private enum class RTab(@androidx.annotation.StringRes val title: Int) { SETUP(R.string.race_a), REPLAY(R.string.tab_replay), CHARTS(R.string.tab_charts) }
 private val RACE_SPEEDS = listOf(0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
 
 @Composable
@@ -72,14 +73,9 @@ fun RaceScreen(ctl: RaceController, a: AP, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { ctl.refresh() }
     Column(Modifier.fillMaxSize().background(a.bg).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().background(a.pnl2).padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("‹", Modifier.clickable(onClick = onBack).padding(end = 6.dp), color = a.cyn, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            Lbl(a, "GT7", a.acc, 16, true); Lbl(a, "RACE ANALYST", a.cyn, 16, true)
-            Spacer(Modifier.weight(1f))
-            if (ctl.busy) Lbl(a, "loading…", a.dim, 11)
-        }
+        ToolHeader(stringResource(R.string.title_race), a.pnl2, a.acc, a.cyn, a.pnl, a.fg, onBack) { if (ctl.busy) Lbl(a, "loading…", a.dim, 11) }
         Row(Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (t in RTab.values()) TBtn(a, t.title, Modifier.weight(1f), on = tab == t) { tab = t }
+            for (t in RTab.values()) TBtn(a, stringResource(t.title), Modifier.weight(1f), on = tab == t) { tab = t }
         }
         ctl.error?.let { e -> Row(Modifier.fillMaxWidth().background(a.pnl).clickable { ctl.error = null }.padding(8.dp)) { Lbl(a, e, a.org, 11) } }
         Box(Modifier.weight(1f)) {
@@ -89,7 +85,7 @@ fun RaceScreen(ctl: RaceController, a: AP, onBack: () -> Unit) {
                 RTab.REPLAY -> {
                     val s = ctl.a
                     if (s == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Lbl(a, "Load Race A first", a.dim, 13) }
-                    else ReplayView(a, s.df, ctl.b?.df, RACE_SPEEDS) { f ->
+                    else ReplayView(a, s.df, ctl.b?.df, RACE_SPEEDS, race = true, exportCsv = { "race_${LapMath.safeName(s.meta.text("car"))}_${LapMath.safeName(s.meta.text("track"))}.csv" to RaceLoader.exportCsv(s.df) }) { f ->
                         val dt = RaceLoader.dtSeries(f)
                         Np.cumsum(DoubleArray(f.n) { f["speed_kmh"][it] / 3.6 * dt[it] }) to Np.cummax(Np.nanToNum(f["t"]))
                     }
@@ -105,6 +101,10 @@ private fun RaceSetup(ctl: RaceController, a: AP, scope: kotlinx.coroutines.Coro
     var pick by remember { mutableStateOf<String?>(null) }
     val impA = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u: Uri? -> if (u != null) scope.launch { ctl.importA(ctx.contentResolver, u); onLoaded() } }
     val impB = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u: Uri? -> if (u != null) scope.launch { ctl.importB(ctx.contentResolver, u) } }
+    var html by remember { mutableStateOf("") }
+    val saveHtml = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { u: Uri? ->
+        if (u != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(html.toByteArray()) } }
+    }
     var csv by remember { mutableStateOf("") }
     val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { u: Uri? ->
         if (u != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(csv.toByteArray()) } }
@@ -115,24 +115,24 @@ private fun RaceSetup(ctl: RaceController, a: AP, scope: kotlinx.coroutines.Coro
         if (u != null && bytes != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(bytes) } }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Card(a, "RACE A") {
-            Lbl(a, ctl.a?.label ?: "No race loaded", if (ctl.a != null) a.fg else a.dim, 12)
+        Card(a, stringResource(R.string.race_a), accent = a.cyn) {
+            Lbl(a, ctl.a?.label ?: stringResource(R.string.not_loaded), if (ctl.a != null) a.fg else a.dim, 12)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TBtn(a, "Browse", Modifier.weight(1f)) { pick = "A" }
+                TBtn(a, stringResource(R.string.browse), Modifier.weight(1f), color = a.cyn) { pick = "A" }
                 TBtn(a, "Import", Modifier.weight(1f)) { impA.launch(arrayOf("*/*")) }
             }
         }
-        Card(a, "RACE B", accent = a.yel) {
-            Lbl(a, ctl.b?.label ?: "No race loaded", if (ctl.b != null) a.fg else a.dim, 12)
+        Card(a, stringResource(R.string.race_b), accent = a.acc) {
+            Lbl(a, ctl.b?.label ?: stringResource(R.string.not_loaded), if (ctl.b != null) a.fg else a.dim, 12)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TBtn(a, "Browse", Modifier.weight(1f)) { pick = "B" }
+                TBtn(a, stringResource(R.string.browse), Modifier.weight(1f), color = a.acc) { pick = "B" }
                 TBtn(a, "Import", Modifier.weight(1f)) { impB.launch(arrayOf("*/*")) }
                 TBtn(a, "Clear", Modifier.weight(1f)) { ctl.clearB() }
             }
         }
         val s = ctl.a
         if (s != null) {
-            Card(a, "LAP SPLITS", accent = a.org) {
+            Card(a, stringResource(R.string.lap_splits_race_a), accent = a.org) {
                 val splits = remember(s) { RaceLoader.lapSplitStats(s.df) }
                 val best = splits.filter { it.complete && it.timeS > 1 }.minByOrNull { it.timeS }
                 Row(Modifier.fillMaxWidth()) { for (h in listOf("Lap", "Time", "Avg", "Top", "Brk%", "Thr%")) Lbl(a, h, a.dim, 10, modifier = Modifier.weight(1f)) }
@@ -145,25 +145,27 @@ private fun RaceSetup(ctl: RaceController, a: AP, scope: kotlinx.coroutines.Coro
                     }
                 }
             }
-            Card(a, "STATS", accent = a.grn) {
+            Card(a, stringResource(R.string.stats_race_a), accent = a.grn) {
                 val stats = remember(s) { RaceLoader.buildStats(s.meta, s.df) }
                 for ((k, v) in stats) Row(Modifier.fillMaxWidth()) { Lbl(a, k, a.dim, 12, modifier = Modifier.weight(1f)); Lbl(a, v, a.fg, 12, true) }
             }
-            Card(a, "CORNER BASELINE", accent = a.prp) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TBtn(a, "Best lap in race", Modifier.weight(1f), on = !ctl.pbBaseline) { ctl.pbBaseline = false; ctl.epoch++ }
-                    TBtn(a, "Saved PB lap", Modifier.weight(1f), on = ctl.pbBaseline) { ctl.pbBaseline = true; ctl.epoch++ }
-                }
-            }
-            Card(a, "RACE NOTES", accent = a.yel) {
+            Card(a, stringResource(R.string.race_notes), accent = a.yel) {
                 Field(a, ctl.notes, "notes (this session only)", Modifier.fillMaxWidth()) { ctl.notes = it }
             }
-            Card(a, "EXPORT", accent = a.cyn) {
-                TBtn(a, "Export CSV", Modifier.fillMaxWidth()) {
+            Card(a, stringResource(R.string.export_section), accent = a.cyn) {
+                TBtn(a, stringResource(R.string.export_csv), Modifier.fillMaxWidth(), color = a.grn) {
                     csv = RaceLoader.exportCsv(s.df)
                     saveCsv.launch("race_${LapMath.safeName(s.meta.text("car"))}_${LapMath.safeName(s.meta.text("track"))}.csv")
                 }
-                TBtn(a, "Race Card (PNG)", Modifier.fillMaxWidth()) {
+                TBtn(a, stringResource(R.string.export_chart_html), Modifier.fillMaxWidth(), color = a.cyn) {
+                    scope.launch {
+                        val bl = ctl.baseline(s)
+                        val f = withContext(Dispatchers.Default) { RaceCharts.build(ctl.group, RaceCharts.Input(a, s.df, if (ctl.compare) ctl.b?.df else null, if (ctl.group == "Corners") bl else null)) }
+                        html = withContext(Dispatchers.Default) { Exports.chartHtml(ctx, a, f, "TRACE Race Analyst — " + ctl.group) }
+                        saveHtml.launch("trace_race_${LapMath.safeName(ctl.group)}_${LapMath.safeName(s.meta.text("track"))}.html")
+                    }
+                }
+                TBtn(a, stringResource(R.string.export_race_card), Modifier.fillMaxWidth(), color = a.prp) {
                     scope.launch {
                         val fonts = CardFonts(
                             ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_regular) ?: Typeface.MONOSPACE,
@@ -226,10 +228,12 @@ private fun RaceChartsTab(ctl: RaceController, a: AP) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (g in RaceCharts.GROUPS) TBtn(a, g, on = ctl.group == g) { ctl.group = g }
         }
+        Lbl(a, stringResource(R.string.charts), a.dim, 12, true, Modifier.padding(start = 12.dp, top = 4.dp))
         Row(Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            TBtn(a, if (ctl.compare) "Compare: ON" else "Compare: OFF", on = ctl.compare) { ctl.compare = !ctl.compare }
+            TBtn(a, if (ctl.compare) stringResource(R.string.compare_on) else stringResource(R.string.compare_off), on = ctl.compare) { ctl.compare = !ctl.compare }
+            TBtn(a, stringResource(if (ctl.pbBaseline) R.string.corner_baseline_pb else R.string.corner_baseline_best), color = a.cyn) { ctl.pbBaseline = !ctl.pbBaseline; ctl.epoch++ }
             Lbl(a, if (ctl.b == null) "(no Race B)" else ctl.b!!.label, a.dim, 11, modifier = Modifier.weight(1f))
-            TBtn(a, "HTML") {
+            TBtn(a, stringResource(R.string.export_chart_html), color = a.cyn) {
                 val f = fig ?: return@TBtn
                 scope.launch {
                     val ttl = "TRACE Race Analyst — ${s.label}"

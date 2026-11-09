@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -64,8 +65,8 @@ fun LeaderboardCard(ctl: LapController, a: AP, scope: CoroutineScope) {
     var dlg by remember { mutableStateOf<String?>(null) }   // "account" | "psn"
     var psn by remember { mutableStateOf(Account.psn(ctx)) }
     LaunchedEffect(ctl.a) { if (ctl.a != null) ctl.refreshTop10() }
-    Card(a, "LEADERBOARD", accent = a.yel) {
-        if (s == null) { Lbl(a, "Load Lap A to see the top 10", a.dim, 11); return@Card }
+    Card(a, stringResource(R.string.leaderboard_section), accent = a.yel) {
+        if (s == null) { Lbl(a, stringResource(R.string.top10_placeholder), a.dim, 11); return@Card }
         val (car, track) = ctl.carTrack(s)
         Lbl(a, "$car @ $track", a.cyn, 11)
         val rows = ctl.top10
@@ -82,12 +83,12 @@ fun LeaderboardCard(ctl: LapController, a: AP, scope: CoroutineScope) {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TBtn(a, "Submit lap", Modifier.weight(1f), color = a.grn) {
+            TBtn(a, stringResource(R.string.submit_to_leaderboard), Modifier.weight(1f), color = a.grn) {
                 val err = Leaderboard.submissionError(s.meta, s.df)
                 if (err != null) ctl.lbMsg = err
                 else dlg = if (Account.load(ctx).signedIn) "psn" else "account"
             }
-            TBtn(a, "Community line", Modifier.weight(1f), color = a.cyn) { scope.launch { ctl.loadConsensus() } }
+            TBtn(a, stringResource(R.string.load_community_line), Modifier.weight(1f), color = a.cyn) { scope.launch { ctl.loadConsensus() } }
         }
         TBtn(a, "Refresh top 10", Modifier.fillMaxWidth()) { scope.launch { ctl.refreshTop10() } }
         ctl.lbMsg?.let { m -> Lbl(a, m, a.org, 11, modifier = Modifier.clickable { ctl.lbMsg = null }) }

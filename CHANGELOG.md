@@ -5,6 +5,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-09
+**Android now matches the desktop app word for word.**
+- **One source of wording.** New `labels.py` holds every shared label; the desktop windows use it and the Android `strings.xml` is generated from it (`tools/gen_android_strings.py`). `tests/test_android_parity.py` fails the build if a desktop label is missing or different on Android, if the chart tabs differ, or if old wording comes back.
+- **Headers.** Live Dashboard, Lap Analyst and Race Analyst on Android show the red `GT7 TRACE` over the teal tool title with a `← Menu` button, like the desktop; the recent-apps title follows `TRACE <version> - <Tool>`.
+- **Launcher.** Both launchers show the version (`v1.0.3`) with `current` (green) or `update available: vX` (blue, opens the release page), and an `Ignore update checks` box that shares the existing CHECK FOR UPDATES setting. Checks run once in the background, compare versions numerically and skip drafts and pre-releases. The Android launcher's Race Analyst text, footer note and links now match the desktop.
+- **Live Dashboard (Android).** Preferences in desktop order, new AUTO LAP, `WEB UI :8080` with `ALLOW REMOTE (WEB UI)` (serves the same page as the desktop over your Wi-Fi, off by default) and `ALLOW REMOTE (METRICS)`.
+- **Analysts (Android).** Sidebar and export wording as on the desktop, Replay controls (`Play`, `Speed:`, readouts, Export CSV), `Export Chart HTML`, `Find Duplicate Laps` and the Dyno & Tune chart group with a weight prompt.
+- New files: `labels.py`, `updates.py`.
+
 ## [1.0.3] - 2026-11-08
 **A small design follow-up to 1.0.2. No new features.**
 - **Matching window titles.** The Live Dashboard, Lap Analyst and Race Analyst headers show `GT7 TRACE` with the tool name stacked under it in the top-left corner (the Menu button moved to the right). The analysts' tab pages no longer show a pale default border.

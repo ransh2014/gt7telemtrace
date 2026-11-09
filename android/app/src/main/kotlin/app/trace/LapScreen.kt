@@ -15,6 +15,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import app.trace.telemetry.LapClean
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -35,7 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.*
 
-private enum class LTab(val title: String) { SETUP("Laps"), CHARTS("Charts"), REPLAY("Replay") }
+private enum class LTab(@androidx.annotation.StringRes val title: Int) { SETUP(R.string.lap_a), REPLAY(R.string.tab_replay), CHARTS(R.string.tab_charts) }
 
 @Composable
 fun LapScreen(ctl: LapController, a: AP, onBack: () -> Unit) {
@@ -43,14 +46,9 @@ fun LapScreen(ctl: LapController, a: AP, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { ctl.refresh() }
     Column(Modifier.fillMaxSize().background(a.bg).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().background(a.pnl2).padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("‹", Modifier.clickable(onClick = onBack).padding(end = 6.dp), color = a.cyn, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            Lbl(a, "GT7", a.acc, 16, true); Lbl(a, "LAP ANALYST", a.cyn, 16, true)
-            Spacer(Modifier.weight(1f))
-            if (ctl.busy) Lbl(a, "loading…", a.dim, 11)
-        }
+        ToolHeader(stringResource(R.string.title_lap), a.pnl2, a.acc, a.cyn, a.pnl, a.fg, onBack) { if (ctl.busy) Lbl(a, "loading…", a.dim, 11) }
         Row(Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (t in LTab.values()) TBtn(a, t.title, Modifier.weight(1f), on = tab == t) { tab = t }
+            for (t in LTab.values()) TBtn(a, stringResource(t.title), Modifier.weight(1f), on = tab == t) { tab = t }
         }
         ctl.error?.let { e ->
             Row(Modifier.fillMaxWidth().background(a.pnl).clickable { ctl.error = null }.padding(8.dp)) { Lbl(a, e, a.org, 11) }
@@ -86,66 +84,83 @@ private fun SetupTab(ctl: LapController, a: AP, scope: kotlinx.coroutines.Corout
         val bytes = png
         if (u != null && bytes != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(bytes) } }
     }
+    var html by remember { mutableStateOf("") }
+    val saveHtml = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { u: Uri? ->
+        if (u != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(html.toByteArray()) } }
+    }
+    var dupGroups by remember { mutableStateOf<List<LapClean.Group>?>(null) }
+    var dupMsg by remember { mutableStateOf<String?>(null) }
     var notes by remember(ctl.a) { mutableStateOf((ctl.a?.meta?.get("notes") as? String) ?: "") }
     var notesSaved by remember(ctl.a) { mutableStateOf(false) }
     val overlayColors = listOf(a.yel, a.grn, a.prp, a.org, Color(0xFF96949c), Color(0xFFf2f0ec))
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Card(a, "LAP A") {
-            Lbl(a, ctl.a?.full ?: "No lap loaded", if (ctl.a != null) a.fg else a.dim, 12)
+        Card(a, stringResource(R.string.lap_a), accent = a.cyn) {
+            Lbl(a, ctl.a?.full ?: stringResource(R.string.not_loaded), if (ctl.a != null) a.fg else a.dim, 12)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TBtn(a, "Browse", Modifier.weight(1f)) { pick = "A" }
+                TBtn(a, stringResource(R.string.browse), Modifier.weight(1f), color = a.cyn) { pick = "A" }
                 TBtn(a, "Import", Modifier.weight(1f)) { importA.launch(arrayOf("*/*")) }
             }
         }
-        Card(a, "LAP B", accent = a.yel) {
-            Lbl(a, ctl.b?.full ?: "No lap loaded", if (ctl.b != null) a.fg else a.dim, 12)
+        Card(a, stringResource(R.string.lap_b), accent = a.acc) {
+            Lbl(a, ctl.b?.full ?: stringResource(R.string.not_loaded), if (ctl.b != null) a.fg else a.dim, 12)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TBtn(a, "Browse", Modifier.weight(1f)) { pick = "B" }
+                TBtn(a, stringResource(R.string.browse), Modifier.weight(1f), color = a.acc) { pick = "B" }
                 TBtn(a, "Import", Modifier.weight(1f)) { importB.launch(arrayOf("*/*")) }
                 TBtn(a, "Clear", Modifier.weight(1f)) { ctl.clearB() }
             }
         }
-        Card(a, "OVERLAY", accent = a.prp) {
+        Card(a, stringResource(R.string.overlay_section), accent = a.prp) {
             if (ctl.extras.isEmpty()) Lbl(a, "Extra laps drawn on the Inputs charts", a.dim, 11)
             for ((s, c) in ctl.extras) Lbl(a, s.label, Color(c), 11)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TBtn(a, "Add lap", Modifier.weight(1f)) { pick = "X" }
+                TBtn(a, stringResource(R.string.add_overlay_lap), Modifier.weight(1f), color = a.prp) { pick = "X" }
                 TBtn(a, "Clear", Modifier.weight(1f)) { ctl.clearExtras() }
             }
         }
         LeaderboardCard(ctl, a, scope)
         val s = ctl.a
         if (s != null) {
-            Card(a, "STATS", accent = a.grn) {
+            Card(a, stringResource(R.string.stats_lap_a), accent = a.grn) {
                 val stats = remember(s) { LapMath.buildStats(s.meta, s.df) }
                 for ((k, v) in stats) Row(Modifier.fillMaxWidth()) { Lbl(a, k, a.dim, 12, modifier = Modifier.weight(1f)); Lbl(a, v, a.fg, 12, true) }
                 LapMath.lapFuelUsed(s.df)?.let { Row(Modifier.fillMaxWidth()) { Lbl(a, "Fuel / lap", a.dim, 12, modifier = Modifier.weight(1f)); Lbl(a, it, a.fg, 12, true) } }
             }
-            Card(a, "SECTORS", accent = a.org) {
+            Card(a, stringResource(R.string.sectors_lap_a), accent = a.org) {
                 val sec = remember(s) { LapMath.buildSectorStats(s.df) }
                 Row(Modifier.fillMaxWidth()) { for (h in listOf("", "Time", "Avg", "Top")) Lbl(a, h, a.dim, 11, modifier = Modifier.weight(1f)) }
                 for (r in sec) Row(Modifier.fillMaxWidth()) { for (c in r) Lbl(a, c, a.fg, 12, modifier = Modifier.weight(1f)) }
             }
-            Card(a, "LAP NOTES", accent = a.yel) {
+            Card(a, stringResource(R.string.lap_notes), accent = a.yel) {
                 Field(a, notes, "notes for this lap", Modifier.fillMaxWidth()) { notes = it; notesSaved = false }
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TBtn(a, "Save notes", Modifier.weight(1f)) { scope.launch { notesSaved = ctl.saveNotes(notes) } }
+                    TBtn(a, stringResource(R.string.save_notes), Modifier.weight(1f)) { scope.launch { notesSaved = ctl.saveNotes(notes) } }
                     if (notesSaved) Lbl(a, "saved", a.grn, 11)
                     else if (s.file == null) Lbl(a, "imported lap: not saved", a.dim, 11)
                 }
             }
-            Card(a, "EXPORT", accent = a.cyn) {
-                TBtn(a, "Export CSV", Modifier.fillMaxWidth()) {
+            Card(a, stringResource(R.string.export_section), accent = a.cyn) {
+                TBtn(a, stringResource(R.string.export_csv), Modifier.fillMaxWidth(), color = a.grn) {
                     csv = LapMath.exportCsv(s.df)
                     saveCsv.launch("lap_${LapMath.safeName(s.meta.text("car"))}_${LapMath.safeName(s.meta.text("track"))}.csv")
                 }
-                TBtn(a, "Backup All Laps", Modifier.fillMaxWidth()) {
+                TBtn(a, stringResource(R.string.backup_all_laps), Modifier.fillMaxWidth(), color = a.yel) {
                     if (!Exports.hasLaps(ctl.lapsDir)) backupMsg = "No laps found to back up yet."
                     else saveZip.launch("trace_laps_backup_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.ROOT).format(java.util.Date())}.zip")
                 }
                 if (backupMsg.isNotEmpty()) Lbl(a, backupMsg, a.dim, 11)
-                TBtn(a, "Lap Card (PNG)", Modifier.fillMaxWidth()) {
+                TBtn(a, stringResource(R.string.export_chart_html), Modifier.fillMaxWidth(), color = a.cyn) {
+                    scope.launch {
+                        val extras = ctl.extrasFor()
+                        val f = withContext(Dispatchers.Default) { LapCharts.build(ctl.group, LapCharts.Input(a, s.df, if (ctl.compare) ctl.b?.df else null, extras, ctl.consensus, if (ctl.group == "Theoretical") ctl.theoryPool() else null, ctl.dynoIn(ctx))) }
+                        html = withContext(Dispatchers.Default) { Exports.chartHtml(ctx, a, f, "TRACE Lap Analyst — " + ctl.group) }
+                        saveHtml.launch("trace_${LapMath.safeName(ctl.group)}_${LapMath.safeName(s.meta.text("track"))}.html")
+                    }
+                }
+                TBtn(a, stringResource(R.string.find_duplicate_laps), Modifier.fillMaxWidth(), color = a.yel) {
+                    scope.launch { dupMsg = null; dupGroups = withContext(Dispatchers.IO) { LapClean.findDuplicates(ctl.lapsDir) } }
+                }
+                TBtn(a, stringResource(R.string.export_lap_card), Modifier.fillMaxWidth(), color = a.prp) {
                     scope.launch {
                         val fonts = CardFonts(
                             ResourcesCompat.getFont(ctx, R.font.jetbrainsmono_regular) ?: Typeface.MONOSPACE,
@@ -158,6 +173,23 @@ private fun SetupTab(ctl: LapController, a: AP, scope: kotlinx.coroutines.Corout
             }
         }
         Spacer(Modifier.height(20.dp))
+    }
+    dupGroups?.let { groups ->
+        val extras = groups.flatMap { it.extras }
+        AlertDialog(onDismissRequest = { dupGroups = null }, containerColor = a.bg,
+            title = { Lbl(a, "Duplicate laps", a.yel, 14, true) },
+            text = {
+                if (extras.isEmpty()) Lbl(a, "No duplicate laps found.", a.fg, 12)
+                else Column {
+                    Lbl(a, "Found ${extras.size} extra cop${if (extras.size == 1) "y" else "ies"} of laps you already have:", a.fg, 12)
+                    extras.take(12).forEach { Lbl(a, "  ${it.parentFile?.name}/${it.name}", a.dim, 11) }
+                    if (extras.size > 12) Lbl(a, "  ... and ${extras.size - 12} more", a.dim, 11)
+                    Lbl(a, "Move them to the _duplicates folder? The original of each lap stays where it is, and nothing is deleted.", a.fg, 12, modifier = Modifier.padding(top = 8.dp))
+                    dupMsg?.let { Lbl(a, it, a.grn, 12) }
+                }
+            },
+            confirmButton = { if (extras.isNotEmpty() && dupMsg == null) TBtn(a, "Move", on = true) { scope.launch { dupMsg = withContext(Dispatchers.IO) { val (m, e) = LapClean.moveDuplicates(groups, ctl.lapsDir); "Moved $m file(s) to _duplicates" + (if (e > 0) " ($e could not be moved)" else "") } } } },
+            dismissButton = { TBtn(a, if (dupMsg == null) "Cancel" else "Close") { dupGroups = null } })
     }
     val mode = pick
     if (mode != null) LapPicker(a, ctl.rows, "Pick lap " + (if (mode == "X") "(overlay)" else mode), { r ->
@@ -179,26 +211,35 @@ private fun ChartsTab(ctl: LapController, a: AP) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var html by remember { mutableStateOf("") }
+    var wDlg by remember { mutableStateOf(false) }
+    var wTxt by remember { mutableStateOf("") }
     val saveHtml = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { u: Uri? ->
         if (u != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(html.toByteArray()) } }
     }
+    if (wDlg) AlertDialog(onDismissRequest = { wDlg = false }, containerColor = a.bg,
+        title = { Lbl(a, "Car weight (kg)", a.yel, 14, true) },
+        text = { Field(a, wTxt, "300 - 5000", Modifier.fillMaxWidth()) { wTxt = it } },
+        confirmButton = { TBtn(a, "Save", on = true) { wTxt.toDoubleOrNull()?.let { ctl.setWeight(ctx, it) }; wDlg = false } },
+        dismissButton = { TBtn(a, "Cancel") { wDlg = false } })
     LaunchedEffect(ctl.epoch, ctl.group, ctl.compare, a) {
         fig = null; err = null
         val pool = if (ctl.group == "Theoretical") ctl.theoryPool() else null
         val extras = ctl.extrasFor()
         val dfb = if (ctl.compare) ctl.b?.df else null
         try {
-            fig = withContext(Dispatchers.Default) { LapCharts.build(ctl.group, LapCharts.Input(a, s.df, dfb, extras, ctl.consensus, pool)) }
+            fig = withContext(Dispatchers.Default) { LapCharts.build(ctl.group, LapCharts.Input(a, s.df, dfb, extras, ctl.consensus, pool, ctl.dynoIn(ctx))) }
         } catch (e: Exception) { err = "${e::class.simpleName}: ${e.message}" }
     }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (g in LapCharts.GROUPS) TBtn(a, g, on = ctl.group == g) { ctl.group = g }
         }
+        Lbl(a, stringResource(R.string.charts), a.dim, 12, true, Modifier.padding(start = 12.dp, top = 4.dp))
         Row(Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            TBtn(a, if (ctl.compare) "Compare: ON" else "Compare: OFF", on = ctl.compare) { ctl.compare = !ctl.compare }
+            TBtn(a, if (ctl.compare) stringResource(R.string.compare_on) else stringResource(R.string.compare_off), on = ctl.compare) { ctl.compare = !ctl.compare }
             Lbl(a, if (ctl.b == null) "(no Lap B)" else ctl.b!!.label, a.dim, 11, modifier = Modifier.weight(1f))
-            TBtn(a, "HTML") {
+            if (ctl.group == "Dyno & Tune") TBtn(a, "Set weight" + (ctl.weightOf(ctx, s)?.let { " (${it.toInt()} kg)" } ?: "")) { wDlg = true }
+            TBtn(a, stringResource(R.string.export_chart_html), color = a.cyn) {
                 val f = fig ?: return@TBtn
                 scope.launch {
                     val ttl = "TRACE Lap Analyst — ${s.label}"
@@ -242,7 +283,7 @@ private fun ReplayTab(ctl: LapController, a: AP) {
     if (s == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Lbl(a, "Load Lap A on the Laps tab", a.dim, 13) }; return }
     val track = s.meta.text("track") ?: ""
     var bins by remember(s) { mutableStateOf(if (track.isNotBlank()) Boundary.load(ctl.lapsDir, track) else null) }
-    ReplayView(a, s.df, ctl.b?.df, SPEEDS, boundary = bins, onSaveBoundary = {
+    ReplayView(a, s.df, ctl.b?.df, SPEEDS, exportCsv = { "lap_${LapMath.safeName(s.meta.text("car"))}_${LapMath.safeName(s.meta.text("track"))}.csv" to LapMath.exportCsv(s.df) }, boundary = bins, onSaveBoundary = {
         when {
             !s.df.has("world_x") -> "This lap has no GPS data to extract a boundary from."
             track.isBlank() -> "This lap has no track name recorded."
@@ -256,8 +297,14 @@ private fun ReplayTab(ctl: LapController, a: AP) {
 }
 
 @Composable
-fun ReplayView(a: AP, dfa: Frame, dfb: Frame?, speeds: List<Double>, boundary: List<Boundary.Bin>? = null, onSaveBoundary: (() -> String)? = null, xyOf: (Frame) -> Pair<DoubleArray, DoubleArray>) {
+fun ReplayView(a: AP, dfa: Frame, dfb: Frame?, speeds: List<Double>, race: Boolean = false, exportCsv: (() -> Pair<String, String>)? = null, boundary: List<Boundary.Bin>? = null, onSaveBoundary: (() -> String)? = null, xyOf: (Frame) -> Pair<DoubleArray, DoubleArray>) {
     var bMsg by remember { mutableStateOf("") }
+    val rctx = LocalContext.current
+    val rscope = rememberCoroutineScope()
+    var csvText by remember { mutableStateOf("") }
+    val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { u: Uri? ->
+        if (u != null) rscope.launch(Dispatchers.IO) { rctx.contentResolver.openOutputStream(u)?.use { it.write(csvText.toByteArray()) } }
+    }
     val SPEEDS = speeds
     val s = dfa
     val n = dfa.n
@@ -300,8 +347,8 @@ fun ReplayView(a: AP, dfa: Frame, dfb: Frame?, speeds: List<Double>, boundary: L
                 Lbl(a, txt, if (abs(d) < 0.0005) a.dim else if (d > 0) a.cyn else a.yel, 14, true)
             }
         }
-        InfoRow(a, "A", a.cyn, dfa, i)
-        if (dfb != null) InfoRow(a, "B", a.yel, dfb, ib)
+        InfoRow(a, if (race) stringResource(R.string.race_a) else stringResource(R.string.lap_a), a.cyn, dfa, i, race)
+        if (dfb != null) InfoRow(a, if (race) stringResource(R.string.race_b) else stringResource(R.string.lap_b), a.acc, dfb, ib, race)
         if (hasMap) {
             BoxWithConstraints(Modifier.fillMaxWidth().height(330.dp).background(a.pnl)) {
                 val dn = androidx.compose.ui.platform.LocalDensity.current
@@ -335,7 +382,7 @@ fun ReplayView(a: AP, dfa: Frame, dfb: Frame?, speeds: List<Double>, boundary: L
                     }
                     val size = 0.022 * max(bnd.second - bnd.first, 1.0) * 1.0
                     carTri(dfa, i, frac, xf, size, a.cyn, bnd)
-                    if (dfb != null) carTri(dfb, ib, 0.0, xf, size, a.yel, bnd)
+                    if (dfb != null) carTri(dfb, ib, 0.0, xf, size, a.acc, bnd)
                 }
             }
         } else Box(Modifier.fillMaxWidth().height(80.dp).background(a.pnl), contentAlignment = Alignment.Center) { Lbl(a, "This lap has no GPS track", a.dim, 12) }
@@ -345,14 +392,18 @@ fun ReplayView(a: AP, dfa: Frame, dfb: Frame?, speeds: List<Double>, boundary: L
             colors = SliderDefaults.colors(thumbColor = a.cyn, activeTrackColor = a.cyn, inactiveTrackColor = a.dim2),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-            TBtn(a, "⏮", Modifier.weight(1f)) { pos = 0.0; playing = false }
-            TBtn(a, if (playing) "⏸" else "▶", Modifier.weight(1f), on = playing) { if (pos >= n - 1) pos = 0.0; playing = !playing }
-            TBtn(a, "${SPEEDS[spdIdx].toString().removeSuffix(".0")}×", Modifier.weight(1f)) { spdIdx = (spdIdx + 1) % SPEEDS.size }
+            TBtn(a, if (playing) stringResource(R.string.pause) else stringResource(R.string.play), Modifier.weight(2f), on = playing, color = a.grn) { if (pos >= n - 1) pos = 0.0; playing = !playing }
+            TBtn(a, stringResource(R.string.restart), Modifier.weight(1f)) { pos = 0.0; playing = false }
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Lbl(a, "  " + stringResource(R.string.speed_label), a.dim, 12)
+            SPEEDS.forEachIndexed { k, sp -> TBtn(a, stringResource(R.string.speed_fmt, sp.toString()), on = spdIdx == k, color = a.yel) { spdIdx = k } }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-            TBtn(a, if (synced) "Synced" else "Real-Time", Modifier.weight(1f)) { synced = !synced }
-            TBtn(a, "Heatmap", Modifier.weight(1f), on = heat) { heat = !heat }
-            if (onSaveBoundary != null) TBtn(a, "Save Boundary", Modifier.weight(1f), on = boundary != null) { bMsg = onSaveBoundary() }
+            TBtn(a, if (synced) stringResource(R.string.mode_synced) else stringResource(R.string.mode_realtime), Modifier.weight(1f), color = if (synced) a.cyn else a.org) { synced = !synced }
+            TBtn(a, if (heat) stringResource(R.string.heatmap_on) else stringResource(R.string.heatmap), Modifier.weight(1f), on = heat) { heat = !heat }
+            if (exportCsv != null) TBtn(a, stringResource(R.string.replay_export_csv), Modifier.weight(1f), color = a.fg) { val (nm, txt) = exportCsv(); csvText = txt; saveCsv.launch(nm) }
+            if (onSaveBoundary != null) TBtn(a, stringResource(R.string.save_boundary), Modifier.weight(1f), on = boundary != null) { bMsg = onSaveBoundary() }
         }
         if (bMsg.isNotEmpty()) Lbl(a, bMsg, a.dim, 11)
         Spacer(Modifier.height(20.dp))
@@ -395,24 +446,32 @@ private fun DrawScope.carTri(df: Frame, i: Int, frac: Double, xf: MapXf, size: D
 }
 
 @Composable
-private fun InfoRow(a: AP, name: String, c: Color, df: Frame, i: Int) {
+private fun InfoRow(a: AP, name: String, c: Color, df: Frame, i: Int, race: Boolean = false) {
     val ii = i.coerceIn(0, df.n - 1)
     val thr = if (df.has("throttle")) df["throttle"][ii] else 0.0
     val brk = if (df.has("brake")) df["brake"][ii] else 0.0
-    Column(Modifier.fillMaxWidth().background(a.pnl).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Lbl(a, name, c, 13, true)
-            Lbl(a, LapMath.fmtTime(df["t"][ii], 2), a.fg, 12)
-            Lbl(a, "${fixed(df["speed_kmh"][ii], 0)} km/h", a.fg, 12)
-            Lbl(a, "G${df["gear"][ii].toInt()}", a.fg, 12)
-            if (df.has("rpm")) Lbl(a, "${fixed(df["rpm"][ii], 0)} rpm", a.fg, 12)
-            Lbl(a, "${fixed(ii.toDouble() / max(1, df.n - 1) * 100, 0)}%", a.dim, 12)
+    @Composable fun cell(label: String, value: String, bar: Pair<Double, Color>? = null) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Lbl(a, label, a.dim, 9); Lbl(a, value, c, 12, true)
+            if (bar != null) Box(Modifier.width(44.dp).height(5.dp).background(a.dim2)) { Box(Modifier.fillMaxHeight().fillMaxWidth(bar.first.toFloat().coerceIn(0f, 1f)).background(bar.second)) }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Lbl(a, "THR", a.grn, 10)
-            Box(Modifier.weight(1f).height(8.dp).background(a.dim2)) { Box(Modifier.fillMaxHeight().fillMaxWidth(thr.toFloat().coerceIn(0f, 1f)).background(a.grn)) }
-            Lbl(a, "BRK", a.acc, 10)
-            Box(Modifier.weight(1f).height(8.dp).background(a.dim2)) { Box(Modifier.fillMaxHeight().fillMaxWidth(brk.toFloat().coerceIn(0f, 1f)).background(a.acc)) }
+    }
+    val rpmTxt = if (df.has("rpm")) fixed(df["rpm"][ii], 0) else "—"
+    val lapTxt = if (df.has("lap_number")) df["lap_number"][ii].toInt().toString() else "—"
+    val pct = fixed(ii.toDouble() / max(1, df.n - 1) * 100, 0) + "%"
+    Column(Modifier.fillMaxWidth().background(a.pnl2).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Lbl(a, name, c, 12, true)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+            cell(stringResource(R.string.read_time), LapMath.fmtTime(df["t"][ii], 2))
+            cell(stringResource(R.string.read_speed), fixed(df["speed_kmh"][ii], 0))
+            cell(stringResource(R.string.read_gear), df["gear"][ii].toInt().toString())
+            cell(stringResource(R.string.read_throttle), fixed(thr * 100, 0) + "%", thr to a.grn)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+            cell(stringResource(R.string.read_brake), fixed(brk * 100, 0) + "%", brk to a.acc)
+            cell(stringResource(R.string.read_rpm), rpmTxt)
+            if (race) cell(stringResource(R.string.read_lap), lapTxt)
+            cell(stringResource(if (race) R.string.read_race_pct else R.string.read_lap_pct), pct)
         }
     }
 }

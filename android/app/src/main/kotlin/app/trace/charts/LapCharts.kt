@@ -8,11 +8,11 @@ import kotlin.math.*
 /** The 19 chart groups of the Lap Analyst, in the PC order. */
 object LapCharts {
     val GROUPS = listOf("Inputs", "Engine", "Tyres", "Dynamics", "Maps", "G-Force", "Fuel", "Braking", "Sectors", "Traction",
-        "Tele Diff", "Ratings", "Heat Maps", "Timeline", "Extended", "Consensus", "Style", "Corners", "Theoretical")
+        "Tele Diff", "Ratings", "Heat Maps", "Timeline", "Extended", "Consensus", "Style", "Corners", "Theoretical", "Dyno & Tune")
 
     class Input(
         val a: AP, val df: Frame, val dfb: Frame?, val extra: List<Extra> = emptyList(),
-        val consensus: List<Map<String, Any?>>? = null, val pool: List<Pair<String, Frame>>? = null,
+        val consensus: List<Map<String, Any?>>? = null, val pool: List<Pair<String, Frame>>? = null, val dyno: DynoIn? = null,
     )
 
     fun build(name: String, i: Input): Fig {
@@ -37,6 +37,7 @@ object LapCharts {
             "Style" -> c.style()
             "Corners" -> c.corners()
             "Theoretical" -> c.theoretical(i.pool)
+            "Dyno & Tune" -> c.dynoFig(i.dyno)
             else -> Fig(listOf(c.msg("Unknown chart group")), 1)
         }
     }

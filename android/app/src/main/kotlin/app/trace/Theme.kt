@@ -27,18 +27,19 @@ object D {
     val bg = c(0x08080a); val pnl = c(0x0e0e11); val tile = c(0x202024); val hdr = c(0x17171b)
     val acc = c(0xe2455a); val hi = c(0x5fb3a8); val fg = c(0xf2f0ec); val dim = c(0x605e68)
     val good = c(0x3c9a5f); val amb = c(0xc9a24b); val red = c(0xe2455a); val cold = c(0x1c5c58)
-    val map = c(0x050506); val trough = c(0x202024); val log = c(0x5fb3a8); val frame = c(0x2f2f31)
+    val blue = c(0x4da3ff); val map = c(0x050506); val trough = c(0x202024); val log = c(0x5fb3a8); val frame = c(0x2f2f31)
 }
 
 /** Lap / Race Analyst + launcher palette. */
 data class AP(
     val bg: Color, val pnl: Color, val pnl2: Color, val dim2: Color, val acc: Color, val cyn: Color,
     val grn: Color, val yel: Color, val org: Color, val prp: Color, val fg: Color, val dim: Color,
+    val blue: Color,   // links / "update available": a clear blue, not the petrol teal (theme.py BLUE_LINK)
 ) {
     companion object {
         val Dark = AP(c(0x08080a), c(0x0e0e11), c(0x17171b), c(0x202024), c(0xe2455a), c(0x5fb3a8),
-            c(0x3c9a5f), c(0xc9a24b), c(0xc8102e), c(0x96949c), c(0xf2f0ec), c(0x605e68))
+            c(0x3c9a5f), c(0xc9a24b), c(0xc8102e), c(0x96949c), c(0xf2f0ec), c(0x605e68), c(0x4da3ff))
         val Light = AP(c(0xf4f2ee), c(0xffffff), c(0xebe8e2), c(0xe2dfd8), c(0xc8102e), c(0x1c5c58),
-            c(0x23743f), c(0x8a6a1c), c(0x8c0c22), c(0x55535c), c(0x16161a), c(0x7a7880))
+            c(0x23743f), c(0x8a6a1c), c(0x8c0c22), c(0x55535c), c(0x16161a), c(0x7a7880), c(0x1f6fd1))
     }
 }

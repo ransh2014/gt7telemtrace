@@ -26,6 +26,7 @@ from matplotlib.patches import Polygon as MplPolygon
 
 warnings.filterwarnings("ignore")
 
+from . import labels as L  # noqa: E402
 from . import (  # noqa: E402
     __version__,
     consistency,
@@ -1478,22 +1479,22 @@ class Replay:
 
         ctrl = tk.Frame(parent, bg=PNL, pady=5)
         ctrl.pack(fill="x", padx=4, pady=(2,0))
-        self._pbtn = tk.Button(ctrl, text="▶  Play", command=self._toggle,
+        self._pbtn = tk.Button(ctrl, text=L.PLAY, command=self._toggle,
                                 bg=PNL2, fg=GRN, relief="flat", font=FONTB,
                                 padx=10, pady=2, cursor="hand2")
         self._pbtn.pack(side="left", padx=(8,4))
-        tk.Button(ctrl, text="⏮", command=self._reset,
+        tk.Button(ctrl, text=L.RESTART, command=self._reset,
                   bg=PNL2, fg=FG, relief="flat", font=FONT,
                   padx=6, pady=2, cursor="hand2").pack(side="left", padx=2)
-        tk.Label(ctrl, text="  Speed:", fg=DIM, bg=PNL, font=FONT).pack(side="left")
+        tk.Label(ctrl, text="  " + L.SPEED_LABEL, fg=DIM, bg=PNL, font=FONT).pack(side="left")
         for i, s in enumerate(self.SPEEDS):
-            tk.Button(ctrl, text=f"{s}×", bg=PNL2, fg=YLW, relief="flat", font=FONTL,
+            tk.Button(ctrl, text=L.SPEED_FMT.format(speed=s), bg=PNL2, fg=YLW, relief="flat", font=FONTL,
                       padx=5, pady=2, cursor="hand2",
                       command=lambda i=i: self._spd(i)).pack(side="left", padx=1)
-        self._mode_btn = tk.Button(ctrl, text="🔀 Synced", command=self._toggle_mode,
+        self._mode_btn = tk.Button(ctrl, text=L.MODE_SYNCED, command=self._toggle_mode,
                                     bg=DIM2, fg=CYN, relief="flat", font=FONTL,
                                     padx=8, pady=2, cursor="hand2")
-        tk.Button(ctrl, text="📄 Export CSV", command=self._export_csv,
+        tk.Button(ctrl, text=L.REPLAY_EXPORT_CSV, command=self._export_csv,
                   bg=DIM2, fg=FG, relief="flat", font=FONTL,
                   padx=8, pady=2, cursor="hand2").pack(side="right", padx=8)
 
@@ -1546,10 +1547,10 @@ class Replay:
     def _toggle_mode(self):
         if self._dual_mode == "synced":
             self._dual_mode = "realtime"
-            self._mode_btn.config(text="⏱ Real-Time", fg=ORG)
+            self._mode_btn.config(text=L.MODE_REALTIME, fg=ORG)
         else:
             self._dual_mode = "synced"
-            self._mode_btn.config(text="🔀 Synced", fg=CYN)
+            self._mode_btn.config(text=L.MODE_SYNCED, fg=CYN)
         self._update()
 
     def _export_csv(self):
@@ -1576,7 +1577,7 @@ class Replay:
         self._cum_a = self._cum_dist(self._df)
         self._rate  = self._sample_rate(self._df)
         self._idx = 0; self._playing = False
-        self._pbtn.config(text="▶  Play", fg=GRN)
+        self._pbtn.config(text=L.PLAY, fg=GRN)
         self._sv.set(0); self._delta_var.set("")
         self._draw_base(); self._update()
 
@@ -1757,11 +1758,11 @@ class Replay:
             self._update()
         except Exception:
             self._playing = False
-            self._pbtn.config(text="▶  Play", fg=GRN)
+            self._pbtn.config(text=L.PLAY, fg=GRN)
             return
         if self._idx >= len(self._df)-1:
             self._playing = False
-            self._pbtn.config(text="▶  Play", fg=GRN)
+            self._pbtn.config(text=L.PLAY, fg=GRN)
         else:
             self._after_id = self._canvas.get_tk_widget().after(1000//self.FPS, self._tick)
 
@@ -1770,7 +1771,7 @@ class Replay:
         self._playing = not self._playing
         if self._playing:
             if self._idx >= len(self._df)-1: self._idx = 0
-            self._pbtn.config(text="⏸  Pause", fg=YLW)
+            self._pbtn.config(text=L.PAUSE, fg=YLW)
             # A frame queued before a quick pause/play would otherwise start a
             # second tick chain alongside this one, doubling playback speed.
             if self._after_id is not None:
@@ -1779,10 +1780,10 @@ class Replay:
             self._last_tick_t = None
             self._tick()
         else:
-            self._pbtn.config(text="▶  Play", fg=GRN)
+            self._pbtn.config(text=L.PLAY, fg=GRN)
 
     def _reset(self):
-        self._playing = False; self._pbtn.config(text="▶  Play", fg=GRN)
+        self._playing = False; self._pbtn.config(text=L.PLAY, fg=GRN)
         self._idx = 0; self._update()
 
     def _spd(self, i): self._si = i
@@ -1796,7 +1797,7 @@ class Replay:
 class AnalystApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title(f"TRACE {__version__} - Race Analyst")
+        self.title(L.window_title(L.TOOL_RACE, __version__))
         self.configure(bg=BG)
         theme.fit_window(self, 1380, 860, 1100, 700)
         self._da = self._dfa = None
@@ -1835,12 +1836,12 @@ class AnalystApp(tk.Tk):
 
         hdr = tk.Frame(self, bg=PNL2, pady=7); hdr.pack(fill="x")
         if FROM_MENU:
-            tk.Button(hdr, text="\u2190 Menu", command=self._go_menu, bg=PNL, fg=FG, relief="flat",
+            tk.Button(hdr, text=L.MENU_BUTTON, command=self._go_menu, bg=PNL, fg=FG, relief="flat",
                       font=FONT, padx=10, pady=2, cursor="hand2").pack(side="right", padx=(4, 12))
         brand = tk.Frame(hdr, bg=PNL2)   # brand + tool name, stacked in the top-left corner
         brand.pack(side="left", padx=(10, 12))
-        tk.Label(brand, text="GT7 TRACE", fg=ACC, bg=PNL2, font=(theme.MONO, 8, "bold")).pack(anchor="w")
-        tk.Label(brand, text="RACE ANALYST", fg=CYN, bg=PNL2,
+        tk.Label(brand, text=L.HEADER_BRAND, fg=ACC, bg=PNL2, font=(theme.MONO, 8, "bold")).pack(anchor="w")
+        tk.Label(brand, text=L.TITLE_RACE, fg=CYN, bg=PNL2,
                  font=(theme.DISPLAY, 15, "bold")).pack(anchor="w")
         self._hdr = tk.Label(hdr, text="", fg=DIM, bg=PNL2, font=FONT)
         self._hdr.pack(side="right", padx=16)
@@ -1869,33 +1870,33 @@ class AnalystApp(tk.Tk):
             return f
 
         fa = _section("RACE A", CYN)
-        self._la = tk.Label(fa, text="not loaded", fg=DIM, bg=PNL, font=FONTL,
+        self._la = tk.Label(fa, text=L.NOT_LOADED, fg=DIM, bg=PNL, font=FONTL,
                              wraplength=theme.px(236), justify="left")
         self._la.pack(anchor="w", padx=8, pady=2)
-        tk.Button(fa, text="📂  Browse", command=lambda: self._load("a"),
+        tk.Button(fa, text=L.BROWSE, command=lambda: self._load("a"),
                   bg=DIM2, fg=CYN, relief="flat", font=FONT, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(2,4))
 
         fb = _section("RACE B", ACC)
-        self._lb = tk.Label(fb, text="not loaded", fg=DIM, bg=PNL, font=FONTL,
+        self._lb = tk.Label(fb, text=L.NOT_LOADED, fg=DIM, bg=PNL, font=FONTL,
                              wraplength=theme.px(236), justify="left")
         self._lb.pack(anchor="w", padx=8, pady=2)
-        tk.Button(fb, text="📂  Browse", command=lambda: self._load("b"),
+        tk.Button(fb, text=L.BROWSE, command=lambda: self._load("b"),
                   bg=DIM2, fg=ACC, relief="flat", font=FONT, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(2,4))
 
         fe = _section("EXPORT", DIM)
-        tk.Button(fe, text="💾  Export CSV", command=self._export_csv,
+        tk.Button(fe, text=L.EXPORT_CSV, command=self._export_csv,
                   bg=DIM2, fg=GRN, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(2,2))
-        tk.Button(fe, text="🌐  Export Chart HTML", command=self._export_html,
+        tk.Button(fe, text=L.EXPORT_CHART_HTML, command=self._export_html,
                   bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
-        tk.Button(fe, text="🖼  Export Race Card (PNG)", command=self._export_card,
+        tk.Button(fe, text=L.EXPORT_RACE_CARD, command=self._export_card,
                   bg=DIM2, fg=PRP, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
-        tk.Label(p, text="LAP SPLITS — RACE A", fg=DIM, bg=PNL2,
+        tk.Label(p, text=L.LAP_SPLITS_RACE_A, fg=DIM, bg=PNL2,
                  font=FONTL).pack(anchor="w", padx=12, pady=(6,2))
         self._sec_outer = tk.Frame(p, bg=PNL2); self._sec_outer.pack(fill="both", padx=6, expand=False)
         self._sec_canvas = tk.Canvas(self._sec_outer, bg=PNL2, highlightthickness=0, height=theme.px(140))
@@ -1908,12 +1909,12 @@ class AnalystApp(tk.Tk):
         self._sec_f.bind("<Configure>",
                           lambda e: self._sec_canvas.configure(scrollregion=self._sec_canvas.bbox("all")))
 
-        tk.Label(p, text="STATS — RACE A", fg=DIM, bg=PNL2,
+        tk.Label(p, text=L.STATS_RACE_A, fg=DIM, bg=PNL2,
                  font=FONTL).pack(anchor="w", padx=12, pady=(6,2))
         self._sf = tk.Frame(p, bg=PNL2); self._sf.pack(fill="x", padx=6)
 
         fn = tk.Frame(p, bg=PNL, pady=4); fn.pack(fill="x", padx=6, pady=(6,4))
-        tk.Label(fn, text="RACE NOTES", fg=DIM, bg=PNL, font=FONTL).pack(anchor="w", padx=8)
+        tk.Label(fn, text=L.RACE_NOTES, fg=DIM, bg=PNL, font=FONTL).pack(anchor="w", padx=8)
         self._notes = tk.Text(fn, height=5, bg=PNL2, fg=FG, font=FONTL,
                               insertbackground=CYN, relief="flat",
                               wrap="word", padx=4, pady=4)
@@ -1945,12 +1946,12 @@ class AnalystApp(tk.Tk):
     def _build_charts(self, parent):
         hdr = tk.Frame(parent, bg=PNL, pady=4); hdr.pack(fill="x")
         tk.Label(hdr, text="CHARTS", fg=DIM, bg=PNL, font=FONTB).pack(side="left", padx=12)
-        self._cmp_btn = tk.Button(hdr, text="⚡ Compare: OFF",
+        self._cmp_btn = tk.Button(hdr, text=L.COMPARE_OFF,
                                    command=self._toggle_compare,
                                    bg=DIM2, fg=DIM, relief="flat", font=FONTB,
                                    padx=10, pady=2, cursor="hand2")
         self._cmp_btn.pack(side="right", padx=10)
-        self._base_btn = tk.Button(hdr, text="Corner baseline: best lap in race",
+        self._base_btn = tk.Button(hdr, text=L.CORNER_BASELINE_BEST,
                                    command=self._toggle_baseline,
                                    bg=DIM2, fg=CYN, relief="flat", font=FONTB,
                                    padx=10, pady=2, cursor="hand2")
@@ -1971,9 +1972,9 @@ class AnalystApp(tk.Tk):
     def _toggle_compare(self):
         self._compare_mode = not self._compare_mode
         if self._compare_mode:
-            self._cmp_btn.config(text="⚡ Compare: ON", fg=CYN, bg=PNL2)
+            self._cmp_btn.config(text=L.COMPARE_ON, fg=CYN, bg=PNL2)
         else:
-            self._cmp_btn.config(text="⚡ Compare: OFF", fg=DIM, bg=DIM2)
+            self._cmp_btn.config(text=L.COMPARE_OFF, fg=DIM, bg=DIM2)
         for k in list(self._cfigs):
             if self._cfigs[k]: plt.close(self._cfigs[k])
             self._cfigs[k] = None
@@ -1983,8 +1984,7 @@ class AnalystApp(tk.Tk):
         """Corners tab: score every lap against the race's best lap, or against
         your saved PB lap for this track and car."""
         self._baseline_mode = "pb" if self._baseline_mode == "best" else "best"
-        self._base_btn.config(text="Corner baseline: " + ("saved PB lap" if self._baseline_mode == "pb"
-                                                          else "best lap in race"))
+        self._base_btn.config(text=L.CORNER_BASELINE_PB if self._baseline_mode == "pb" else L.CORNER_BASELINE_BEST)
         if self._cfigs.get("Corners"):
             plt.close(self._cfigs["Corners"])
         self._cfigs["Corners"] = None

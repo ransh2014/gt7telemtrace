@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import app.trace.charts.*
+import app.trace.charts.DynoIn
 import app.trace.telemetry.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -142,6 +143,17 @@ class LapController(val lapsDir: File) {
             else -> "Couldn't reach the leaderboard -- check your internet connection and try again."
         }
     }
+
+    private fun ratios(s: Slot?): List<Double> = (s?.meta?.get("gear_ratios") as? List<*>)?.map { numOf(it) } ?: emptyList()
+    private fun carOf(s: Slot?): String = (s?.meta?.text("car") ?: "").trim().lowercase()
+    fun weightOf(ctx: android.content.Context, s: Slot?): Double? =
+        carOf(s).takeIf { it.isNotEmpty() }?.let { ctx.getSharedPreferences("trace_weights", android.content.Context.MODE_PRIVATE).getFloat(it, 0f).toDouble() }?.takeIf { it in 300.0..5000.0 }
+    fun setWeight(ctx: android.content.Context, kg: Double): Boolean {
+        val k = carOf(a).takeIf { it.isNotEmpty() && kg in 300.0..5000.0 } ?: return false
+        ctx.getSharedPreferences("trace_weights", android.content.Context.MODE_PRIVATE).edit().putFloat(k, kg.toFloat()).apply(); epoch++; return true
+    }
+    fun dynoIn(ctx: android.content.Context) = DynoIn(ratios(a), a?.meta?.num("tyre_radius_m")?.takeIf { it > 0 }, weightOf(ctx, a),
+        ratios(b), b?.meta?.num("tyre_radius_m")?.takeIf { it > 0 }, weightOf(ctx, b))
 
     fun extrasFor(): List<Extra> = extras.map { Extra(it.first.label, it.first.df, Color(it.second)) }
 

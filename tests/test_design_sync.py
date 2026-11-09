@@ -60,9 +60,9 @@ def test_android_dark_analyst_palette_matches_theme_py():
     kt = ANDROID_THEME.read_text(encoding="utf-8")
     dark = re.search(r"val Dark = AP\((.*?)\)\n", kt, re.S).group(1)
     got = ["#" + h.lower() for h in re.findall(r"c\(0x([0-9a-fA-F]{6})\)", dark)]
-    # AP(bg, pnl, pnl2, dim2, acc, cyn, grn, yel, org, prp, fg, dim)
+    # AP(bg, pnl, pnl2, dim2, acc, cyn, grn, yel, org, prp, fg, dim, blue)
     want = [theme.BG, theme.BG1, theme.BG2, theme.BG3, theme.RED_2, theme.TEAL_2, theme.GREEN, theme.GOLD, theme.RED,
-            theme.MID, theme.TXT, theme.DIM]
+            theme.MID, theme.TXT, theme.DIM, theme.BLUE_LINK]
     assert got == [w.lower() for w in want]
 
 

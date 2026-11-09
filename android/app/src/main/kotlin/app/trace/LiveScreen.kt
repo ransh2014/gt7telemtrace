@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,10 +76,8 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(D.bg).statusBarsPadding().navigationBarsPadding()
         .verticalScroll(rememberScrollState()).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
-        Row(Modifier.fillMaxWidth().background(D.hdr).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("‹", Modifier.clickable(onClick = onBack).padding(end = 10.dp), color = D.acc, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            Text("TRACE  LIVE DASHBOARD", Modifier.weight(1f), color = D.acc, fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
-            Text(if (online) "● LIVE" else "● OFFLINE", color = if (online) D.good else D.dim, fontFamily = Mono, fontSize = 11.sp)
+        ToolHeader(stringResource(R.string.title_live), D.hdr, D.acc, D.hi, D.tile, D.fg, onBack) {
+            Text(stringResource(if (online) R.string.status_online else R.string.status_offline), color = if (online) D.good else D.dim, fontFamily = Mono, fontSize = 11.sp, maxLines = 1)
         }
 
         c.battWarn?.let { pct ->
@@ -89,86 +88,93 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
         }
 
         Grid(2, 6.dp) {
-            DBtn(if (c.raceRec) "Stop Race Recording" else "Record Race", bg = if (c.raceRec) D.acc else D.tile, fg = if (c.raceRec) Color.White else D.fg) { c.toggleRace() }
-            DBtn(when (c.recLapState) { 1 -> "Waiting for start line..."; 2 -> "Stop Recording"; else -> "Record Lap" },
+            DBtn(if (c.raceRec) stringResource(R.string.stop_race_recording) else stringResource(R.string.record_race), bg = if (c.raceRec) D.acc else D.tile, fg = if (c.raceRec) Color.White else D.fg) { c.toggleRace() }
+            DBtn(when (c.recLapState) { 1 -> stringResource(R.string.waiting_for_start_line); 2 -> stringResource(R.string.stop_recording); else -> stringResource(R.string.record_lap) },
                 bg = when (c.recLapState) { 1 -> D.amb; 2 -> D.acc; else -> D.tile }, fg = if (c.recLapState == 1) Color.Black else if (c.recLapState == 2) Color.White else D.fg) { c.toggleLap() }
-            DBtn("Session Summary") { showSummary = true }
-            DBtn("Export Session") { c.exportSession() }
+            DBtn(stringResource(R.string.session_summary)) { showSummary = true }
+            DBtn(stringResource(R.string.export_session)) { c.exportSession() }
         }
 
         Column(Modifier.fillMaxWidth().background(D.hdr).padding(10.dp, 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Field("CONSOLE IP") {
+            Field(stringResource(R.string.console_ip)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     DInput(c.ip, { c.ip = it; c.onIpChange() }, Modifier.weight(1f))
-                    DBtn(if (detecting) "..." else "Auto-Detect", Modifier.width(112.dp), fg = D.hi) {
+                    DBtn(if (detecting) "..." else stringResource(R.string.auto_detect), Modifier.width(112.dp), fg = D.hi) {
                         if (!detecting) { detecting = true; c.discover { detecting = false } }
                     }
                 }
             }
-            Field("TRACK") { Picker(c.track, c.db.allTrackNames(), { c.onTrack(it) }, Modifier.fillMaxWidth(), D.fg) }
-            Field("CAR") { DInput(c.car, { c.onCar(it) }, Modifier.fillMaxWidth(), color = D.fg) }
-            Field("REC RATE") {
+            Field(stringResource(R.string.track)) { Picker(c.track, c.db.allTrackNames(), { c.onTrack(it) }, Modifier.fillMaxWidth(), D.fg) }
+            Field(stringResource(R.string.car)) { DInput(c.car, { c.onCar(it) }, Modifier.fillMaxWidth(), color = D.fg) }
+            Field(stringResource(R.string.rec_rate)) {
                 var open by remember { mutableStateOf(false) }
                 Box { DInput("${c.rate} Hz", {}, Modifier.fillMaxWidth().clickable { open = true }, readOnly = true)
                     DropdownMenu(open, { open = false }) { for (r in listOf(10, 20, 30, 60)) DropdownMenuItem({ Text("$r Hz", fontFamily = Mono) }, { c.onRate(r); open = false }) } }
             }
-            Grid(2, 8.dp) { Check("ALLOW REMOTE", c.remoteOn) { c.onRemote(it) }; Check("METRICS :9109", c.metricsOn) { c.onMetrics(it) } }
-            Text("PREFERENCES", color = D.dim, fontFamily = Mono, fontSize = 10.sp)
             Grid(2, 8.dp) {
-                Check("VOICE ALERTS", c.voiceOn) { c.onVoice(it) }; Check("NOTIFICATIONS", c.notifyOn) { c.onNotify(it) }; Check("TOP-LAP GHOST", c.ghostEnabled) { c.onGhostToggle(it) }
-                Check("CHECK FOR UPDATES", c.updateOn) { c.onUpdate(it) }; Check("SHARE USAGE DATA", c.analyticsOn) { c.onAnalytics(it) }; Check("DEBUG LOG", c.debugOn) { c.onDebug(it) }
-                Check("KEEP AWAKE", c.keepAwake) { c.onKeepAwake(it) }
+                Check(stringResource(R.string.webui_fmt, WebUiServer.PORT), c.webUiOn) { c.onWebUi(it) }
+                Check(stringResource(R.string.allow_remote_webui), c.webRemoteOn) { c.onWebRemote(it) }
+                Check(stringResource(R.string.allow_remote_metrics), c.remoteOn) { c.onRemote(it) }
+                Check(stringResource(R.string.metrics_fmt, 9109), c.metricsOn) { c.onMetrics(it) }
+            }
+            if (c.webUiOn && c.webUiUrl.isNotEmpty()) Text(c.webUiUrl, Modifier.clickable { }, color = D.acc, fontFamily = Mono, fontSize = 11.sp)
+            Text(stringResource(R.string.preferences), color = D.dim, fontFamily = Mono, fontSize = 10.sp)
+            Grid(2, 8.dp) {
+                Check(stringResource(R.string.pref_keep_awake), c.keepAwake) { c.onKeepAwake(it) }; Check(stringResource(R.string.pref_auto_lap), c.autoLapOn) { c.onAutoLap(it) }
+                Check(stringResource(R.string.pref_voice_alerts), c.voiceOn) { c.onVoice(it) }; Check(stringResource(R.string.pref_notifications), c.notifyOn) { c.onNotify(it) }
+                Check(stringResource(R.string.pref_top_lap_ghost), c.ghostEnabled) { c.onGhostToggle(it) }; Check(stringResource(R.string.pref_check_for_updates), c.updateOn) { c.onUpdate(it) }
+                Check(stringResource(R.string.pref_share_usage_data), c.analyticsOn) { c.onAnalytics(it) }; Check(stringResource(R.string.pref_debug_log), c.debugOn) { c.onDebug(it) }
             }
         }
 
         Row(Modifier.fillMaxWidth().background(D.pnl).padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
                 Text("%.0f".format(Locale.ROOT, spd), color = D.hi, fontFamily = Impact, fontSize = 60.sp, maxLines = 1)
-                Text("km/h", Modifier.padding(start = 4.dp, bottom = 10.dp), color = D.dim, fontFamily = Mono, fontSize = 12.sp)
+                Text(stringResource(R.string.speed_unit), Modifier.padding(start = 4.dp, bottom = 10.dp), color = D.dim, fontFamily = Mono, fontSize = 12.sp)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("SUGGEST", color = D.dim, fontFamily = Mono, fontSize = 10.sp)
+                Text(stringResource(R.string.suggest), color = D.dim, fontFamily = Mono, fontSize = 10.sp)
                 Text(if (sug > 0) sug.toString() else "--", color = D.amb, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 20.sp)
             }
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Bottom) {
-                Text("gear", Modifier.padding(end = 4.dp, bottom = 10.dp), color = D.dim, fontFamily = Mono, fontSize = 12.sp)
+                Text(stringResource(R.string.gear), Modifier.padding(end = 4.dp, bottom = 10.dp), color = D.dim, fontFamily = Mono, fontSize = 12.sp)
                 Text(if (gear > 0) gear.toString() else "N", color = D.amb, fontFamily = Impact, fontSize = 60.sp)
             }
         }
 
         val deltaV = c.delta
         Grid(4, 8.dp, Modifier.fillMaxWidth().background(D.pnl).padding(horizontal = 4.dp, vertical = 10.dp)) {
-            Stat("LAP", if (has) "$curLap/$totLap" else "--")
-            Stat("CURRENT", if (c.curElapsed > 0) TraceUtil.msToLapTime((c.curElapsed * 1000).toInt()) else "--", D.hi)
-            Stat("BEST", TraceUtil.msToLapTime(bestMs), D.good)
-            Stat("LAST", TraceUtil.msToLapTime(lastMs))
-            Stat("GRID", if (curPos > 0 && totPos > 0) "P$curPos/$totPos" else "--")
-            Stat("TOP SPD", if (topSpd != 0) "$topSpd km/h" else "--", D.hi)
-            Stat("DELTA", if (deltaV != null) sf(deltaV, 2) + "s" else "--", if (deltaV == null) D.fg else if (deltaV > 0) D.red else D.good)
-            Stat("VS TOP", c.ghostGap?.let { sf(it, 2) + "s" } ?: "--", c.ghostGap?.let { if (it > 0) D.red else D.good } ?: D.fg)
+            Stat(stringResource(R.string.stat_lap), if (has) "$curLap/$totLap" else "--")
+            Stat(stringResource(R.string.stat_current), if (c.curElapsed > 0) TraceUtil.msToLapTime((c.curElapsed * 1000).toInt()) else "--", D.hi)
+            Stat(stringResource(R.string.stat_best), TraceUtil.msToLapTime(bestMs), D.good)
+            Stat(stringResource(R.string.stat_last), TraceUtil.msToLapTime(lastMs))
+            Stat(stringResource(R.string.stat_grid), if (curPos > 0 && totPos > 0) "P$curPos/$totPos" else "--")
+            Stat(stringResource(R.string.stat_top_spd), if (topSpd != 0) "$topSpd km/h" else "--", D.hi)
+            Stat(stringResource(R.string.stat_delta), if (deltaV != null) sf(deltaV, 2) + "s" else "--", if (deltaV == null) D.fg else if (deltaV > 0) D.red else D.good)
+            Stat(stringResource(R.string.stat_vs_top), c.ghostGap?.let { sf(it, 2) + "s" } ?: "--", c.ghostGap?.let { if (it > 0) D.red else D.good } ?: D.fg)
         }
 
         Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Bar("RPM", (rpm / mrpm).coerceIn(0.0, 1.0), D.red, f(rpm, 0) + " / " + mrpm.toInt())
-            Bar("THROTTLE", thr, D.good, f(thr * 100, 0) + "%")
-            Bar("BRAKE", brk, D.red, f(brk * 100, 0) + "%")
-            Bar("CLUTCH", clt.coerceIn(0.0, 1.0), D.amb, f(clt * 100, 0) + "%")
+            Bar(stringResource(R.string.bar_rpm), (rpm / mrpm).coerceIn(0.0, 1.0), D.red, f(rpm, 0) + " / " + mrpm.toInt())
+            Bar(stringResource(R.string.bar_throttle), thr, D.good, f(thr * 100, 0) + "%")
+            Bar(stringResource(R.string.bar_brake), brk, D.red, f(brk * 100, 0) + "%")
+            Bar(stringResource(R.string.bar_clutch), clt.coerceIn(0.0, 1.0), D.amb, f(clt * 100, 0) + "%")
         }
 
-        Frame("TYRES") { Grid(4, 8.dp) {
+        Frame(stringResource(R.string.frame_tyres)) { Grid(4, 8.dp) {
             for ((n, k, s) in listOf(Triple("FL", "tyre_temp_fl", "tyre_slip_fl"), Triple("FR", "tyre_temp_fr", "tyre_slip_fr"), Triple("RL", "tyre_temp_rl", "tyre_slip_rl"), Triple("RR", "tyre_temp_rr", "tyre_slip_rr"))) {
                 val t = p.d(k); val sl = if (p.containsKey(s)) p.d(s) else 1.0
                 Cell(n, if (t > 0) f(t, 0) + "C" else "--C", big = true, sub = "slip " + f(sl, 2), color = bandColor(TraceUtil.tempBand(t)), subColor = bandColor(TraceUtil.slipBand(sl)))
             }
         } }
-        Frame("SUSPENSION (mm)") { Grid(4, 8.dp) {
+        Frame(stringResource(R.string.frame_suspension)) { Grid(4, 8.dp) {
             Cell("FL", f(p.d("susp_fl") * 1000, 0)); Cell("FR", f(p.d("susp_fr") * 1000, 0)); Cell("RL", f(p.d("susp_rl") * 1000, 0)); Cell("RR", f(p.d("susp_rr") * 1000, 0))
         } }
-        Frame("DRIVER AIDS") { Grid(3, 8.dp) {
+        Frame(stringResource(R.string.frame_driver_aids)) { Grid(3, 8.dp) {
             for ((k, n) in listOf("handbrake_active" to "HANDBRAKE", "asm_active" to "ASM", "tcs_active" to "TCS", "rev_limit_alert" to "REV LIMIT", "lights_active" to "LIGHTS", "high_beams" to "HIGH BEAM"))
                 Cell(n, if (p.b(k)) "YES" else "NO", color = if (p.b(k)) D.acc else D.dim)
         } }
-        Frame("ENGINE AND FLUIDS") {
+        Frame(stringResource(R.string.frame_engine)) {
             Grid(4, 8.dp) {
                 Cell("FUEL", fuelStr); Cell("FUEL LAPS", if (fuelLapsNum < 999) f(fuelLapsNum, 1) else "--")
                 Cell("BOOST bar", if (p.d("boost") > 0) f(p.d("boost"), 2) else "--"); Cell("OIL C*", f(p.d("oil_temp"), 0))
@@ -176,7 +182,7 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
             }
             Text("* GT7 sends fixed values for these (85 / 110 C) -- not simulated", Modifier.padding(top = 4.dp), color = D.dim, fontFamily = Mono, fontSize = 8.sp)
         }
-        Frame("STRATEGY (est.)") {
+        Frame(stringResource(R.string.frame_strategy)) {
             val rough = if (st.fuelBasisLaps < 3) "~" else ""
             val fpl = st.fuelPerLap; val lof = st.lapsOfFuel; val spare = st.spareLaps; val pit = st.pitByLap
             Grid(4, 8.dp) {
@@ -203,23 +209,23 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
                 Modifier.padding(top = 6.dp), color = D.dim, fontFamily = Mono, fontSize = 8.sp)
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Estimates from live data. GT7 sends no tyre wear; fuel burn-off hides some pace loss.", Modifier.weight(1f), color = D.dim, fontFamily = Mono, fontSize = 7.sp)
-                Text("[ NEW TYRES ]", Modifier.clickable { c.newTyres() }.padding(start = 6.dp, top = 4.dp, bottom = 4.dp), color = D.acc, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 8.sp)
+                Text(stringResource(R.string.new_tyres), Modifier.clickable { c.newTyres() }.padding(start = 6.dp, top = 4.dp, bottom = 4.dp), color = D.acc, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 8.sp)
             }
         }
-        Frame("DYNAMICS") { Grid(4, 8.dp) {
+        Frame(stringResource(R.string.frame_dynamics)) { Grid(4, 8.dp) {
             Cell("VEL X", f(p.d("vel_x"), 2)); Cell("VEL Y", f(p.d("vel_y"), 2)); Cell("VEL Z", f(p.d("vel_z"), 2)); Cell("ANG X", f(p.d("ang_x"), 3))
             Cell("ANG Y", f(p.d("ang_y"), 3)); Cell("ANG Z", f(p.d("ang_z"), 3)); Cell("HEADING", f(Math.toDegrees(p.d("heading")), 1) + "deg")
         } }
-        Frame("POSITION") { Grid(4, 8.dp) {
+        Frame(stringResource(R.string.frame_position)) { Grid(4, 8.dp) {
             Cell("WORLD X", f(p.d("world_x"), 1)); Cell("WORLD Y", f(p.d("world_y"), 1)); Cell("WORLD Z", f(p.d("world_z"), 1)); Cell("TRACK POS", f(p.d("track_position"), 1) + " m")
         } }
-        Frame("DRIVETRAIN EXTRAS") { Grid(3, 8.dp) {
+        Frame(stringResource(R.string.frame_drivetrain)) { Grid(3, 8.dp) {
             Cell("STEERING", sf(p.d("steering"), 2)); Cell("CLUTCH ENG", f(p.d("clutch_engaged"), 2))
             Cell("RPM WARN", p.i("rpm_warning").toString()); Cell("RPM LIM", p.i("rpm_limiter").toString()); Cell("RPM@CLUTCH", f(p.d("rpm_after_clutch"), 0))
         } }
-        Text("GEAR RATIOS: " + (gearRatios.withIndex().filter { it.value > 0 }.joinToString("  ") { "G${it.index + 1}:" + f(it.value, 3) }.ifEmpty { "--" }),
+        Text(stringResource(R.string.gear_ratios) + " " + (gearRatios.withIndex().filter { it.value > 0 }.joinToString("  ") { "G${it.index + 1}:" + f(it.value, 3) }.ifEmpty { "--" }),
             Modifier.padding(horizontal = 4.dp), color = D.dim, fontFamily = Mono, fontSize = 8.sp)
-        Frame("EXTENDED (B/~/C)") {
+        Frame(stringResource(R.string.frame_extended)) {
             fun opt(k: String, fmt: (Double) -> String) = (p[k] as? Number)?.let { fmt(it.toDouble()) } ?: "--"
             Grid(4, 8.dp) {
                 Cell("CUR LAP", (p["current_lap_ms"] as? Number)?.let { TraceUtil.msToLapTime(it.toInt()) } ?: "--")
@@ -229,17 +235,17 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
                 Cell("ENERGY RECOV", opt("energy_recovery") { sf(it, 3) })
             }
         }
-        Frame("SURFACE (per tyre)") { Grid(4, 8.dp) {
+        Frame(stringResource(R.string.frame_surface)) { Grid(4, 8.dp) {
             val names = mapOf("T" to "Tarmac", "C" to "Curb", "D" to "Dirt", "G" to "Grass", "S" to "Sand", "s" to "Snow")
             for ((i, n) in listOf("FL", "FR", "RL", "RR").withIndex()) {
                 val code = surf?.getOrNull(i)?.ifEmpty { null }
                 Cell(n, names[code] ?: code ?: "--", big = true, color = if (code == "T") D.good else if (code != null) D.amb else D.fg)
             }
         } }
-        Frame("WHEEL STEERING ANGLE") { Grid(2, 8.dp) {
+        Frame(stringResource(R.string.frame_steering)) { Grid(2, 8.dp) {
             Cell("FRONT L", wsa?.let { sf(Math.toDegrees(it[0]), 1) + "deg" } ?: "--"); Cell("FRONT R", wsa?.let { sf(Math.toDegrees(it[1]), 1) + "deg" } ?: "--")
         } }
-        Frame("SESSION / MISC") { Grid(3, 8.dp) {
+        Frame(stringResource(R.string.frame_misc)) { Grid(3, 8.dp) {
             val tod = p.i("time_of_day")
             Cell("TIME OF DAY", "%02d:%02d:%02d".format(Locale.ROOT, (tod / 3600000) % 24, (tod % 3600000) / 60000, (tod % 60000) / 1000))
             Cell("IS EV", if (isEv) "YES" else "no", color = if (isEv) D.good else D.fg); Cell("CAR ID", p.i("car_id").toString())
@@ -247,16 +253,16 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
         } }
 
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (online && hasHot) Alert("TYRE HOT", if (c.flashOn) D.red else Color(0xFF8c0c22), Color.White, true)
-            if (online && hasCold) Alert("TYRE COLD", if (c.flashOn) D.cold else Color(0xFF17171b), D.hi, true)
-            if (online && hasFuel) Alert("FUEL LOW", if (c.flashOn) D.amb else Color(0xFF3a2f14), Color.Black, true)
+            if (online && hasHot) Alert(stringResource(R.string.alert_tyre_hot), if (c.flashOn) D.red else Color(0xFF8c0c22), Color.White, true)
+            if (online && hasCold) Alert(stringResource(R.string.alert_tyre_cold), if (c.flashOn) D.cold else Color(0xFF17171b), D.hi, true)
+            if (online && hasFuel) Alert(stringResource(R.string.alert_fuel_low), if (c.flashOn) D.amb else Color(0xFF3a2f14), Color.Black, true)
         }
 
-        Section("TRACK MAP")
+        Section(stringResource(R.string.track_map))
         TrackMap(c.trackPts)
-        Section("LAP HISTORY")
+        Section(stringResource(R.string.lap_history))
         LapHistory(c)
-        Section("LOG")
+        Section(stringResource(R.string.log))
         Column(Modifier.fillMaxWidth().heightIn(min = 96.dp).background(D.map).padding(8.dp)) {
             c.log.takeLast(12).forEach { Text(it, color = D.log, fontFamily = Mono, fontSize = 8.sp, lineHeight = 12.sp) }
         }
@@ -276,7 +282,7 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
 @Composable
 private fun TrackMap(pts: List<Pair<Double, Double>>) {
     Box(Modifier.fillMaxWidth().height(180.dp).background(D.map).border(1.dp, D.dim)) {
-        if (pts.size < 2) { Text("WAITING FOR DATA", Modifier.align(Alignment.Center), color = Color(0xFF202024), fontFamily = Mono, fontSize = 9.sp); return@Box }
+        if (pts.size < 2) { Text(stringResource(R.string.waiting_for_data), Modifier.align(Alignment.Center), color = Color(0xFF202024), fontFamily = Mono, fontSize = 9.sp); return@Box }
         Canvas(Modifier.fillMaxSize()) {
             val pad = 14.dp.toPx(); val w = size.width; val h = size.height
             val minX = pts.minOf { it.first }; val maxX = pts.maxOf { it.first }; val minZ = pts.minOf { it.second }; val maxZ = pts.maxOf { it.second }
@@ -299,7 +305,7 @@ private fun TrackMap(pts: List<Pair<Double, Double>>) {
 private fun LapHistory(c: LiveController) {
     Column(Modifier.fillMaxWidth().background(D.map)) {
         Row(Modifier.fillMaxWidth().background(D.pnl).padding(6.dp)) {
-            for ((t, w) in listOf("#" to .1f, "Time" to .35f, "Track" to .28f, "Car" to .27f)) Text(t, Modifier.weight(w), color = D.acc, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+            for ((t, w) in listOf(stringResource(R.string.hist_num) to .1f, stringResource(R.string.hist_time) to .35f, stringResource(R.string.hist_track) to .28f, stringResource(R.string.hist_car) to .27f)) Text(t, Modifier.weight(w), color = D.acc, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 9.sp)
         }
         c.history.take(6).forEachIndexed { idx, m ->
             var ts = TraceUtil.msToLapTime((m.lapTimeS * 1000).toInt()); if (m.incomplete) ts = "($ts)"; if (m.isPb) ts = "🏆$ts"
@@ -317,7 +323,7 @@ private fun LapHistory(c: LiveController) {
 @Composable
 private fun SummaryDialog(c: LiveController, onDismiss: () -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, confirmButton = { Text("Close", Modifier.clickable(onClick = onDismiss).padding(12.dp), color = D.acc, fontFamily = Mono) },
-        containerColor = D.bg, title = { Text("Session Summary", color = D.acc, fontFamily = Mono) },
+        containerColor = D.bg, title = { Text(stringResource(R.string.session_summary), color = D.acc, fontFamily = Mono) },
         text = {
             Column {
                 if (c.recorder.sessionSummary.isEmpty()) Text("No races recorded this session yet.", color = D.fg, fontFamily = Mono, fontSize = 12.sp)

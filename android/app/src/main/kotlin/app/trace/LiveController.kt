@@ -46,6 +46,12 @@ class LiveController(private val appCtx: Context) {
     var analyticsOn by mutableStateOf(prefs.getBoolean("analytics", true))
     var debugOn by mutableStateOf(prefs.getBoolean("debug", false))
     var keepAwake by mutableStateOf(prefs.getBoolean("keep_awake", true))
+    var autoLapOn by mutableStateOf(prefs.getBoolean("auto_lap", false))
+    var webUiOn by mutableStateOf(prefs.getBoolean("webui", false))
+    var webRemoteOn by mutableStateOf(prefs.getBoolean("webui_remote", false))
+    var webUiUrl by mutableStateOf("")
+    private val autoLap = AutoLap()
+    private val webUi = WebUiServer { appCtx.assets.open("webui.html").readBytes() }
     var battWarn by mutableStateOf<Int?>(null)       // charge % shown on the red low-battery bar; null = hidden
     val alerts = Alerts(appCtx)
     private val battery = BatteryGuard()
@@ -100,6 +106,21 @@ class LiveController(private val appCtx: Context) {
     }
     fun onBatteryAck() { battery.ack(); battWarn = null }
 
+    fun onAutoLap(v: Boolean) {
+        autoLapOn = v; pref("auto_lap", v)
+        say(if (v) "Auto lap on -- in time trial / practice, laps record by themselves from the next start/finish crossing" else "Auto lap off")
+    }
+    private fun startWebUi() {
+        if (!webUi.start(WebUiServer.PORT, webRemoteOn)) {
+            say("Web UI: failed to start on port ${WebUiServer.PORT} (${webUi.lastError ?: "port in use?"})"); webUiOn = false; pref("webui", false); webUiUrl = ""
+        } else {
+            webUiUrl = "http://${if (webRemoteOn) (WebUiServer.lanIp() ?: "<phone-ip>") else "127.0.0.1"}:${WebUiServer.PORT}"
+            say("Web UI on -- open $webUiUrl" + if (webRemoteOn) " on any device on this network (no password -- trusted networks only)" else " (this phone only)")
+        }
+    }
+    fun onWebUi(v: Boolean) { webUiOn = v; pref("webui", v); if (v) startWebUi() else { webUi.stop(); webUiUrl = ""; say("Web UI off") } }
+    fun onWebRemote(v: Boolean) { webRemoteOn = v; pref("webui_remote", v); if (webUiOn) { webUi.stop(); startWebUi() } }
+
     fun onNotify(v: Boolean) { notifyOn = v; pref("notify", v); say(if (v) "Notifications on" else "Notifications off") }
     private fun startMetrics() {
         if (!metrics.start(9109, remoteOn)) { say("Metrics export: failed to bind port 9109 (already in use?)"); metricsOn = false; pref("metrics", false) }
@@ -150,6 +171,7 @@ class LiveController(private val appCtx: Context) {
     init {
         recorder.recordRate = rate
         if (metricsOn) startMetrics()
+        if (webUiOn) startWebUi()
         if (voiceOn) alerts.prepareVoice()
         if (updateOn) Updates.check(versionName())
         events.register("race_start") { recorder.onRaceStart(); raceRec = recorder.raceRecording }
@@ -168,7 +190,7 @@ class LiveController(private val appCtx: Context) {
         thread(isDaemon = true, name = "trace-rec") { while (running) { try { synchronized(lock) { recorder.tick(client.latest, client.isConnected(), ctx()) }; recLapState = if (recorder.recording) 2 else if (recorder.waiting) 1 else 0; raceRec = recorder.raceRecording } catch (_: Exception) {}; Thread.sleep(16) } }
     }
 
-    fun stop() { running = false; releaseWake(); client.stop() }
+    fun stop() { running = false; releaseWake(); client.stop(); webUi.stop(); metrics.stop() }
 
     fun onIpChange(force: Boolean = false) { val v = ip.trim(); client.ip = v; prefs.edit().putString("ip", v).apply() }
     fun onRate(r: Int) { rate = r; recorder.recordRate = r; prefs.edit().putInt("rate", r).apply() }
@@ -176,7 +198,7 @@ class LiveController(private val appCtx: Context) {
     fun onCar(c: String) { car = c; client.decoder.car = c.ifBlank { "unknown_car" } }
     var promptTick by mutableStateOf(0)
     fun resolveIncomplete(save: Boolean) { synchronized(lock) { recorder.resolvePending(save) }; promptTick++ }
-    fun toggleLap() { synchronized(lock) { recorder.toggleLap((d["lap_number"] as? Number)?.toInt() ?: 0, ctx()) }; recLapState = if (recorder.recording) 2 else if (recorder.waiting) 1 else 0; promptTick++ }
+    fun toggleLap() { synchronized(lock) { if (recorder.recording || recorder.waiting) autoLap.onUserStop(); recorder.toggleLap((d["lap_number"] as? Number)?.toInt() ?: 0, ctx()) }; recLapState = if (recorder.recording) 2 else if (recorder.waiting) 1 else 0; promptTick++ }
     fun toggleRace() { synchronized(lock) { if (recorder.raceRecording) { recorder.stopRace(false, ctx()); summaryTick++; if (notifyOn) alerts.notify("Race Ended", "Recording saved.") } else recorder.startRace() }; raceRec = recorder.raceRecording }
     fun newTyres() { stint.resetStint(); log.add("Strategy: new tyre stint started") }
     fun discover(done: (String?) -> Unit) { thread { val f = TelemetryClient.discoverPsIp(); if (f != null) { ip = f; onIpChange() }; done(f) } }
@@ -269,6 +291,27 @@ class LiveController(private val appCtx: Context) {
         }
         val gh = if (ghostEnabled && key != null) synchronized(ghosts) { ghosts[key] } else null
         ghostGap = if (gh != null && curElapsed > 0.5) gh.gap(trackPos, curElapsed) else null
+
+        autoLapStep(p, now)
+        webUi.update(p, true, if (curElapsed > 0) (curElapsed * 1000).toInt() else null, delta, ghostGap, strat, car, track)
+    }
+
+    /** dashboard._auto_lap_step: arm Record Lap by itself while driving in a session without race laps. */
+    private fun autoLapStep(p: Packet, now: Double) {
+        val inSession = AutoLap.inSession(p["car_on_track"] as? Boolean ?: false, p["loading"] as? Boolean ?: false, (p["total_laps"] as? Number)?.toInt() ?: 0)
+        val can = AutoLap.canArm(inSession, recorder.paused, (p["speed_kmh"] as? Number)?.toDouble() ?: 0.0)
+        val busy = recorder.recording || recorder.waiting || recorder.raceRecording || recorder.paused
+        when (autoLap.step(autoLapOn, inSession, can, busy && !autoLap.active, now)) {
+            AutoLap.Action.ARM -> synchronized(lock) {
+                recorder.startLap((p["lap_number"] as? Number)?.toInt() ?: 0)
+                recLapState = 1; say("Auto lap: armed -- recording starts at the next start/finish crossing")
+            }
+            AutoLap.Action.DISARM_OFF, AutoLap.Action.DISARM_ENDED -> synchronized(lock) {
+                val n = recorder.discardArmed(); recLapState = 0
+                say("Auto lap: " + (if (autoLapOn) "session ended" else "turned off") + (if (n > 0) " -- partial lap ($n samples) discarded" else ""))
+            }
+            AutoLap.Action.NONE -> {}
+        }
     }
 
     fun exportSession(): File? {

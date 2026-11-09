@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,6 +38,10 @@ class MainActivity : ComponentActivity() {
                 if (live.online || live.keepAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
             var records by remember { mutableStateOf(false) }
+            // desktop window-title pattern "TRACE <version> - <Tool name>", shown in the recent-apps switcher
+            val titleFmt = getString(R.string.window_title_fmt)
+            val names = mapOf(null to getString(R.string.launcher_window_tool), Tool.LIVE to getString(R.string.tool_live), Tool.LAPS to getString(R.string.tool_lap), Tool.RACE to getString(R.string.tool_race))
+            LaunchedEffect(tool) { setTaskDescription(android.app.ActivityManager.TaskDescription(titleFmt.format(live.versionName(), names[tool]))) }
             LaunchedEffect(tool) {
                 val t = tool
                 if (t != null && live.analyticsOn) Analytics.track(when (t) { Tool.LIVE -> "dashboard"; Tool.LAPS -> "lap_analyst"; Tool.RACE -> "race_analyst" }, live.versionName())
@@ -46,7 +51,7 @@ class MainActivity : ComponentActivity() {
             Column(Modifier.fillMaxSize().background(if (tool == Tool.LIVE) D.bg else a.bg)) {
                 Box(Modifier.weight(1f)) {
                     when (tool) {
-                        null -> Launcher(a, light, live.lapsDir, { light = !light }, { records = true }) { tool = it }
+                        null -> Launcher(a, light, live.lapsDir, live.versionName(), !live.updateOn, { live.onUpdate(!it) }, { light = !light }, { records = true }) { tool = it }
                         Tool.LIVE -> LiveScreen(live) { tool = null }
                         Tool.LAPS -> LapScreen(lapCtl, a) { tool = null }
                         Tool.RACE -> RaceScreen(raceCtl, a) { tool = null }
@@ -62,21 +67,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun NavBar(cur: Tool, onPick: (Tool) -> Unit) {
     Row(Modifier.fillMaxWidth().background(D.hdr).navigationBarsPadding().padding(8.dp, 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        for ((t, n) in listOf(Tool.LIVE to "Live", Tool.LAPS to "Laps", Tool.RACE to "Race")) {
+        for ((t, n) in listOf(Tool.LIVE to stringResource(R.string.tool_live), Tool.LAPS to stringResource(R.string.tool_lap), Tool.RACE to stringResource(R.string.tool_race))) {
             Box(Modifier.weight(1f).height(48.dp).background(if (t == cur) D.acc else D.hdr).clickable { onPick(t) }, contentAlignment = Alignment.Center) {
-                Text(n, color = if (t == cur) androidx.compose.ui.graphics.Color.White else D.fg, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(n, color = if (t == cur) androidx.compose.ui.graphics.Color.White else D.fg, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
             }
-        }
-    }
-}
-
-@Composable
-private fun AnalystStub(a: AP, title: String, onBack: () -> Unit) {
-    Column(Modifier.fillMaxSize().background(a.bg).statusBarsPadding().padding(8.dp)) {
-        Row(Modifier.fillMaxWidth().background(a.pnl2).padding(12.dp, 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("‹", Modifier.clickable(onClick = onBack), color = a.cyn, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            Text("GT7", color = a.acc, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(title, color = a.cyn, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }

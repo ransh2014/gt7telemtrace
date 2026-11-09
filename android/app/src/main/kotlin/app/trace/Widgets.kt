@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import app.trace.telemetry.LapIndex
@@ -73,6 +74,21 @@ fun LapPicker(a: AP, rows: List<LapIndex.Row>, title: String, onPick: (LapIndex.
                 }
             }
             TBtn(a, "Close", Modifier.fillMaxWidth(), onClick = onDismiss)
+        }
+    }
+}
+
+/** The desktop header: small red "GT7 TRACE" over the big teal tool title, status + "← Menu" on the right. */
+@Composable
+fun ToolHeader(title: String, bg: Color, brand: Color, titleColor: Color, btnBg: Color, btnFg: Color, onMenu: () -> Unit, trailing: @Composable RowScope.() -> Unit = {}) {
+    Row(Modifier.fillMaxWidth().background(bg).padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.header_brand), color = brand, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 10.sp, maxLines = 1)
+            Text(title, color = titleColor, fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 18.sp, maxLines = 1)
+        }
+        trailing()
+        Box(Modifier.height(36.dp).background(btnBg).clickable(onClick = onMenu).padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+            Text(stringResource(R.string.menu_button), color = btnFg, fontFamily = Mono, fontSize = 12.sp, maxLines = 1)
         }
     }
 }

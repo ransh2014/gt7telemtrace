@@ -6,7 +6,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDecoration
+import app.trace.telemetry.Versions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -24,11 +29,12 @@ import androidx.compose.ui.unit.sp
 enum class Tool { LIVE, LAPS, RACE }
 
 @Composable
-fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, onToggleTheme: () -> Unit, onRecords: () -> Unit, onOpen: (Tool) -> Unit) {
+fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, version: String, ignoreUpdates: Boolean, onIgnoreUpdates: (Boolean) -> Unit, onToggleTheme: () -> Unit, onRecords: () -> Unit, onOpen: (Tool) -> Unit) {
     val sub = Color(0xFF96949c)
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var signed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Account.load(ctx).signedIn) }
+    val psn = Account.load(ctx).psn
     var dlg by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var msg by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     val saveZip = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) { u: android.net.Uri? ->
@@ -43,40 +49,49 @@ fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, onToggleTheme: () -> 
             .verticalScroll(rememberScrollState()).padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("TRACE", Modifier.fillMaxWidth().padding(top = 28.dp), color = a.cyn, fontFamily = Display,
+        Text(stringResource(R.string.launcher_title), Modifier.fillMaxWidth().padding(top = 28.dp), color = a.cyn, fontFamily = Display,
             fontWeight = FontWeight.Bold, fontSize = 44.sp, textAlign = TextAlign.Center)
-        Text("GT7 Telemetry Suite", Modifier.fillMaxWidth().padding(bottom = 8.dp), color = sub,
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.version_fmt, version), color = sub, fontFamily = Mono, fontSize = 12.sp)
+            if (!ignoreUpdates) when (val st = Updates.status) {
+                is Versions.Status.Current -> Text(stringResource(R.string.update_current), Modifier.padding(start = 8.dp), color = a.grn, fontFamily = Mono, fontSize = 12.sp)
+                is Versions.Status.Available -> Text(stringResource(R.string.update_available_fmt, st.version),
+                    Modifier.padding(start = 8.dp).clickable { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(st.url))) },
+                    color = a.blue, fontFamily = Mono, fontSize = 12.sp, textDecoration = TextDecoration.Underline)
+                null -> {}
+            }
+        }
+        Row(Modifier.fillMaxWidth().clickable { onIgnoreUpdates(!ignoreUpdates) }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(ignoreUpdates, { onIgnoreUpdates(it) }, colors = CheckboxDefaults.colors(checkedColor = a.acc, uncheckedColor = a.dim, checkmarkColor = Color.White))
+            Text(stringResource(R.string.ignore_update_checks), color = sub, fontFamily = Mono, fontSize = 11.sp)
+        }
+        Text(stringResource(R.string.launcher_subtitle), Modifier.fillMaxWidth().padding(bottom = if (signed && psn.isNotEmpty()) 0.dp else 8.dp), color = sub,
             fontFamily = Mono, fontSize = 15.sp, textAlign = TextAlign.Center)
-        ToolCard(a, "Live Dashboard", "Real-time telemetry overlay while you drive.", a.cyn) { onOpen(Tool.LIVE) }
-        ToolCard(a, "Lap Analyst", "Compare laps, chart every input, submit to the leaderboard.", a.prp) { onOpen(Tool.LAPS) }
-        ToolCard(a, "Race Analyst", "Full-race lap splits, stats and notes.", a.acc) { onOpen(Tool.RACE) }
+        if (signed && psn.isNotEmpty()) Text(stringResource(R.string.signed_in_as_fmt, psn), Modifier.fillMaxWidth().padding(bottom = 8.dp), color = sub, fontFamily = Mono, fontSize = 12.sp, textAlign = TextAlign.Center)
+        ToolCard(a, stringResource(R.string.tool_live), stringResource(R.string.card_live_desc), a.cyn) { onOpen(Tool.LIVE) }
+        ToolCard(a, stringResource(R.string.tool_lap), stringResource(R.string.card_lap_desc), a.prp) { onOpen(Tool.LAPS) }
+        ToolCard(a, stringResource(R.string.tool_race), stringResource(R.string.card_race_desc), a.acc) { onOpen(Tool.RACE) }
         Spacer(Modifier.height(6.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FootBtn(a, if (signed) "Log Out" else "Create Free Account", Modifier.weight(1f)) {
+        // desktop footer, left to right: Log Out / Create Free Account, Backup Laps, Records, theme toggle
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            FootLink(a, if (signed) stringResource(R.string.log_out) else stringResource(R.string.create_account), if (signed) sub else a.cyn) {
                 if (signed) { Account.clear(ctx); signed = false; msg = "Logged out." } else dlg = true
             }
-            FootBtn(a, "Backup Laps", Modifier.weight(1f)) {
+            FootLink(a, stringResource(R.string.backup_laps), sub) {
                 if (!Exports.hasLaps(lapsDir)) msg = "No laps found to back up yet."
                 else saveZip.launch("trace_laps_backup_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.ROOT).format(java.util.Date())}.zip")
             }
+            FootLink(a, stringResource(R.string.records), sub, onRecords)
+            FootLink(a, if (light) stringResource(R.string.theme_dark) else stringResource(R.string.theme_light), sub, onToggleTheme)
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FootBtn(a, "Records", Modifier.weight(1f), onRecords)
-            FootBtn(a, if (light) "Dark" else "Light", Modifier.weight(1f), onToggleTheme)
-        }
-        Updates.latest?.let { v ->
-            Text("Update available: v$v -- tap to open", Modifier.fillMaxWidth().clickable { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(Updates.url))) }.padding(6.dp),
-                color = a.cyn, fontFamily = Mono, fontSize = 12.sp, textAlign = TextAlign.Center)
-        }
+        Text(stringResource(R.string.footer_note), Modifier.fillMaxWidth().padding(top = 6.dp), color = a.dim2, fontFamily = Body, fontSize = 10.sp)
         if (msg.isNotEmpty()) Text(msg, Modifier.fillMaxWidth(), color = sub, fontFamily = Mono, fontSize = 12.sp, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun FootBtn(a: AP, text: String, m: Modifier, onClick: () -> Unit) =
-    Box(m.height(46.dp).background(a.pnl2).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Text(text, color = a.fg, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-    }
+private fun FootLink(a: AP, text: String, color: Color, onClick: () -> Unit) =
+    Text(text, Modifier.clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 2.dp), color = color, fontFamily = Body, fontSize = 12.sp, textDecoration = TextDecoration.Underline, maxLines = 1)
 
 @Composable
 private fun ToolCard(a: AP, title: String, desc: String, accent: Color, onClick: () -> Unit) {
@@ -91,6 +106,6 @@ private fun ToolCard(a: AP, title: String, desc: String, accent: Color, onClick:
             Spacer(Modifier.height(6.dp))
             Text(desc, color = Color(0xFF96949c), fontFamily = Mono, fontSize = 13.sp, lineHeight = 18.sp)
         }
-        Text("Launch →", Modifier.padding(top = 14.dp), color = accent, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Text(stringResource(R.string.launch), Modifier.padding(top = 14.dp), color = accent, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 15.sp)
     }
 }

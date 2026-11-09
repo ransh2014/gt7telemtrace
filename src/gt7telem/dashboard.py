@@ -32,6 +32,7 @@ from . import (
     webui_server,
 )
 from . import cars as car_db
+from . import labels as L
 from . import config as runtime_config
 from . import tracks as track_db
 from . import udp as telem
@@ -269,7 +270,7 @@ session = Session()
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title(f"TRACE {__version__} - Live Dashboard")
+        self.title(L.window_title(L.TOOL_LIVE, __version__))
         self.configure(bg=theme.BG)
         theme.fit_window(self, 1280, 920, 1100, 700)
         self._fuel_per_lap      = 0.0
@@ -381,33 +382,33 @@ class App(tk.Tk):
         hdr.pack(fill="x")
 
         if FROM_MENU:
-            tk.Button(hdr, text="\u2190 Menu", command=self._go_menu, bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
+            tk.Button(hdr, text=L.MENU_BUTTON, command=self._go_menu, bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                       font=(theme.MONO, 10), padx=10, pady=3, cursor="hand2").pack(side="right", padx=(4, 12))
         brand = tk.Frame(hdr, bg=theme.BG2)   # brand + tool name, stacked in the top-left corner
         brand.pack(side="left", padx=(10, 12))
-        tk.Label(brand, text="GT7 TRACE", fg=ACC, bg=theme.BG2, font=(theme.MONO, 8, "bold")).pack(anchor="w")
-        tk.Label(brand, text="LIVE DASHBOARD", fg=theme.TEAL_2, bg=theme.BG2,
+        tk.Label(brand, text=L.HEADER_BRAND, fg=ACC, bg=theme.BG2, font=(theme.MONO, 8, "bold")).pack(anchor="w")
+        tk.Label(brand, text=L.TITLE_LIVE, fg=theme.TEAL_2, bg=theme.BG2,
                  font=(theme.DISPLAY, 14, "bold")).pack(anchor="w")
-        self.conn_dot = tk.Label(hdr, text="● OFFLINE", fg=DIM, bg=theme.BG2,
+        self.conn_dot = tk.Label(hdr, text=L.STATUS_OFFLINE, fg=DIM, bg=theme.BG2,
                                  font=(theme.MONO, 10))
         self.conn_dot.pack(side="left", padx=8)
 
-        tk.Button(hdr, text="Export Session",
+        tk.Button(hdr, text=L.EXPORT_SESSION,
                   command=self._export_session,
                   bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                   font=(theme.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
-        tk.Button(hdr, text="Session Summary",
+        tk.Button(hdr, text=L.SESSION_SUMMARY,
                   command=self._show_session_summary,
                   bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                   font=(theme.MONO, 10), padx=12, pady=3).pack(side="right", padx=4)
 
-        self.rec_btn = tk.Button(hdr, text="Record Lap",
+        self.rec_btn = tk.Button(hdr, text=L.RECORD_LAP,
                                  command=self._toggle_record,
                                  bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                                  font=(theme.MONO, 10, "bold"), padx=12, pady=3)
         self.rec_btn.pack(side="right", padx=6)
 
-        self.race_btn = tk.Button(hdr, text="Record Race",
+        self.race_btn = tk.Button(hdr, text=L.RECORD_RACE,
                                   command=self._toggle_record_race,
                                   bg=theme.BG3, fg=FG, relief="flat", activebackground=theme.LINE2, activeforeground=FG, highlightthickness=1, highlightbackground=theme.LINE2, bd=0,
                                   font=(theme.MONO, 10, "bold"), padx=12, pady=3)
@@ -418,7 +419,7 @@ class App(tk.Tk):
         hdr2 = tk.Frame(self, bg=theme.BG2, pady=4)
         hdr2.pack(fill="x")
 
-        tk.Label(hdr2, text="CONSOLE IP", fg=DIM, bg=theme.BG2,
+        tk.Label(hdr2, text=L.CONSOLE_IP, fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 8)).pack(side="left", padx=(16, 2))
         self.ip_var = tk.StringVar(value=PS4_IP)
         _ip_values = list(KNOWN_IPS)
@@ -435,13 +436,13 @@ class App(tk.Tk):
         ip_entry.bind("<FocusOut>",   lambda e: self._on_ip_change())
         ip_entry.bind("<<ComboboxSelected>>", lambda e: self._on_ip_change())
 
-        self.discover_btn = tk.Button(hdr2, text="Auto-Detect",
+        self.discover_btn = tk.Button(hdr2, text=L.AUTO_DETECT,
                                        command=self._on_discover_ip,
                                        bg=theme.BG3, fg=HI, relief="flat",
                                        font=(theme.MONO, 8), padx=6, pady=1)
         self.discover_btn.pack(side="left", padx=(0, 12))
 
-        tk.Label(hdr2, text="TRACK", fg=DIM, bg=theme.BG2,
+        tk.Label(hdr2, text=L.TRACK, fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 9)).pack(side="left", padx=(8, 2))
         self.track_var = tk.StringVar(value="")
         st_track = ttk.Style()
@@ -453,7 +454,7 @@ class App(tk.Tk):
                                    style="Track.TCombobox")
         track_entry.pack(side="left", padx=(0, 12))
 
-        tk.Label(hdr2, text="CAR", fg=DIM, bg=theme.BG2,
+        tk.Label(hdr2, text=L.CAR, fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 9)).pack(side="left", padx=(8, 2))
         self.car_var = tk.StringVar(value="")
         tk.Entry(hdr2, textvariable=self.car_var, bg=theme.BG3, fg=FG,
@@ -464,65 +465,65 @@ class App(tk.Tk):
         # row above never loses its controls to a window that is too narrow.
         hdr3 = tk.Frame(self, bg=theme.BG2, pady=2)
         hdr3.pack(fill="x")
-        tk.Label(hdr3, text="PREFERENCES", fg=DIM, bg=theme.BG2,
+        tk.Label(hdr3, text=L.PREFERENCES, fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 8)).pack(side="left", padx=(16, 2))
 
         self.debug_var = tk.BooleanVar(value=bool(runtime_config.DEBUG_LOG))
-        tk.Checkbutton(hdr3, text="DEBUG LOG", variable=self.debug_var,
+        tk.Checkbutton(hdr3, text=L.PREF_DEBUG_LOG, variable=self.debug_var,
                        command=self._on_debug_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 16))
 
         self.analytics_var = tk.BooleanVar(value=bool(runtime_config.ANALYTICS_ENABLED))
-        tk.Checkbutton(hdr3, text="SHARE USAGE DATA", variable=self.analytics_var,
+        tk.Checkbutton(hdr3, text=L.PREF_SHARE_USAGE_DATA, variable=self.analytics_var,
                        command=self._on_analytics_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.update_var = tk.BooleanVar(value=bool(runtime_config.UPDATE_CHECK_ENABLED))
-        tk.Checkbutton(hdr3, text="CHECK FOR UPDATES", variable=self.update_var,
+        tk.Checkbutton(hdr3, text=L.PREF_CHECK_FOR_UPDATES, variable=self.update_var,
                        command=self._on_update_check_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.ghost_var = tk.BooleanVar(value=bool(runtime_config.GHOST_ENABLED))
-        tk.Checkbutton(hdr3, text="TOP-LAP GHOST", variable=self.ghost_var,
+        tk.Checkbutton(hdr3, text=L.PREF_TOP_LAP_GHOST, variable=self.ghost_var,
                        command=self._on_ghost_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.notify_var = tk.BooleanVar(value=bool(runtime_config.NOTIFY_ENABLED))
-        tk.Checkbutton(hdr3, text="NOTIFICATIONS", variable=self.notify_var,
+        tk.Checkbutton(hdr3, text=L.PREF_NOTIFICATIONS, variable=self.notify_var,
                        command=self._on_notify_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.voice_var = tk.BooleanVar(value=bool(runtime_config.VOICE_ENABLED))
-        tk.Checkbutton(hdr3, text="VOICE ALERTS", variable=self.voice_var,
+        tk.Checkbutton(hdr3, text=L.PREF_VOICE_ALERTS, variable=self.voice_var,
                        command=self._on_voice_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.auto_lap_var = tk.BooleanVar(value=bool(runtime_config.AUTO_LAP_ENABLED))
-        tk.Checkbutton(hdr3, text="AUTO LAP", variable=self.auto_lap_var,
+        tk.Checkbutton(hdr3, text=L.PREF_AUTO_LAP, variable=self.auto_lap_var,
                        command=self._on_auto_lap_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.keep_awake_var = tk.BooleanVar(value=bool(runtime_config.KEEP_AWAKE_ENABLED))
-        tk.Checkbutton(hdr3, text="KEEP AWAKE", variable=self.keep_awake_var,
+        tk.Checkbutton(hdr3, text=L.PREF_KEEP_AWAKE, variable=self.keep_awake_var,
                        command=self._on_keep_awake_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.metrics_var = tk.BooleanVar(value=bool(runtime_config.METRICS_ENABLED))
-        tk.Checkbutton(hdr2, text=f"METRICS :{runtime_config.METRICS_PORT}", variable=self.metrics_var,
+        tk.Checkbutton(hdr2, text=L.METRICS_FMT.format(port=runtime_config.METRICS_PORT), variable=self.metrics_var,
                        command=self._on_metrics_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.metrics_bind_var = tk.BooleanVar(value=bool(runtime_config.METRICS_BIND_ALL))
-        tk.Checkbutton(hdr2, text="ALLOW REMOTE (METRICS)", variable=self.metrics_bind_var,
+        tk.Checkbutton(hdr2, text=L.ALLOW_REMOTE_METRICS, variable=self.metrics_bind_var,
                        command=self._on_metrics_bind_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
@@ -532,12 +533,12 @@ class App(tk.Tk):
         self.webui_url_lbl.bind("<Button-1>", lambda _e: self._copy_webui_url())
         self.webui_url_lbl.pack(side="right", padx=(4, 4))
         self.webui_bind_var = tk.BooleanVar(value=bool(runtime_config.WEBUI_BIND_ALL))
-        tk.Checkbutton(hdr2, text="ALLOW REMOTE (WEB UI)", variable=self.webui_bind_var,
+        tk.Checkbutton(hdr2, text=L.ALLOW_REMOTE_WEBUI, variable=self.webui_bind_var,
                        command=self._on_webui_bind_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
         self.webui_var = tk.BooleanVar(value=bool(runtime_config.WEBUI_ENABLED))
-        tk.Checkbutton(hdr2, text=f"WEB UI :{runtime_config.WEBUI_PORT}", variable=self.webui_var,
+        tk.Checkbutton(hdr2, text=L.WEBUI_FMT.format(port=runtime_config.WEBUI_PORT), variable=self.webui_var,
                        command=self._on_webui_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
@@ -553,7 +554,7 @@ class App(tk.Tk):
                                   style="Rate.TCombobox")
         rate_combo.pack(side="right", padx=(0, 4))
         rate_combo.bind("<<ComboboxSelected>>", lambda e: self._on_rate_change())
-        tk.Label(hdr2, text="REC RATE", fg=DIM, bg=theme.BG2,
+        tk.Label(hdr2, text=L.REC_RATE, fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 8)).pack(side="right", padx=(8, 2))
 
         for _row in (hdr, hdr2, hdr3):
@@ -605,11 +606,11 @@ class App(tk.Tk):
         self.speed_lbl = tk.Label(sg, text="0", fg=HI, bg=PNL,
                                   font=(theme.IMPACT, 64))
         self.speed_lbl.pack(side="left", padx=20)
-        tk.Label(sg, text="km/h", fg=DIM, bg=PNL,
+        tk.Label(sg, text=L.SPEED_UNIT, fg=DIM, bg=PNL,
                  font=(theme.MONO, 14)).pack(side="left", pady=(24, 0))
         sg_mid = tk.Frame(sg, bg=PNL)
         sg_mid.pack(side="left", expand=True)
-        tk.Label(sg_mid, text="SUGGEST", fg=DIM, bg=PNL, font=(theme.MONO, 8)).pack()
+        tk.Label(sg_mid, text=L.SUGGEST, fg=DIM, bg=PNL, font=(theme.MONO, 8)).pack()
         self.sug_gear_lbl = tk.Label(sg_mid, text="--", fg=theme.GOLD, bg=PNL,
                                      font=(theme.MONO, 20, "bold"))
         self.sug_gear_lbl.pack()
@@ -746,7 +747,7 @@ class App(tk.Tk):
         foot_f.pack(fill="x", padx=6, pady=(0, 3))
         tk.Label(foot_f, text="Estimates from live data. GT7 sends no tyre wear; fuel burn-off hides some pace loss.",
                  fg=DIM, bg=BG, font=(theme.MONO, 7), anchor="w").pack(side="left")
-        new_tyres = tk.Label(foot_f, text="[ NEW TYRES ]", fg=ACC, bg=BG, cursor="hand2",
+        new_tyres = tk.Label(foot_f, text=L.NEW_TYRES, fg=ACC, bg=BG, cursor="hand2",
                              font=(theme.MONO, 8, "bold"))
         new_tyres.pack(side="right")
         new_tyres.bind("<Button-1>", lambda _e: self._on_new_tyres())
@@ -794,7 +795,7 @@ class App(tk.Tk):
 
         gr_f = tk.Frame(left, bg=BG)
         gr_f.pack(fill="x", pady=(0, 4), padx=4)
-        tk.Label(gr_f, text="GEAR RATIOS:", fg=DIM, bg=BG, font=(theme.MONO, 8)).pack(side="left", padx=4)
+        tk.Label(gr_f, text=L.GEAR_RATIOS, fg=DIM, bg=BG, font=(theme.MONO, 8)).pack(side="left", padx=4)
         self.gr_lbl = tk.Label(gr_f, text="--", fg=FG, bg=BG, font=(theme.MONO, 8))
         self.gr_lbl.pack(side="left")
 
@@ -858,11 +859,11 @@ class App(tk.Tk):
         af = tk.Frame(right, bg=BG)
         af.pack(fill="x", pady=(0, 4))
 
-        self.alert_hot  = tk.Label(af, text="TYRE HOT",  bg=theme.RED_2, fg="#fff",
+        self.alert_hot  = tk.Label(af, text=L.ALERT_TYRE_HOT,  bg=theme.RED_2, fg="#fff",
                                    font=(theme.MONO, 8, "bold"), padx=5, pady=2)
-        self.alert_cold = tk.Label(af, text="TYRE COLD", bg=theme.TEAL, fg=theme.TEAL_2,
+        self.alert_cold = tk.Label(af, text=L.ALERT_TYRE_COLD, bg=theme.TEAL, fg=theme.TEAL_2,
                                    font=(theme.MONO, 8, "bold"), padx=5, pady=2)
-        self.alert_fuel = tk.Label(af, text="FUEL LOW",  bg=theme.GOLD, fg="#000",
+        self.alert_fuel = tk.Label(af, text=L.ALERT_FUEL_LOW,  bg=theme.GOLD, fg="#000",
                                    font=(theme.MONO, 8, "bold"), padx=5, pady=2)
         # hidden until triggered — _poll calls grid / grid_remove
         self.alert_hot.grid( in_=af, row=0, column=0, padx=2, pady=1)
@@ -873,16 +874,16 @@ class App(tk.Tk):
         self.alert_fuel.grid_remove()
 
         # ── Track map ────────────────────────────────────────────────────────
-        tk.Label(right, text="TRACK MAP", fg=ACC, bg=BG,
+        tk.Label(right, text=L.TRACK_MAP, fg=ACC, bg=BG,
                  font=(theme.MONO, 9, "bold")).pack(anchor="w", padx=2)
         self.map_canvas = tk.Canvas(right, bg=theme.CBG, width=theme.px(240), height=theme.px(180),
                                     highlightthickness=1, highlightbackground=DIM)
         self.map_canvas.pack(pady=(0, 4))
-        self.map_canvas.create_text(theme.px(120), theme.px(90), text="WAITING FOR DATA",
+        self.map_canvas.create_text(theme.px(120), theme.px(90), text=L.WAITING_FOR_DATA,
                                     fill=theme.BG3, font=(theme.MONO, 9))
 
         # ── Lap history ──────────────────────────────────────────────────────
-        tk.Label(right, text="LAP HISTORY", fg=ACC, bg=BG,
+        tk.Label(right, text=L.LAP_HISTORY, fg=ACC, bg=BG,
                  font=(theme.MONO, 9, "bold")).pack(anchor="w", padx=2)
 
         hist_outer = tk.Frame(right, bg=BG)
@@ -922,7 +923,7 @@ class App(tk.Tk):
         self.hist_tree.pack(side="left", fill="both", expand=True)
 
         # ── Log ──────────────────────────────────────────────────────────────
-        tk.Label(right, text="LOG", fg=ACC, bg=BG,
+        tk.Label(right, text=L.LOG, fg=ACC, bg=BG,
                  font=(theme.MONO, 9, "bold")).pack(anchor="w", pady=(2, 2), padx=2)
         log_box = tk.Frame(right, bg=BG)
         log_box.pack(fill="both", expand=True)
@@ -942,7 +943,7 @@ class App(tk.Tk):
         pts = list(self._track_pts)
 
         if len(pts) < 2:
-            c.create_text(theme.px(120), theme.px(90), text="WAITING FOR DATA",
+            c.create_text(theme.px(120), theme.px(90), text=L.WAITING_FOR_DATA,
                           fill=theme.BG3, font=(theme.MONO, 9))
             return
 
@@ -1215,7 +1216,7 @@ class App(tk.Tk):
             self._post(self._on_discover_done, found_ip)
 
     def _on_discover_done(self, found_ip):
-        self.discover_btn.config(state="normal", text="Auto-Detect")
+        self.discover_btn.config(state="normal", text=L.AUTO_DETECT)
         if found_ip:
             self.ip_var.set(found_ip)
             self.log_msg(f"Auto-detect: found a console at {found_ip}")
@@ -1451,7 +1452,7 @@ class App(tk.Tk):
         ok = telem.is_connected()
 
         self.conn_dot.config(
-            text="● LIVE" if ok else "● OFFLINE",
+            text=L.STATUS_ONLINE if ok else "● OFFLINE",
             fg=theme.GREEN if ok else theme.DIM
         )
 
@@ -2349,7 +2350,7 @@ class App(tk.Tk):
         session.samples   = []
         self._auto_lap_active = False
         self._auto_lap_since = self._auto_lap_off_since = None
-        self.rec_btn.config(text="Record Lap", bg=theme.BG3)
+        self.rec_btn.config(text=L.RECORD_LAP, bg=theme.BG3)
         self.log_msg(f"Auto lap: {why}" + (f" -- partial lap ({n} samples) discarded" if n else ""))
 
     def _auto_lap_step(self, d, now):
@@ -2402,7 +2403,7 @@ class App(tk.Tk):
         session.samples   = []
         session.cur_lap   = telem.get_int("lap_number")
         session.prev_lap  = session.cur_lap
-        self.rec_btn.config(text="Waiting for start line...", bg=theme.GOLD)
+        self.rec_btn.config(text=L.WAITING_FOR_START_LINE, bg=theme.GOLD)
         self.log_msg("Armed -- cross the start line to begin recording")
 
     def _stop_record(self):
@@ -2412,7 +2413,7 @@ class App(tk.Tk):
             self._auto_lap_block = True
         session.recording = False
         session.waiting   = False
-        self.rec_btn.config(text="Record Lap", bg=theme.BG3)
+        self.rec_btn.config(text=L.RECORD_LAP, bg=theme.BG3)
         samples, session.samples = session.samples, []
         if samples:
             self._save_lap(samples, lap_time_ms=None, incomplete=True)
@@ -2495,12 +2496,12 @@ class App(tk.Tk):
         self._rec_due_race = 0.0
         session.race_recording = True
         self._td_race_reset()
-        self.race_btn.config(text="Stop Race Recording", bg=theme.RED_2)
+        self.race_btn.config(text=L.STOP_RACE_RECORDING, bg=theme.RED_2)
         self.log_msg("Race recording started")
 
     def _stop_record_race(self, notify_end=False):
         session.race_recording = False
-        self.race_btn.config(text="Record Race", bg=theme.BG3)
+        self.race_btn.config(text=L.RECORD_RACE, bg=theme.BG3)
         samples, session.race_samples = session.race_samples, []
         if samples:
             self._save_race(samples, background=True, notify_end=notify_end)
@@ -2792,7 +2793,7 @@ class App(tk.Tk):
                 session.recording = True
                 session.start_t   = now
                 session.prev_lap  = lap
-                self.rec_btn.config(text="Stop Recording", bg=theme.RED_2)
+                self.rec_btn.config(text=L.STOP_RECORDING, bg=theme.RED_2)
                 self.log_msg(f"Start line crossed -- recording lap {lap}")
             else:
                 session.prev_lap = lap
@@ -2812,7 +2813,7 @@ class App(tk.Tk):
             session.prev_lap  = lap
             session.recording = False
             session.waiting   = True
-            self.rec_btn.config(text="Waiting for start line...", bg=theme.GOLD)
+            self.rec_btn.config(text=L.WAITING_FOR_START_LINE, bg=theme.GOLD)
             return
 
         if lap > session.prev_lap:
