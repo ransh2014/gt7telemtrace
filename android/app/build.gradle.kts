@@ -9,8 +9,8 @@ android {
         applicationId = "app.trace.gt7"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1004
-        versionName = "1.0.4"
+        versionCode = 1100
+        versionName = "1.1.0"
     }
     val ks = System.getenv("TRACE_KEYSTORE")
     signingConfigs {
@@ -23,7 +23,13 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: drops unused code (most of Compose/Material3/coroutines we never call) and shortens names;
+            // the resource shrinker then drops resources nothing references. Rules: proguard-rules.pro.
+            // One universal APK stays the only download: the app has no native libraries, so there is
+            // nothing per-ABI to split.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = if (ks != null) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }

@@ -28,6 +28,7 @@ from . import (
     notify,
     theme,
     trackdetect,
+    updates,
     voice,
     webui_server,
 )
@@ -364,6 +365,7 @@ class App(tk.Tk):
         self.after(200, self._poll)
         self.after(_RECORD_TICK_MS, self._record_tick)
         self.after(50, self._drain_uiq)
+        self.after(500, self._webui_auth_refresh)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Build UI
@@ -481,10 +483,11 @@ class App(tk.Tk):
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.update_var = tk.BooleanVar(value=bool(runtime_config.UPDATE_CHECK_ENABLED))
-        tk.Checkbutton(hdr3, text=L.PREF_CHECK_FOR_UPDATES, variable=self.update_var,
-                       command=self._on_update_check_toggle, bg=theme.BG2, fg=DIM,
-                       selectcolor=theme.BG3, activebackground=theme.BG2,
-                       font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
+        if not updates.is_store_install():   # the Microsoft Store handles updates itself
+            tk.Checkbutton(hdr3, text=L.PREF_CHECK_FOR_UPDATES, variable=self.update_var,
+                           command=self._on_update_check_toggle, bg=theme.BG2, fg=DIM,
+                           selectcolor=theme.BG3, activebackground=theme.BG2,
+                           font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
 
         self.ghost_var = tk.BooleanVar(value=bool(runtime_config.GHOST_ENABLED))
         tk.Checkbutton(hdr3, text=L.PREF_TOP_LAP_GHOST, variable=self.ghost_var,
@@ -557,9 +560,29 @@ class App(tk.Tk):
         tk.Label(hdr2, text=L.REC_RATE, fg=DIM, bg=theme.BG2,
                  font=(theme.MONO, 8)).pack(side="right", padx=(8, 2))
 
+        # ── WEB UI passcode panel: code, QR and LOG OUT ALL DEVICES next to the address. Shown only while
+        # WEB UI and ALLOW REMOTE (WEB UI) are both on (_webui_auth_refresh packs / unpacks it under hdr3).
+        self._hdr3 = hdr3
+        self.webui_auth_row = tk.Frame(self, bg=theme.BG2, pady=6)
+        self.webui_qr = tk.Canvas(self.webui_auth_row, width=1, height=1, bg="#ffffff", highlightthickness=0)
+        self.webui_qr.pack(side="left", padx=(16, 12))
+        _code_col = tk.Frame(self.webui_auth_row, bg=theme.BG2)
+        _code_col.pack(side="left", padx=(0, 16))
+        tk.Label(_code_col, text=L.WEBUI_CODE, fg=DIM, bg=theme.BG2, font=(theme.MONO, 8)).pack(anchor="w")
+        self.webui_code_lbl = tk.Label(_code_col, text="", fg=FG, bg=theme.BG2, font=(theme.MONO, 28, "bold"))
+        self.webui_code_lbl.pack(anchor="w")
+        tk.Label(_code_col, text=L.WEBUI_SCAN, fg=DIM, bg=theme.BG2, font=(theme.MONO, 8)).pack(anchor="w")
+        self.webui_auth_url_lbl = tk.Label(_code_col, text="", fg=ACC, bg=theme.BG2, font=(theme.MONO, 9))
+        self.webui_auth_url_lbl.pack(anchor="w")
+        tk.Button(self.webui_auth_row, text=L.LOG_OUT_ALL_DEVICES, command=self._on_webui_logout_all,
+                  bg=theme.BG3, fg=ACC, relief="flat", activebackground=theme.LINE2, activeforeground=FG,
+                  highlightthickness=1, highlightbackground=theme.LINE2, bd=0, font=(theme.MONO, 9, "bold"),
+                  padx=12, pady=4, cursor="hand2").pack(side="left", padx=4)
+        self._webui_qr_url = ""
+
         for _row in (hdr, hdr2, hdr3):
             theme.reflow(_row)
-        self._add_tooltips(hdr, hdr2, hdr3)
+        self._add_tooltips(hdr, hdr2, hdr3, self.webui_auth_row)
 
         # ── Body ─────────────────────────────────────────────────────────────
         body = tk.Frame(self, bg=BG)
@@ -1088,9 +1111,55 @@ class App(tk.Tk):
         self._webui_url = f"http://{host}:{port}"
         self.webui_url_lbl.config(text=self._webui_url + "  (click to copy)")
         self.log_msg(f"Web UI on {self._webui_url}" + (
-            " -- no password: anyone on your network can see live telemetry" if runtime_config.WEBUI_BIND_ALL
+            " -- other devices need the code shown under the header, or scan its QR" if runtime_config.WEBUI_BIND_ALL
             else " -- this PC only (tick ALLOW REMOTE to open it from a phone)"))
+        self._webui_auth_refresh(reschedule=False)
         return True
+
+    def _webui_auth_refresh(self, reschedule=True):
+        """Show / hide the passcode panel and redraw the QR when its one-time token changes (used or 5 min old)."""
+        try:
+            if webui_server.auth_required():
+                host = webui_server.lan_ip() or "this-pc-ip"
+                port = runtime_config.WEBUI_PORT
+                code = webui_server.code()
+                self.webui_code_lbl.config(text=f"{code[:3]} {code[3:]}")
+                self.webui_auth_url_lbl.config(text=f"http://{host}:{port}")
+                url = webui_server.qr_url(host, port) if webui_server.lan_ip() else ""
+                if url != self._webui_qr_url:
+                    self._webui_qr_url = url
+                    self._draw_qr(url)
+                if not self.webui_auth_row.winfo_ismapped():
+                    self.webui_auth_row.pack(fill="x", after=self._hdr3)
+            elif self.webui_auth_row.winfo_ismapped() or self._webui_qr_url:
+                self.webui_auth_row.pack_forget()
+                self._webui_qr_url = ""
+                self.webui_code_lbl.config(text="")
+        except tk.TclError:
+            return
+        if reschedule:
+            self.after(2000, self._webui_auth_refresh)
+
+    def _draw_qr(self, url):
+        c = self.webui_qr
+        c.delete("all")
+        if not url:
+            c.config(width=1, height=1)
+            return
+        from . import qr
+        m = qr.encode(url)
+        cell, quiet = 3, 4
+        side = (len(m) + 2 * quiet) * cell
+        c.config(width=side, height=side)
+        for y, row in enumerate(m):
+            for x, dark in enumerate(row):
+                if dark:
+                    x0, y0 = (x + quiet) * cell, (y + quiet) * cell
+                    c.create_rectangle(x0, y0, x0 + cell, y0 + cell, fill="#000000", width=0)
+
+    def _on_webui_logout_all(self):
+        webui_server.logout_all()
+        self.log_msg("Web UI: logged out all devices -- each one needs the code again")
 
     def _copy_webui_url(self):
         url = getattr(self, "_webui_url", "")
@@ -1113,6 +1182,7 @@ class App(tk.Tk):
         else:
             webui_server.stop()
             self.webui_url_lbl.config(text="")
+            self._webui_auth_refresh(reschedule=False)
             self.log_msg("Web UI disabled")
 
     def _on_webui_bind_toggle(self):
@@ -1124,6 +1194,7 @@ class App(tk.Tk):
                 self.webui_var.set(False)
                 runtime_config.WEBUI_ENABLED = False
                 runtime_config.save(WEBUI_ENABLED=False)
+            self._webui_auth_refresh(reschedule=False)
         else:
             self.log_msg("Web UI will bind to your LAN next time it's enabled" if runtime_config.WEBUI_BIND_ALL
                          else "Web UI will bind to localhost only next time it's enabled")
@@ -1816,8 +1887,9 @@ class App(tk.Tk):
         ("METRICS", "Serve live gauges for Grafana or Prometheus on this PC. Off by default."),
         ("ALLOW REMOTE (METRICS)", "Let other devices on your network read the metrics. There is no password, "
                                    "so only do this on a network you trust."),
-        ("ALLOW REMOTE (WEB UI)", "Let phones and tablets on your network open the web dashboard. There is no "
-                                  "password, so only do this on a network you trust."),
+        ("ALLOW REMOTE (WEB UI)", "Let phones and tablets on your network open the web dashboard. They need the "
+                                  "6-digit code (or the QR) shown here; this PC itself never does."),
+        ("LOG OUT ALL DEVICES", "Sign every phone and tablet out of the web dashboard, including remembered ones."),
         ("WEB UI", "Serve a live, read-only dashboard to phones and tablets on your Wi-Fi. Off by default."),
         ("KEEP AWAKE", "Stop this PC from sleeping while the Dashboard is open."),
         ("AUTO LAP", "In time trial and practice, record laps by themselves from the next start/finish crossing."),

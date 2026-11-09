@@ -427,7 +427,10 @@ function connect(){
    $("ident").textContent=[S.car,S.track].filter(Boolean).join(" · ")}
   else if(m.type==="track"){TRACK=m.pts||[]}
   else if(m.type==="idle"){setConn("wait","WAITING")}};
- ws.onclose=function(){ws=null;setConn("off","DISCONNECTED");setTimeout(connect,backoff);backoff=Math.min(8000,backoff*1.6)};
+ ws.onclose=function(){ws=null;setConn("off","DISCONNECTED");
+  /* logged out (LOG OUT ALL DEVICES, or the WEB UI was turned off and on): back to the code page */
+  fetch("/session",{cache:"no-store",credentials:"same-origin"}).then(function(r){if(r.status===401)location.reload()}).catch(function(){});
+  setTimeout(connect,backoff);backoff=Math.min(8000,backoff*1.6)};
  ws.onerror=function(){try{ws.close()}catch(e){}};
 }
 

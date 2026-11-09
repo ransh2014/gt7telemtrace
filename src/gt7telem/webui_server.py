@@ -12,7 +12,9 @@ Design rules (mirrors metrics_server.py):
   * optional: a busy port or a missing ``websockets`` install makes start()
     return False instead of raising;
   * read-only: anything a client sends is ignored;
-  * nothing is sent to the internet.
+  * nothing is sent to the internet;
+  * with ALLOW REMOTE on, every page, API route and the /ws stream needs the passcode (webui_auth.py): a 6-digit
+    code, the Dashboard's QR link or a remembered device. Requests from this machine (127.0.0.1 / ::1) skip it.
 
 Testable without a console: start(), then call update() with dicts shaped like
 udp.get_snapshot() (or samples from a saved lap file).
@@ -24,10 +26,13 @@ import socket
 import threading
 import time
 from collections import deque
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
-__all__ = ["start", "stop", "update", "is_running", "lan_ip", "build_frame",
-           "DEFAULT_PORT", "MIN_HZ", "MAX_HZ", "MAX_CLIENTS"]
+from . import webui_auth
+from .webui_auth import DEVICE_COOKIE, DEVICE_DAYS, SESSION_COOKIE, is_loopback, parse_cookies
+
+__all__ = ["start", "stop", "update", "is_running", "lan_ip", "build_frame", "auth_required", "code",
+           "qr_url", "logout_all", "DEFAULT_PORT", "MIN_HZ", "MAX_HZ", "MAX_CLIENTS"]
 
 DEFAULT_PORT = 8080
 MIN_HZ, MAX_HZ = 5, 60
@@ -45,9 +50,49 @@ _track = {"pts": deque(maxlen=_TRACK_MAX_POINTS), "version": 0, "key": None}
 _laps = []                   # [(lap_number, ms)] of completed laps this session
 _last_lap_ms = [None]
 
+# passcode state (memory only) and whether the server is reachable from other devices
+_auth = webui_auth.Auth()
+_remote = [False]
+_LOOPBACK_BYPASS = True      # tests turn this off to exercise the remote path from 127.0.0.1
+_AUTH_RECHECK_S = 1.0        # how often an open /ws re-checks its login (LOG OUT ALL DEVICES closes it)
+_SEC_HEADERS = (("X-Content-Type-Options", "nosniff"), ("X-Frame-Options", "DENY"), ("Referrer-Policy", "no-referrer"))
+
 
 def is_running() -> bool:
     return bool(_state["running"])
+
+
+def auth_required() -> bool:
+    """True while the server is up with ALLOW REMOTE on, i.e. other devices need the code."""
+    return bool(_state["running"] and _remote[0])
+
+
+def code() -> str:
+    """The current 6-digit code ("" when the WEB UI is off). Shown in the Dashboard only, never logged."""
+    return _auth.code if _state["running"] else ""
+
+
+def qr_url(host: str, port: int) -> str:
+    """The link the Dashboard's QR encodes: http://<ip>:<port>/?t=<one-time login token>. A new token is issued
+    once the previous one was used or is 5 minutes old, so the QR on screen always works. "" when off."""
+    tok = _auth.qr_token() if _state["running"] else ""
+    return f"http://{host}:{port}/?t={tok}" if tok else ""
+
+
+def logout_all() -> None:
+    """LOG OUT ALL DEVICES: forget every session and remembered device (open live feeds close within a second)."""
+    _auth.logout_all()
+
+
+def _needs_auth(remote_address) -> bool:
+    if not _remote[0]:
+        return False
+    host = remote_address[0] if remote_address else ""
+    return not (_LOOPBACK_BYPASS and is_loopback(host))
+
+
+def _authed(headers, remote_address) -> bool:
+    return not _needs_auth(remote_address) or _auth.is_authed(parse_cookies(headers.get("Cookie")))
 
 
 def lan_ip() -> str | None:
@@ -211,41 +256,95 @@ async def _serve(port, addr, hz, ready, result):
     from websockets.datastructures import Headers
     from websockets.http11 import Response
 
+    from .webui_login import LOGIN_PAGE
     from .webui_page import PAGE
 
     page = PAGE.encode("utf-8")
+    login = LOGIN_PAGE.encode("utf-8")
     interval = 1.0 / _clamp_hz(hz)
     clients = set()
 
-    def respond(status, body, ctype="text/plain; charset=utf-8"):
+    def respond(status, body, ctype="text/plain; charset=utf-8", extra=()):
         h = Headers([
             ("Content-Type", ctype), ("Content-Length", str(len(body))),
-            ("Cache-Control", "no-store"), ("X-Content-Type-Options", "nosniff"),
-            ("Referrer-Policy", "no-referrer"),
+            ("Cache-Control", "no-store"), *_SEC_HEADERS,
             ("Content-Security-Policy",
              "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-             "connect-src 'self' ws: wss:; font-src data:; img-src 'self' data:; manifest-src 'self'"),
+             "connect-src 'self' ws: wss:; font-src data:; img-src 'self' data:; manifest-src 'self'; "
+             "form-action 'self'; frame-ancestors 'none'; base-uri 'none'"),
+            *extra,
         ])
         return Response(status.value, status.phrase, h, body)
 
+    def cookie(name, value, max_age=None):
+        # Secure only over HTTPS; this server is plain HTTP on the LAN, so it is never set here.
+        c = f"{name}={value}; Path=/; HttpOnly; SameSite=Strict"
+        return ("Set-Cookie", c + (f"; Max-Age={max_age}" if max_age else ""))
+
+    def login_page():
+        return respond(http.HTTPStatus.UNAUTHORIZED, login, "text/html; charset=utf-8")
+
+    def same_origin(request):
+        origin = request.headers.get("Origin")
+        host = request.headers.get("Host", "")
+        return not origin or urlsplit(origin).netloc.lower() == host.lower()
+
     async def process_request(connection, request):
-        path = request.path.split("?", 1)[0]
+        parts = urlsplit(request.path)
+        path = parts.path
+        peer = getattr(connection, "remote_address", None)
+        need = _needs_auth(peer)
+        if path in ("/", "/index.html"):
+            query = parse_qsl(parts.query, keep_blank_values=True)
+            token = next((v for k, v in query if k == "t"), None)
+            if token is not None:
+                if need and not _auth.consume_qr(token):
+                    return login_page()
+                # 302 to the same path WITHOUT the token so it never stays in history
+                rest = urlencode([(k, v) for k, v in query if k != "t"])
+                extra = [("Location", path + ("?" + rest if rest else ""))]
+                if need:
+                    extra.append(cookie(SESSION_COOKIE, _auth.new_session()))
+                return respond(http.HTTPStatus.FOUND, b"", extra=extra)
+            if not _authed(request.headers, peer):
+                return login_page()
+            return respond(http.HTTPStatus.OK, page, "text/html; charset=utf-8")
+        if path == "/login":
+            if not same_origin(request):
+                return respond(http.HTTPStatus.FORBIDDEN, b"Forbidden\n")
+            if not need:
+                return respond(http.HTTPStatus.NO_CONTENT, b"")
+            ip = peer[0] if peer else "?"
+            if not _auth.check_code(ip, request.headers.get("X-Trace-Code")):
+                return respond(http.HTTPStatus.UNAUTHORIZED, b"Wrong code or too many tries\n")
+            extra = [cookie(SESSION_COOKIE, _auth.new_session())]
+            if request.headers.get("X-Trace-Remember") == "1":
+                extra.append(cookie(DEVICE_COOKIE, _auth.remember_device(), DEVICE_DAYS * 86400))
+            return respond(http.HTTPStatus.NO_CONTENT, b"", extra=extra)
+        if not _authed(request.headers, peer):
+            # nothing -- not the feed, not even a 404 -- before the code
+            return login_page()
+        if path == "/session":
+            return respond(http.HTTPStatus.NO_CONTENT, b"")
         if path == "/ws":
-            origin = request.headers.get("Origin")
-            host = request.headers.get("Host", "")
             # a web page on another site must not be able to read the feed
-            if origin and urlsplit(origin).netloc.lower() != host.lower():
+            if not same_origin(request):
                 return respond(http.HTTPStatus.FORBIDDEN, b"Forbidden\n")
             if len(clients) >= MAX_CLIENTS:
                 return respond(http.HTTPStatus.SERVICE_UNAVAILABLE, b"Too many viewers\n")
             return None
-        if path in ("/", "/index.html"):
-            return respond(http.HTTPStatus.OK, page, "text/html; charset=utf-8")
         return respond(http.HTTPStatus.NOT_FOUND, b"Not found\n")
+
+    def process_response(connection, request, response):
+        for k, v in _SEC_HEADERS:          # the 101 upgrade gets the same headers as every other response
+            if k not in response.headers:
+                response.headers[k] = v
+        return response
 
     async def handler(ws):
         clients.add(ws)
         seq, tkey, tsent, idle = -1, None, 0.0, False
+        checked = time.monotonic()
         try:
             await ws.send(json.dumps({"type": "hello", "hz": _clamp_hz(hz)}))
 
@@ -256,6 +355,11 @@ async def _serve(port, addr, hz, ready, result):
             try:
                 while not reader.done():
                     now = time.monotonic()
+                    if now - checked >= _AUTH_RECHECK_S:
+                        checked = now
+                        if not _state["running"] or not _authed(ws.request.headers, ws.remote_address):
+                            await ws.close(4401, "logged out")
+                            break
                     key = (_track["version"], len(_track["pts"]) // 20)
                     if key != tkey and (tkey is None or key[0] != tkey[0] or now - tsent > _TRACK_REFRESH_S):
                         await ws.send(_track_message())
@@ -277,6 +381,7 @@ async def _serve(port, addr, hz, ready, result):
 
     try:
         server = await serve(handler, addr, port, process_request=process_request,
+                             process_response=process_response,
                              max_size=1024, ping_interval=20, ping_timeout=20)
     except Exception as e:
         result["error"] = f"{type(e).__name__}: {e}"
@@ -299,8 +404,8 @@ def start(port: int = DEFAULT_PORT, addr: str = "127.0.0.1", hz: int = 30) -> bo
     Returns True if the server is up afterwards, False if it could not start
     (port busy, ``websockets`` missing/too old, anything else). Binds to
     localhost by default; pass addr="0.0.0.0" to let other devices connect --
-    there is no password, so anyone on that network could then read live
-    telemetry."""
+    they then need the passcode (code(), qr_url()). Every start issues a new
+    code and QR token and drops every session."""
     with _lock:
         if _state["running"]:
             return True
@@ -310,6 +415,8 @@ def start(port: int = DEFAULT_PORT, addr: str = "127.0.0.1", hz: int = 30) -> bo
             return False
         ready = threading.Event()
         result: dict = {}
+        _remote[0] = not (is_loopback(addr) or addr == "localhost")
+        _auth.rotate()
 
         def run():
             loop = asyncio.new_event_loop()
@@ -332,6 +439,7 @@ def start(port: int = DEFAULT_PORT, addr: str = "127.0.0.1", hz: int = 30) -> bo
         ready.wait(timeout=5)
         if not result.get("ok"):
             _state.update(thread=None, loop=None, stop=None, running=False)
+            _auth.end()
             last_error[0] = result.get("error")
             return False
         last_error[0] = None
@@ -348,6 +456,7 @@ def stop() -> None:
     with _lock:
         loop, ev, t = _state["loop"], _state["stop"], _state["thread"]
         _state["running"] = False
+        _auth.end()            # turning the WEB UI off logs every device out of this session
         if loop is not None and ev is not None:
             try:
                 loop.call_soon_threadsafe(ev.set)

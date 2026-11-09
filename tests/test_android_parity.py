@@ -136,3 +136,36 @@ def test_webui_asset_matches_the_desktop_page():
     spec.loader.exec_module(mod)
     asset = ANDROID / "assets" / "webui.html"
     assert asset.read_text(encoding="utf-8") == mod.render(), "run  python tools/gen_android_webui.py"
+
+
+def _gen_webui():
+    spec = importlib.util.spec_from_file_location("gen_android_webui", ROOT / "tools" / "gen_android_webui.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_webui_login_asset_and_qr_golden_match_the_desktop():
+    mod = _gen_webui()
+    assert (ANDROID / "assets" / "webui_login.html").read_text(encoding="utf-8") == mod.render_login(), \
+        "run  python tools/gen_android_webui.py"
+    golden = ROOT / "android" / "telemetry" / "src" / "test" / "resources" / "qr_golden.json"
+    assert golden.read_text(encoding="utf-8") == mod.render_qr_golden(), "run  python tools/gen_android_webui.py"
+
+
+def test_webui_passcode_rules_match_the_desktop():
+    """WebAuth.kt must use the same cookie names, limits and timings as webui_auth.py, and the Android server must
+    actually use it (login page, QR link, LOG OUT ALL DEVICES, security headers)."""
+    from gt7telem import webui_auth as A
+    kt = (ROOT / "android" / "telemetry" / "src" / "main" / "kotlin" / "app" / "trace" / "telemetry" / "WebAuth.kt").read_text(encoding="utf-8")
+    for name, want in (("SESSION_COOKIE", f'"{A.SESSION_COOKIE}"'), ("DEVICE_COOKIE", f'"{A.DEVICE_COOKIE}"'),
+                       ("DEVICE_DAYS", str(A.DEVICE_DAYS)), ("QR_TTL_S", f"{float(A.QR_TTL_S)}"),
+                       ("MAX_TRIES", str(A.MAX_TRIES)), ("LOCK_BASE_S", f"{float(A.LOCK_BASE_S)}"),
+                       ("LOCK_MAX_S", f"{float(A.LOCK_MAX_S)}")):
+        assert re.search(rf"const val {name} = {re.escape(want)}(?![\w.])", kt), f"WebAuth.{name} differs from the desktop"
+    srv = (ANDROID / "kotlin" / "app" / "trace" / "WebUiServer.kt").read_text(encoding="utf-8")
+    for needle in ("WebAuth(", "auth.rotate()", "auth.end()", "auth.checkCode(", "auth.consumeQr(", "x-trace-code",
+                   "x-trace-remember", "HttpOnly; SameSite=Strict", "X-Frame-Options: DENY", "\"/session\""):
+        assert needle in srv, needle
+    ctl = (ANDROID / "kotlin" / "app" / "trace" / "LiveController.kt").read_text(encoding="utf-8")
+    assert "webui_login.html" in ctl and "QrCode.encode(" in ctl and "devices.json" in ctl

@@ -45,3 +45,41 @@ def test_check_is_silent_on_error_and_cached():
     done.clear()
     updates.check("9.9.9", cb, fetch=lambda: pytest.fail("fetched twice"))
     assert done.wait(3) and got == [None, None]
+
+
+def _mock_rc(monkeypatch, rc):
+    import ctypes
+    import types
+    monkeypatch.setattr(updates.sys, "platform", "win32")
+    fake = types.SimpleNamespace(kernel32=types.SimpleNamespace(GetCurrentPackageFullName=lambda *a: rc))
+    monkeypatch.setattr(ctypes, "windll", fake, raising=False)
+
+
+@pytest.mark.parametrize("rc,expected", [(15700, False), (0, True), (122, True)])
+def test_is_store_install_return_codes(monkeypatch, rc, expected):
+    _mock_rc(monkeypatch, rc)
+    assert updates.is_store_install() is expected
+
+
+def test_is_store_install_false_off_windows_and_on_failure(monkeypatch):
+    monkeypatch.setattr(updates.sys, "platform", "linux")
+    assert updates.is_store_install() is False
+    import ctypes
+    monkeypatch.setattr(updates.sys, "platform", "win32")
+
+    class Boom:
+        @property
+        def kernel32(self):
+            raise OSError("no kernel32")
+    monkeypatch.setattr(ctypes, "windll", Boom(), raising=False)
+    assert updates.is_store_install() is False
+
+
+def test_check_makes_no_request_on_store_install(monkeypatch):
+    updates._cache.clear()
+    _mock_rc(monkeypatch, 0)
+    called = []
+    updates.check("9.9.9", called.append, fetch=lambda: pytest.fail("hit the network"))
+    import time
+    time.sleep(0.2)
+    assert called == []

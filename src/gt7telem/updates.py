@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import threading
 import urllib.request
 
@@ -20,6 +21,21 @@ AVAILABLE = "available"
 
 _lock = threading.Lock()
 _cache: dict[str, tuple] = {}   # installed version -> result tuple (or None)
+
+
+def is_store_install() -> bool:
+    """True when running from the Microsoft Store MSIX package (the Store handles updates there).
+    Uses kernel32.GetCurrentPackageFullName: 15700 (APPMODEL_ERROR_NO_PACKAGE) = not packaged;
+    0 or 122 (ERROR_INSUFFICIENT_BUFFER) = packaged. False on non-Windows or any failure."""
+    try:
+        if sys.platform != "win32":
+            return False
+        import ctypes
+        length = ctypes.c_uint32(0)
+        rc = ctypes.windll.kernel32.GetCurrentPackageFullName(ctypes.byref(length), None)
+        return rc in (0, 122)
+    except Exception:
+        return False
 
 
 def ver_tuple(s) -> tuple:
@@ -56,7 +72,10 @@ def fetch_latest():
 
 def check(installed: str, callback, fetch=fetch_latest) -> None:
     """Run the check on a background thread and call ``callback(result_or_None)`` from that thread.
-    Cached per installed version for the life of the process; never raises."""
+    Cached per installed version for the life of the process; never raises. Store installs make no request."""
+    if is_store_install():
+        return
+
     def work():
         with _lock:
             if installed in _cache:

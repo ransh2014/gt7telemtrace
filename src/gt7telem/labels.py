@@ -65,6 +65,10 @@ METRICS_FMT = "METRICS :{port}"
 ALLOW_REMOTE_METRICS = "ALLOW REMOTE (METRICS)"
 WEBUI_FMT = "WEB UI :{port}"
 ALLOW_REMOTE_WEBUI = "ALLOW REMOTE (WEB UI)"
+# WEB UI passcode panel (shown only while WEB UI and ALLOW REMOTE (WEB UI) are both on)
+WEBUI_CODE = "WEB UI CODE"
+WEBUI_SCAN = "SCAN TO OPEN"
+LOG_OUT_ALL_DEVICES = "LOG OUT ALL DEVICES"
 
 PREFERENCES = "PREFERENCES"
 # in the order they appear on screen, left to right

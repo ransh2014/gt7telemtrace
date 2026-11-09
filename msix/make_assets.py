@@ -13,7 +13,7 @@ from PIL import Image
 
 REPO = Path(__file__).resolve().parent.parent
 RES = REPO / "android/app/src/main/res"
-FG = RES / "mipmap-xxxhdpi/ic_launcher_foreground.png"
+FG = RES / "mipmap-xxxhdpi/ic_launcher_foreground.webp"   # lossless WebP: the same pixels as the old PNG
 COLORS = RES / "values/ic_launcher_colors.xml"
 
 

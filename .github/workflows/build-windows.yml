@@ -63,16 +63,11 @@ jobs:
               sys.exit(main())
           EOF
 
+      # packaging/TRACE-windows.spec = the old command line (one windowed TRACE.exe with the CSVs, fonts and
+      # websockets) plus checked size trims; upx=False on purpose (antivirus / Microsoft Store). See the spec.
       - name: Build TRACE.exe
         shell: bash
-        run: |
-          PKG_DIR=$(python -c "import gt7telem, os; print(os.path.dirname(gt7telem.__file__))")
-          pyinstaller --onefile --windowed --name TRACE \
-            --add-data "$PKG_DIR/car_ids.csv;gt7telem" \
-            --add-data "$PKG_DIR/course_ids.csv;gt7telem" \
-            --add-data "$PKG_DIR/fonts;gt7telem/fonts" \
-            --collect-submodules websockets \
-            entrypoint.py
+        run: pyinstaller --noconfirm packaging/TRACE-windows.spec
 
       - name: Zip the exe
         shell: bash

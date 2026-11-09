@@ -48,6 +48,9 @@
     <string name="allow_remote_metrics" translatable="false">"ALLOW REMOTE (METRICS)"</string>
     <string name="webui_fmt" translatable="false">"WEB UI :%1$s"</string>
     <string name="allow_remote_webui" translatable="false">"ALLOW REMOTE (WEB UI)"</string>
+    <string name="webui_code" translatable="false">"WEB UI CODE"</string>
+    <string name="webui_scan" translatable="false">"SCAN TO OPEN"</string>
+    <string name="log_out_all_devices" translatable="false">"LOG OUT ALL DEVICES"</string>
     <string name="preferences" translatable="false">"PREFERENCES"</string>
     <string name="pref_keep_awake" translatable="false">"KEEP AWAKE"</string>
     <string name="pref_auto_lap" translatable="false">"AUTO LAP"</string>

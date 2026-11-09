@@ -63,8 +63,14 @@ gt7telem/         The TRACE package itself (same source that ships on
                     read-only gauges page to phones/tablets/PCs on your network
                     (HTTP + WebSocket on one port, default 8080). Localhost only
                     unless you tick "ALLOW REMOTE (WEB UI)" next to WEB UI in the Live
-                    Dashboard. Needs the `websockets` package. Nothing leaves
-                    your LAN.
+                    Dashboard; other devices then need a 6-digit code (or the
+                    Dashboard's QR). Needs the `websockets` package. Nothing
+                    leaves your LAN.
+  webui_auth.py     The WEB UI passcode: 6-digit code, one-time QR login link,
+                    lockout after wrong tries, remembered devices (devices.json
+                    keeps only hashes) and LOG OUT ALL DEVICES
+  webui_login.py    The small "enter code" page shown before the passcode
+  qr.py             Tiny built-in QR code encoder for the WEB UI login link
   webui_page.py     The web dashboard's page (HTML/CSS/JS in one string, no CDN)
   webui_fonts.py    The website's fonts (Anton, Sora, Manrope, JetBrains Mono;
                     SIL OFL) embedded so the web dashboard works offline

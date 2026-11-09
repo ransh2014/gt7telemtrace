@@ -50,8 +50,12 @@ class LiveController(private val appCtx: Context) {
     var webUiOn by mutableStateOf(prefs.getBoolean("webui", false))
     var webRemoteOn by mutableStateOf(prefs.getBoolean("webui_remote", false))
     var webUiUrl by mutableStateOf("")
+    var webCode by mutableStateOf("")                               // the 6-digit WEB UI code (screen only, never logged)
+    var webQr by mutableStateOf<Array<BooleanArray>?>(null)         // QR for http://<ip>:8080/?t=<one-time token>
+    private var webQrUrl = ""
     private val autoLap = AutoLap()
-    private val webUi = WebUiServer { appCtx.assets.open("webui.html").readBytes() }
+    private val webUi = WebUiServer({ appCtx.assets.open("webui.html").readBytes() }, { appCtx.assets.open("webui_login.html").readBytes() },
+        File(appCtx.filesDir, "devices.json"))
     var battWarn by mutableStateOf<Int?>(null)       // charge % shown on the red low-battery bar; null = hidden
     val alerts = Alerts(appCtx)
     private val battery = BatteryGuard()
@@ -115,11 +119,21 @@ class LiveController(private val appCtx: Context) {
             say("Web UI: failed to start on port ${WebUiServer.PORT} (${webUi.lastError ?: "port in use?"})"); webUiOn = false; pref("webui", false); webUiUrl = ""
         } else {
             webUiUrl = "http://${if (webRemoteOn) (WebUiServer.lanIp() ?: "<phone-ip>") else "127.0.0.1"}:${WebUiServer.PORT}"
-            say("Web UI on -- open $webUiUrl" + if (webRemoteOn) " on any device on this network (no password -- trusted networks only)" else " (this phone only)")
+            say("Web UI on -- open $webUiUrl" + if (webRemoteOn) " on any device on this network -- enter the code shown here or scan the QR" else " (this phone only)")
         }
+        refreshWebAuth()
     }
-    fun onWebUi(v: Boolean) { webUiOn = v; pref("webui", v); if (v) startWebUi() else { webUi.stop(); webUiUrl = ""; say("Web UI off") } }
-    fun onWebRemote(v: Boolean) { webRemoteOn = v; pref("webui_remote", v); if (webUiOn) { webUi.stop(); startWebUi() } }
+    /** Code + QR for the passcode panel. The QR token is single use / 5 minutes, so the screen calls this every couple of seconds. */
+    fun refreshWebAuth() {
+        if (!webUi.authRequired) { webCode = ""; webQr = null; webQrUrl = ""; return }
+        webCode = webUi.code
+        val ip = WebUiServer.lanIp()
+        val url = if (ip != null) webUi.qrUrl(ip, WebUiServer.PORT) else ""
+        if (url != webQrUrl) { webQrUrl = url; webQr = try { QrCode.encode(url) } catch (_: Exception) { null } }
+    }
+    fun onLogOutAllDevices() { webUi.logoutAll(); say("Web UI: logged out all devices -- each one needs the code again") }
+    fun onWebUi(v: Boolean) { webUiOn = v; pref("webui", v); if (v) startWebUi() else { webUi.stop(); webUiUrl = ""; refreshWebAuth(); say("Web UI off") } }
+    fun onWebRemote(v: Boolean) { webRemoteOn = v; pref("webui_remote", v); if (webUiOn) { webUi.stop(); startWebUi() } else refreshWebAuth() }
 
     fun onNotify(v: Boolean) { notifyOn = v; pref("notify", v); say(if (v) "Notifications on" else "Notifications off") }
     private fun startMetrics() {
@@ -190,7 +204,7 @@ class LiveController(private val appCtx: Context) {
         thread(isDaemon = true, name = "trace-rec") { while (running) { try { synchronized(lock) { recorder.tick(client.latest, client.isConnected(), ctx()) }; recLapState = if (recorder.recording) 2 else if (recorder.waiting) 1 else 0; raceRec = recorder.raceRecording } catch (_: Exception) {}; Thread.sleep(16) } }
     }
 
-    fun stop() { running = false; releaseWake(); client.stop(); webUi.stop(); metrics.stop() }
+    fun stop() { running = false; releaseWake(); client.stop(); webUi.stop(); refreshWebAuth(); metrics.stop() }
 
     fun onIpChange(force: Boolean = false) { val v = ip.trim(); client.ip = v; prefs.edit().putString("ip", v).apply() }
     fun onRate(r: Int) { rate = r; recorder.recordRate = r; prefs.edit().putInt("rate", r).apply() }

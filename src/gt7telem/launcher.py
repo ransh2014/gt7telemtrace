@@ -66,6 +66,7 @@ _uiq = queue.SimpleQueue()  # worker threads -> Tk thread (root.after() isn't th
 _status_lbl = None          # the "current" / "update available" label on the menu, if shown
 _update_res = None          # last updates.check() result for this process (None = nothing to show)
 _update_done = False
+_STORE = updates.is_store_install()   # Microsoft Store (MSIX) build: the Store updates it, so no checks/prompts
 
 
 def _post(fn, *args):
@@ -97,7 +98,7 @@ def _paint_update_status():
     lbl = _status_lbl
     if lbl is None or not lbl.winfo_exists():
         return
-    res = _update_res if config.UPDATE_CHECK_ENABLED else None
+    res = _update_res if config.UPDATE_CHECK_ENABLED and not _STORE else None
     lbl.unbind("<Button-1>")
     if not res:
         lbl.config(text="", cursor="")
@@ -118,7 +119,7 @@ def _got_update_result(res):
 def _check_for_update():
     """Background: compare the installed version against GitHub's latest release. Silent on any failure;
     runs at most once per process and only if the user hasn't ticked "Ignore update checks"."""
-    if not config.UPDATE_CHECK_ENABLED:
+    if _STORE or not config.UPDATE_CHECK_ENABLED:
         return
     if _update_done:
         _paint_update_status()
@@ -355,14 +356,17 @@ def _show_menu():
     ver_row = tk.Frame(hdr, bg=BG)
     ver_row.pack()
     tk.Label(ver_row, text=L.VERSION_FMT.format(version=__version__), font=(theme.MONO, 9),
-              fg=DIM, bg=BG).pack(side="left")
-    _status_lbl = tk.Label(ver_row, text="", font=(theme.MONO, 9), fg=DIM, bg=BG)
-    _status_lbl.pack(side="left", padx=(8, 0))
-    ignore_var = tk.BooleanVar(value=not config.UPDATE_CHECK_ENABLED)
-    tk.Checkbutton(hdr, text=L.IGNORE_UPDATE_CHECKS, variable=ignore_var,
-                   command=lambda: _toggle_ignore_updates(ignore_var), bg=BG, fg=DIM,
-                   selectcolor=PANEL2, activebackground=BG, activeforeground=FG,
-                   font=(theme.MONO, 8), bd=0, highlightthickness=0).pack(pady=(2, 0))
+              fg=theme.GREEN if _STORE else DIM, bg=BG).pack(side="left")
+    if _STORE:
+        _status_lbl = None
+    else:
+        _status_lbl = tk.Label(ver_row, text="", font=(theme.MONO, 9), fg=DIM, bg=BG)
+        _status_lbl.pack(side="left", padx=(8, 0))
+        ignore_var = tk.BooleanVar(value=not config.UPDATE_CHECK_ENABLED)
+        tk.Checkbutton(hdr, text=L.IGNORE_UPDATE_CHECKS, variable=ignore_var,
+                       command=lambda: _toggle_ignore_updates(ignore_var), bg=BG, fg=DIM,
+                       selectcolor=PANEL2, activebackground=BG, activeforeground=FG,
+                       font=(theme.MONO, 8), bd=0, highlightthickness=0).pack(pady=(2, 0))
     tk.Label(hdr, text=L.LAUNCHER_SUBTITLE, font=(theme.BODY, 11),
               fg=DIM, bg=BG).pack(pady=(2, 4))
     if config.SUPABASE_ACCESS_TOKEN and config.PSN_NAME:

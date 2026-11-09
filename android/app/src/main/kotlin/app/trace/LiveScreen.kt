@@ -37,6 +37,7 @@ import app.trace.telemetry.Packet
 import app.trace.telemetry.TraceUtil
 import app.trace.telemetry.TraceUtil.Band
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 private fun Packet.d(k: String): Double = (this[k] as? Number)?.toDouble() ?: 0.0
 private fun Packet.i(k: String): Int = (this[k] as? Number)?.toInt() ?: 0
@@ -118,6 +119,9 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
                 Check(stringResource(R.string.metrics_fmt, 9109), c.metricsOn) { c.onMetrics(it) }
             }
             if (c.webUiOn && c.webUiUrl.isNotEmpty()) Text(c.webUiUrl, Modifier.clickable { }, color = D.acc, fontFamily = Mono, fontSize = 11.sp)
+            // passcode panel: code, QR and LOG OUT ALL DEVICES, only while WEB UI and ALLOW REMOTE (WEB UI) are both on
+            LaunchedEffect(c.webUiOn, c.webRemoteOn) { while (true) { c.refreshWebAuth(); delay(2000) } }
+            if (c.webUiOn && c.webRemoteOn && c.webCode.isNotEmpty()) WebAuthPanel(c)
             Text(stringResource(R.string.preferences), color = D.dim, fontFamily = Mono, fontSize = 10.sp)
             Grid(2, 8.dp) {
                 Check(stringResource(R.string.pref_keep_awake), c.keepAwake) { c.onKeepAwake(it) }; Check(stringResource(R.string.pref_auto_lap), c.autoLapOn) { c.onAutoLap(it) }
@@ -342,6 +346,28 @@ private fun SummaryDialog(c: LiveController, onDismiss: () -> Unit) {
 @Composable
 private fun Alert(t: String, bg: Color, fg: Color, active: Boolean) =
     Text(t, Modifier.alpha(if (active) 1f else .28f).background(bg).padding(8.dp, 6.dp), color = fg, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+
+@Composable
+private fun WebAuthPanel(c: LiveController) {
+    Row(Modifier.fillMaxWidth().background(D.tile).padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        c.webQr?.let { qr ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Canvas(Modifier.size(112.dp).background(Color.White)) {
+                    val n = qr.size + 8                       // 4-module quiet zone on each side
+                    val m = size.width / n
+                    for (y in qr.indices) for (x in qr.indices) if (qr[y][x])
+                        drawRect(Color.Black, Offset((x + 4) * m, (y + 4) * m), androidx.compose.ui.geometry.Size(m + 0.5f, m + 0.5f))
+                }
+                Text(stringResource(R.string.webui_scan), Modifier.padding(top = 4.dp), color = D.dim, fontFamily = Mono, fontSize = 9.sp)
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.webui_code), color = D.dim, fontFamily = Mono, fontSize = 10.sp)
+            Text(c.webCode.chunked(3).joinToString(" "), color = D.fg, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 30.sp, maxLines = 1)
+            DBtn(stringResource(R.string.log_out_all_devices), Modifier.fillMaxWidth(), fg = D.acc) { c.onLogOutAllDevices() }
+        }
+    }
+}
 
 @Composable
 private fun DBtn(text: String, m: Modifier = Modifier, bg: Color = D.tile, fg: Color = D.fg, onClick: () -> Unit = {}) =
