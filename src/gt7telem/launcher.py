@@ -22,18 +22,17 @@ if __name__ == "__main__" and (not __package__):
     __package__ = _pkg_dir.name                      # "gt7telem"
 
 import queue
-import re
 import threading
 import tkinter as tk
 import webbrowser
 
 from . import __version__, analytics, auth, config, lap_analyst, race_analyst, records, theme, updates
-from . import labels as L
 
 # Static imports so PyInstaller's analysis bundles these (and their deps:
 # numpy, pandas, matplotlib, pycryptodome) -- do NOT switch these back to
 # dynamic __import__() calls, PyInstaller can't see those.
 from . import dashboard as gt7telem
+from . import labels as L
 
 config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
 

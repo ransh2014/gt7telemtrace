@@ -29,7 +29,7 @@ def to_android(text: str) -> str:
     t = t.replace("\\", "\\\\").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     t = t.replace('"', '\\"')
     # wrapped in double quotes so aapt keeps runs of spaces (e.g. "Launch  ->") exactly as on the desktop
-    return '"' + t + '"' 
+    return '"' + t + '"'
 
 
 def render() -> str:

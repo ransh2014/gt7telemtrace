@@ -17,7 +17,6 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from . import labels as L
 from . import (
     __version__,
     auth,
@@ -33,6 +32,7 @@ from . import (
     uiscroll,
 )
 from . import config as runtime_config
+from . import labels as L
 
 matplotlib.use("TkAgg")
 import warnings

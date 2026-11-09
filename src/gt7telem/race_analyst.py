@@ -26,7 +26,6 @@ from matplotlib.patches import Polygon as MplPolygon
 
 warnings.filterwarnings("ignore")
 
-from . import labels as L  # noqa: E402
 from . import (  # noqa: E402
     __version__,
     consistency,
@@ -37,6 +36,7 @@ from . import (  # noqa: E402
     uiscroll,
 )
 from . import config as runtime_config  # noqa: E402
+from . import labels as L  # noqa: E402
 
 runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
 

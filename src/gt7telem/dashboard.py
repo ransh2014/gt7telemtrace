@@ -32,8 +32,8 @@ from . import (
     webui_server,
 )
 from . import cars as car_db
-from . import labels as L
 from . import config as runtime_config
+from . import labels as L
 from . import tracks as track_db
 from . import udp as telem
 from .config import KNOWN_IPS
