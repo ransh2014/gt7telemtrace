@@ -97,7 +97,7 @@ class LivePane(Vertical):
     LivePane #conn Input { width: 22; }
     LivePane #rec Input { width: 24; }
     LivePane #body { height: 1fr; }
-    LivePane #gauges { width: 1fr; padding: 0 1; }
+    LivePane #gauges { width: 1fr; }
     LivePane #side { width: 46; }
     LivePane #map { height: 1fr; }
     LivePane #log { height: 10; border: round $primary 30%; }
@@ -911,20 +911,28 @@ class TraceApp(App):
     Tab.-active { color: white; text-style: bold; background: $primary 25%; }
     Underline > .underline--bar { color: $primary; background: $panel; }
     TabPane { padding: 1 0 0 0; }
-    Button { border: none; height: 3; min-width: 12; background: $panel; color: $text; text-style: bold; }
+    Button { border: none; height: 3; min-width: 12; margin: 0 1 0 0; background: $panel; color: $text; text-style: bold; }
     Button:hover { background: $primary 40%; }
     Button.-primary { background: $primary; color: white; }
     Button.-primary:hover { background: $primary 80%; }
-    Input { border: tall $panel; background: $surface; }
-    Input:focus { border: tall $primary; }
-    Select > SelectCurrent { border: tall $panel; background: $surface; }
-    Select:focus > SelectCurrent { border: tall $primary; }
-    DataTable { background: $surface; border: round $panel; }
+    Input { border: none; height: 3; padding: 1 2; margin: 0 1 0 0; background: $surface; }
+    Input:focus { background: $panel; border-left: thick $primary; }
+    Select > SelectCurrent { border: none; height: 3; padding: 1 2; background: $surface; }
+    Select:focus > SelectCurrent { background: $panel; }
+    DataTable { background: $surface; border: none; padding: 0 1; }
     DataTable > .datatable--header { background: $panel; color: $text; text-style: bold; }
     DataTable > .datatable--cursor { background: $primary 50%; color: white; }
-    TextArea { border: tall $panel; background: $surface; }
-    #gauges, #map, #log, #chart, #files, #notes { border: round $panel; border-title-color: $primary; border-title-style: bold; }
-    #status { padding: 1 2; color: $text-muted; }
+    TextArea { border: none; background: $surface; padding: 1 2; }
+    #conn, #rec, #bar { height: 3; margin-bottom: 1; }
+    #conn Label, #rec Label, #bar Label { height: 3; content-align: left middle; padding: 0 2 0 0; color: $text-muted; }
+    #body { margin-top: 1; }
+    #gauges, #map, #log, #chart, #files, #notes { height: 1fr; border: round $panel; padding: 0 2; margin: 0 1 1 0; border-title-color: $primary; border-title-style: bold; background: $surface 60%; }
+    #gauges { width: 1fr; }
+    #log { height: 10; }
+    #notes { height: 8; }
+    #files { height: 14; padding: 0; }
+    #side { padding: 0 1 0 0; }
+    #status { height: 3; content-align: left middle; padding: 0 2; color: $text-muted; }
     .setting { height: 3; padding: 0 1; }
     .compact AnalystPane #side { width: 34; }
     .compact LivePane #side { width: 30; }
