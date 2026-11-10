@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gt7tracetelem"
-version = "1.1.0"
+version = "1.2.0"
 description = "TRACE - GT7 telemetry capture, live dashboard, and lap/race analysis toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -59,6 +59,7 @@ Changelog = "https://github.com/ransh2014/gt7telemtrace/blob/main/CHANGELOG.md"
 
 [project.scripts]
 gt7telem = "gt7telem.launcher:main"
+gt7telem-tools = "gt7telem.cli:main"
 gt7telem-add-car = "gt7telem.add_car:main"
 gt7telem-add-track = "gt7telem.add_track:main"
 

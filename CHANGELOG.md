@@ -4,7 +4,22 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-11-10
+**A driving coach, a setup advisor, a race engineer and more.** Ten new tools built on the corner, ghost, dyno and strategy code TRACE already had.
 - Desktop WEB UI: no more `opening handshake failed ... did not receive a valid HTTP request` traceback in the console when a browser opens a spare connection to port 8080 and closes it unused (Chrome does this to load pages faster). It was harmless noise; real web UI errors are still shown.
+- **Corner-by-corner coach (`coach.py`).** After every lap with a reference, the log gives up to three tips such as "Brake 14 m later at T4" or "You're lifting 0.3 s early at T7: back on the throttle 11 m sooner", ranked by time lost. On the next lap the Dashboard speaks a short cue just before each of those corners ("Turn 4. Brake later") through the existing voice (the `VOICE ALERTS` switch mutes it). The cue is also shown on the web UI.
+- **Setup advisor (`setup_advisor.py`).** Reads one lap for understeer and oversteer (steering angle against yaw, per phase: entry, mid, exit), rear wheelspin, front lock-ups and bottoming-out, and suggests setup changes to try in GT7's own units, e.g. "Front ARB −2", "LSD accel −5". An A/B check compares laps before and after a change. Balance needs the steering-angle and wheelbase fields; without them it says so rather than guessing.
+- **Race engineer (`engineer.py`).** Pit window from fuel and the tyre-stint pace loss, undercut and overcut calculators, a simulated finishing position, and live "Pit next lap" / "Box this lap" calls from the Dashboard (in races with a set lap count). Estimates only: GT7 sends no tyre wear and no pit-lane flag.
+- **3D lap replay (`replay3d.py`).** One offline HTML file: the racing line coloured by speed, a ghost car, a scrubber and synced throttle / brake / speed traces; drag to rotate. Also exports a GIF.
+- **Driver DNA (`driver_dna.py`).** Brake aggression, trail braking, smoothness, throttle modulation and precision, scored 0-100, kept as a history so you can see them change over weeks, and shared as a short code to compare with a friend.
+- **Practice planner (`planner.py`).** After a session: the corners worth drilling, what each is worth, a target for each, and how this session compares with the last one on the same car and track.
+- **Friends groups and weekly challenges (`groups.py`).** Private boards with sector times, the group's ideal lap and weekly challenges. There is no server: results travel as pasteable `TRC1-...` codes with a checksum (against typos, not cheating).
+- **Stream overlay.** The web UI serves a transparent page at `/overlay` for an OBS Browser Source: speed, gear, pedals, delta, lap time and the coach line. Pick widgets with `?w=speed,gear,inputs,delta,lap,fuel,coach` and a corner with `?pos=bl|br|tl|tr`. Same passcode rules as the main page.
+- **Lap validation (`validate.py`).** Flags teleports, shortcuts, impossible acceleration, backwards clocks, off-track stretches and wall hits as clean, suspect or invalid.
+- **Dyno overlay (`dyno_compare.py`).** Two cars' (or tunes') power curves on one axis, and final-drive advice from a lap's speed trace.
+- **`gt7telem-tools` command (`cli.py`).** All of the above on saved lap files: `coach`, `setup`, `ab`, `plan`, `validate`, `replay`, `dna`, `dyno-compare` and `challenge`.
+- Not yet in the windows: the Lap Analyst / Race Analyst and Android app do not have buttons for these tools yet; the Dashboard (coach cues, pit calls) and the web UI overlay are wired in, the rest is reached through `gt7telem-tools` and the Python modules.
 
 ## [1.1.0] - 2026-11-09
 **A passcode for the phone web dashboard, and much smaller downloads.**

@@ -35,6 +35,16 @@ SNAP = {"speed_kmh": 123.4, "rpm": 5000, "max_rpm": 8000, "gear": 3, "suggested_
         "fuel_capacity": 100, "lap_number": 2, "total_laps": 5, "world_x": 10.0, "world_z": 20.0, "speed": 1}
 
 
+def test_overlay_page_is_served_and_carries_the_coach_line():
+    port = _free_port()
+    assert webui_server.start(port)
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/overlay?w=speed,coach", timeout=5) as r:
+        body = r.read().decode()
+        assert r.status == 200 and "background:transparent" in body
+    assert webui_server.build_frame({}, {"coach": "Turn 4. Brake later"})["coach"] == "Turn 4. Brake later"
+    assert len(webui_server.build_frame({}, {"coach": "x" * 500})["coach"]) == 120
+
+
 def test_start_stop_and_idempotent():
     port = _free_port()
     assert webui_server.start(port) is True

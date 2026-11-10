@@ -214,6 +214,8 @@ def build_frame(d: dict, extras: dict | None = None) -> dict:
         "lim": bool(d.get("rev_limit_alert")),
         "loss_pkt": r(ex.get("packet_loss"), 1),
         "hist": list(_laps[-8:]),
+        "coach": _clean_text(ex.get("coach"), 120),
+        "radio": _clean_text(ex.get("radio"), 120),
     }
 
 
@@ -278,10 +280,12 @@ async def _serve(port, addr, hz, ready, result):
     from websockets.datastructures import Headers
     from websockets.http11 import Response
 
+    from .overlay_page import OVERLAY
     from .webui_login import LOGIN_PAGE
     from .webui_page import PAGE
 
     page = PAGE.encode("utf-8")
+    overlay = OVERLAY.encode("utf-8")
     login = LOGIN_PAGE.encode("utf-8")
     interval = 1.0 / _clamp_hz(hz)
     clients = set()
@@ -348,6 +352,8 @@ async def _serve(port, addr, hz, ready, result):
             return login_page()
         if path == "/session":
             return respond(http.HTTPStatus.NO_CONTENT, b"")
+        if path == "/overlay":      # transparent OBS browser-source page; same login rules as the main page
+            return respond(http.HTTPStatus.OK, overlay, "text/html; charset=utf-8")
         if path == "/ws":
             # a web page on another site must not be able to read the feed
             if not same_origin(request):

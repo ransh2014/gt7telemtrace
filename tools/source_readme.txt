@@ -107,6 +107,24 @@ gt7telem/         The TRACE package itself (same source that ships on
   voice.py          Spoken fuel / tyre alerts in the Live Dashboard via the OS
                     voice (Windows SAPI, macOS say, Linux spd-say/espeak);
                     falls back to the notify.py sound. Mute with VOICE ALERTS.
+  coach.py          Corner-by-corner driving coach: one plain-English tip per costly
+                    corner vs your reference lap, spoken before those corners on the
+                    next lap through voice.py (VOICE ALERTS switch)
+  setup_advisor.py  Understeer / oversteer / wheelspin / lock-up / bottoming-out from one
+                    lap, with setup fixes to try, and an A/B check of a setup change
+  engineer.py       Race engineer: pit window, undercut / overcut maths, live "box" calls
+                    and a simulated finishing position
+  replay3d.py       3D lap replay as one offline HTML file (speed-coloured line, ghost,
+                    synced inputs) plus a GIF export
+  driver_dna.py     Driver DNA: five style traits, history over weeks, share-code compare
+  planner.py        Practice planner: the corners worth drilling, a target for each,
+                    progress between sessions
+  validate.py       Lap validation: teleports, shortcuts, impossible data, wall hits
+  dyno_compare.py   Car-vs-car power overlay and final-drive advice
+  groups.py         Friends groups, weekly challenges and sector boards, shared as
+                    pasteable codes (no server)
+  overlay_page.py   The transparent OBS overlay served at /overlay by the web UI
+  cli.py            gt7telem-tools: all of the above from the command line
   cars.py           Car ID -> name lookup (car_ids.csv)
   tracks.py         Track ID -> name lookup (course_ids.csv), plus track
                     boundary extraction from a lap's GPS trace

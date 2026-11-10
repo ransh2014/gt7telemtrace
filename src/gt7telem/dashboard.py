@@ -20,6 +20,8 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import (
     __version__,
+    coach,
+    engineer,
     ghost,
     keepawake,
     lapclean,
@@ -279,6 +281,8 @@ class App(tk.Tk):
         self._strategy          = telem.StintTracker()   # live fuel / tyre-stint estimates
         self._strat_car_id      = None
         self._announcer         = voice.AlertAnnouncer()   # spoken fuel / tyre alerts
+        self._live_coach        = coach.LiveCoach()        # spoken corner cues, set after each lap vs the reference
+        self._radio             = {"text": "", "until": 0.0, "lap": None}   # last coach / pit call, shown on the web UI
         self._ghosts            = {}      # (car, track) -> ghost.Ghost, or None when there is none to show
         self._ghost_fetching    = set()   # (car, track) pairs already asked about this run
         self._ghost_stable      = {"key": None, "since": 0.0}   # when the current pair last changed
@@ -1385,6 +1389,27 @@ class App(tk.Tk):
         for line in self._announcer.update(active, time.monotonic(), fuel_laps=fuel_laps):
             voice.speak(line)
 
+    def _speak_race_calls(self, d, snap):
+        """Corner coaching cues (from last lap's tips) and the race engineer's pit call. Both go through the same
+        VOICE ALERTS switch as the fuel and tyre alerts and never raise into the display refresh."""
+        try:
+            now = time.monotonic()
+            msg = None
+            if not session.paused:
+                msg = self._live_coach.update(float(d.get("track_position") or 0), float(d.get("speed_kmh") or 0))
+                lap, total = int(d.get("lap_number") or 0), int(d.get("total_laps") or 0)
+                if not msg and total > 0 and lap > 0:
+                    call = engineer.pit_call(lap, total, snap, last_called=self._radio["lap"])
+                    if call:
+                        msg = call[0]
+                        self._radio["lap"] = lap
+            if msg:
+                self._radio.update(text=msg, until=now + 6.0)
+                if runtime_config.VOICE_ENABLED:
+                    voice.speak(msg)
+        except Exception:
+            pass
+
     def _on_update_check_toggle(self):
         # launcher.py reads config.UPDATE_CHECK_ENABLED at startup, so this
         # takes effect the next time TRACE is opened.
@@ -1788,6 +1813,7 @@ class App(tk.Tk):
             self.alert_fuel.grid_remove()
 
         self._speak_alerts(has_fuel, has_hot, has_cold, _fuel_laps_num)
+        self._speak_race_calls(d, _st)
 
         # ── Track map update ──────────────────────────────────────────────────
         wx = float(d.get("world_x") or 0)
@@ -1868,6 +1894,7 @@ class App(tk.Tk):
                     "connected": True, "cur_ms": int(cur_elapsed * 1000) if cur_elapsed > 0 else None,
                     "delta": _delta_val, "vs_top": gap, "strategy": _st,
                     "car": self.car_var.get().strip(), "track": track_name,
+                    "coach": self._radio["text"] if time.monotonic() < self._radio["until"] else "",
                     "packet_loss": (100.0 * _bad / (_rx + _bad)) if (_rx + _bad) else 0.0})
             except Exception:
                 pass   # the web UI is optional: never let it break the Dashboard poll
@@ -2958,6 +2985,21 @@ class App(tk.Tk):
         except Exception:
             pass   # a corner summary is a nicety; it must never break a save
 
+    def _coach_lap(self, samples, ref_samples):
+        """After a lap: log the coach's tips against the reference and arm the spoken cues for the next lap. Like
+        _log_time_loss it runs inside the save and must never break it."""
+        try:
+            from . import corners
+            lap_df = corners.frame_from_samples(samples)
+            ref_df = corners.frame_from_samples(ref_samples)
+            if lap_df is None or ref_df is None:
+                return
+            tips = coach.analyse(lap_df, ref_df)
+            self.log_msg(coach.describe(tips))
+            self._live_coach.set_tips(tips)    # spoken before those corners on the next lap
+        except Exception:
+            pass
+
     def _display_path(self, path):
         """laps/<...> for files under LAPS_FOLDER (as the log always showed
         them), the full path for anything else (e.g. the fallback folder)."""
@@ -3097,6 +3139,7 @@ class App(tk.Tk):
 
             if ref_samples:
                 self._log_time_loss(samples, ref_samples)
+                self._coach_lap(samples, ref_samples)
 
             if (ref_time <= 0 or new_time < ref_time) and \
                     self._save_json(ref, data, "reference lap", fallback=False):
