@@ -27,6 +27,7 @@ def folder(tmp_path, monkeypatch):
     monkeypatch.setattr(tui.udp, "get_snapshot", lambda: {})          # never open the real UDP sockets in tests
     monkeypatch.setattr(tui.udp, "is_connected", lambda: False)
     monkeypatch.setattr(tui.config, "save", lambda **kw: True)
+    monkeypatch.setattr("gt7telem.trackdetect.fetch_shared", lambda *a, **k: None)   # no network in tests
     return tmp_path
 
 

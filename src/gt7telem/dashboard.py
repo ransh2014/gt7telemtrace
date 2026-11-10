@@ -41,6 +41,22 @@ from . import tracks as track_db
 from . import udp as telem
 from .config import KNOWN_IPS
 from .config import PS_IP as PS4_IP
+from .core import recorder as rec_core
+from .core.live import tyre_alerts
+from .core.recorder import (  # noqa: F401  (re-exported: tests and callers use these names from here)
+    AUTO_LAP_ARM_HOLD_S,
+    AUTO_LAP_LEAVE_HOLD_S,
+    AUTO_LAP_MIN_KPH,
+    RECORD_QUEUE_MAX,
+    RECORD_TAP_SLACK_S,
+    Session,
+    auto_lap_can_arm,
+    auto_lap_in_session,
+    lap_clock_running,
+    session,
+)
+from .core.recorder import next_due as _next_due  # noqa: F401  (tests import it from here)
+from .core.recorder import thin_accept as _thin_accept
 
 runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
 
@@ -102,48 +118,11 @@ def slip_color(val):
     return theme.RED_2
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Recording state
+# Recording state lives in core/recorder.py (shared with the terminal UI)
 # ─────────────────────────────────────────────────────────────────────────────
-def _next_due(due, now, dt):
-    """Next sample deadline. Schedules against the previous deadline (not the
-    moment the tick happened to run) so Tk's timer jitter doesn't drag the
-    effective rate below the selected one; resyncs after a stall."""
-    nxt = due + dt if due > 0 else now + dt
-    return now + dt if nxt <= now else nxt
-
-
-# Per-packet thinning, run on the UDP receive thread. `slack` lets a packet that
-# arrives a hair early (network jitter) still count, so a 60 Hz stream thinned to
-# 60 Hz keeps every packet instead of dropping every other one.
-RECORD_TAP_SLACK_S = 0.004
-RECORD_QUEUE_MAX = 6000   # ~100 s of 60 Hz samples if the UI thread ever stalls
-
-
-def _thin_accept(due, now, dt):
-    """Is the packet that arrived at `now` a sample, when one is wanted every
-    `dt` seconds? Returns (accept, new_due). Deadlines are anchored to the
-    previous deadline (not to when the packet happened to arrive) so jitter
-    can't drag the rate down; after a stall of more than one interval it resyncs."""
-    if due <= 0.0:
-        return True, now + dt
-    if now + RECORD_TAP_SLACK_S < due:
-        return False, due
-    nxt = due + dt
-    if nxt < now - dt:
-        nxt = now + dt
-    return True, nxt
-
-
-# Auto lap (optional): in a session with no race laps set (time trial, practice,
-# free run) arm Record Lap by itself once the car is moving on track.
-AUTO_LAP_MIN_KPH = 5.0
-AUTO_LAP_ARM_HOLD_S = 1.5     # on track and moving this long before arming
-AUTO_LAP_LEAVE_HOLD_S = 3.0   # out of the session (menu, garage, race) this long before disarming
-
-
 # Returned by _save_lap/_save_race when a recording was deliberately not saved
 # (junk or duplicate), so callers don't mistake it for a failed save.
-_SKIPPED = Path("skipped")
+_SKIPPED = rec_core.SKIPPED
 
 
 # Low-battery warning: while a lap/race is armed or recording on battery power
@@ -194,30 +173,6 @@ def battery_alarm_due(warned_since, now, acked):
     return (not acked) and warned_since is not None and now - warned_since >= BATTERY_ALARM_AFTER_S
 
 
-def auto_lap_in_session(d):
-    """True while the player is on track in a session without race laps."""
-    if d.get("loading") or not d.get("car_on_track", False):
-        return False
-    return int(d.get("total_laps") or 0) == 0
-
-
-def auto_lap_can_arm(d):
-    """In-session, not paused and actually moving."""
-    if d.get("paused") or not auto_lap_in_session(d):
-        return False
-    return float(d.get("speed_kmh") or 0.0) >= AUTO_LAP_MIN_KPH
-
-
-def lap_clock_running(cur_lap, total_laps, paused, on_track, loading):
-    """True only while a real lap is being driven. Menus, the garage, loading
-    screens and pause have no lap clock. After the last lap of a race GT7's
-    lap counter runs past total_laps (e.g. 11/10) while car_on_track stays
-    true on the cruise back to the results, so that counts as finished too."""
-    if cur_lap < 1 or paused or not on_track or loading:
-        return False
-    return not (total_laps > 0 and cur_lap > total_laps)
-
-
 def unknown_car_label(car_id):
     """CAR box text for a car ID missing from car_ids.csv."""
     return f"Unknown car (ID {car_id})"
@@ -250,22 +205,6 @@ def _grab_when_visible(win):
     except tk.TclError:
         pass
 
-
-class Session:
-    recording  = False
-    waiting    = False
-    samples    = []
-    start_t    = 0.0
-    cur_lap    = 0
-    prev_lap   = 0
-    laps_saved = []
-    race_recording = False
-    race_samples   = []
-    race_start_t   = 0.0
-    paused         = False   # True while GT7 reports the game paused -- recording freezes
-    paused_at      = None    # time.monotonic() when the current pause began
-
-session = Session()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main App
@@ -1017,10 +956,8 @@ class App(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
     @staticmethod
     def _reference_path(track_sanitized, car_safe):
-        """Reference lap for the live DELTA: one per track *and car*. It used
-        to be one reference_lap.json per track, so after switching cars the
-        delta compared you against a different car's lap."""
-        return Path(runtime_config.LAPS_FOLDER) / track_sanitized / f"reference_{car_safe}.json"
+        """Reference lap for the live DELTA: one per track *and car* (shared rule: core/recorder.py)."""
+        return rec_core.reference_path(runtime_config.LAPS_FOLDER, track_sanitized, car_safe)
 
     def _get_reference_samples(self, track_sanitized, car_safe):
         """Cached read of this track+car's reference lap samples, sorted by
@@ -1790,8 +1727,7 @@ class App(tk.Tk):
         self._flash_tick = (self._flash_tick + 1) % 4
         self._flash_on   = self._flash_tick < 2
 
-        has_hot  = any(t > 100 for t in tyre_temps_live)
-        has_cold = any(t < 60  for t in tyre_temps_live)
+        has_hot, has_cold = tyre_alerts(tyre_temps_live)
         has_fuel = _fuel_laps_num < 2
 
         if has_hot:
@@ -2805,77 +2741,7 @@ class App(tk.Tk):
     # Sample building (shared by lap recording and race recording)
     # ─────────────────────────────────────────────────────────────────────────
     def _sample_dict(self, d, start_t, now=None):
-        if now is None:
-            now = time.monotonic()
-        def _f(k):
-            try: return round(float(d.get(k) or 0), 4)
-            except Exception: return 0.0
-        def _i(k):
-            try: return int(d.get(k) or 0)
-            except Exception: return 0
-        def _b(k):
-            try: return bool(d.get(k))
-            except Exception: return False
-        def _f_tuple(tup, idx):
-            try: return round(float(tup[idx]), 4) if tup else 0.0
-            except Exception: return 0.0
-
-        return {
-            "t":                round(now - start_t, 3),
-            "world_x":          _f("world_x"),   "world_y":    _f("world_y"),
-            "world_z":          _f("world_z"),   "heading":    _f("heading"),
-            "track_position":   _f("track_position"),
-            "speed_kmh":        _f("speed_kmh"),
-            "vel_x":            _f("vel_x"),     "vel_y":      _f("vel_y"),
-            "vel_z":            _f("vel_z"),     "ang_x":      _f("ang_x"),
-            "ang_y":            _f("ang_y"),     "ang_z":      _f("ang_z"),
-            "throttle":         _f("throttle"),  "brake":      _f("brake"),
-            "steering":         _f("steering"),  "clutch":     _f("clutch"),
-            "steering_source":  d.get("steering_source") or "heading",
-            "clutch_engaged":   _f("clutch_engaged"),
-            "gear":             _i("gear"),      "suggested_gear": _i("suggested_gear"),
-            "rpm":              _f("rpm"),       "max_rpm":    _i("max_rpm"),
-            "rpm_warning":      _i("rpm_warning"), "rpm_limiter": _i("rpm_limiter"),
-            "rpm_after_clutch": _f("rpm_after_clutch"),
-            "boost":            _f("boost"),
-            "tyre_temp_fl":     _f("tyre_temp_fl"), "tyre_temp_fr": _f("tyre_temp_fr"),
-            "tyre_temp_rl":     _f("tyre_temp_rl"), "tyre_temp_rr": _f("tyre_temp_rr"),
-            "tyre_slip_fl":     _f("tyre_slip_fl"), "tyre_slip_fr": _f("tyre_slip_fr"),
-            "tyre_slip_rl":     _f("tyre_slip_rl"), "tyre_slip_rr": _f("tyre_slip_rr"),
-            "susp_fl":          _f("susp_fl"),   "susp_fr":    _f("susp_fr"),
-            "susp_rl":          _f("susp_rl"),   "susp_rr":    _f("susp_rr"),
-            "ride_height_mm":   _f("ride_height_mm"),
-            "fuel_remaining":   _f("fuel_remaining"), "fuel_capacity": _f("fuel_capacity"),
-            "is_ev":            _b("is_ev"),
-            "oil_temp":         _f("oil_temp"),  "water_temp": _f("water_temp"),
-            "oil_pressure":     _f("oil_pressure"),
-            "lap_number":       _i("lap_number"),
-            "current_position": _i("current_position"),
-            "total_positions":  _i("total_positions"),
-            "in_pit":           _b("in_pit"),
-            "time_of_day":      _i("time_of_day"),
-            "est_top_speed":    _i("est_top_speed"),
-            "car_id":           _i("car_id"),
-            "flags_8e":         _i("flags_8e"),
-            "flags_8f":         _i("flags_8f"),
-            "flags_93":         _i("flags_93"),
-            # Extended (Packet B/~/C) -- 0/blank when console only sends packet A
-            "wheel_rotation":            _f("wheel_rotation"),
-            "steering_angular_velocity": _f("steering_angular_velocity"),
-            "sway":                      _f("sway"),
-            "heave":                     _f("heave"),
-            "surge":                     _f("surge"),
-            "torque_vectors":            d.get("torque_vectors") or [],
-            "energy_recovery":           _f("energy_recovery"),
-            "throttle_filtered":         _f("throttle_filtered"),
-            "brake_filtered":            _f("brake_filtered"),
-            "surface_type":              "".join(d.get("surface_type") or []),
-            "current_lap_ms":            _i("current_lap_ms"),
-            "wheel_steering_angle_l":    _f_tuple(d.get("wheel_steering_angle"), 0),
-            "wheel_steering_angle_r":    _f_tuple(d.get("wheel_steering_angle"), 1),
-            "wheel_base":                _f("wheel_base"),
-            "car_category":              d.get("car_category") or "",
-        }
+        return rec_core.sample_dict(d, start_t, now)
 
     def _record_sample(self, d, now=None):
         if now is None:
@@ -3010,18 +2876,7 @@ class App(tk.Tk):
 
     @staticmethod
     def _lap_distance(samples):
-        import math as _math
-        if any(s.get("world_x", 0) != 0 for s in samples):
-            return sum(
-                _math.sqrt((samples[i]["world_x"] - samples[i-1]["world_x"]) ** 2 +
-                           (samples[i]["world_z"] - samples[i-1]["world_z"]) ** 2)
-                for i in range(1, len(samples)))
-        # No coordinates (older recording / signal loss): integrate speed over
-        # each sample's own recorded dt -- correct at any recording rate.
-        return sum(
-            samples[i].get("speed_kmh", 0) / 3.6 *
-            max(0.0, samples[i].get("t", 0) - samples[i - 1].get("t", 0))
-            for i in range(1, len(samples)))
+        return rec_core.lap_distance(samples)
 
     def _save_lap(self, samples, lap_time_ms=None, incomplete=False, prompt=True,
                   background=False, final=True):
@@ -3180,37 +3035,16 @@ class App(tk.Tk):
     # reference lap for the live delta lives in reference_<car>.json)
     # ─────────────────────────────────────────────────────────────────────────
     def _personal_bests_path(self, track):
-        return Path(runtime_config.LAPS_FOLDER) / track / "personal_bests.json"
+        return rec_core.pb_path(runtime_config.LAPS_FOLDER, track)
 
     def _load_personal_bests(self, track):
-        path = self._personal_bests_path(track)
-        if not path.exists():
-            return {}
-        try:
-            with open(path, encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
+        return rec_core.load_pbs(runtime_config.LAPS_FOLDER, track)
 
     def _is_new_personal_best(self, track, car_safe, new_time):
-        """True if new_time beats (or is the first recorded for) the stored
-        best for this exact track+car combo. Read-only -- callers write the
-        new best separately, only once the lap itself is confirmed saved."""
-        entry = self._load_personal_bests(track).get(car_safe, {})
-        prev = entry.get("lap_time_s")
-        if prev is not None and not leaderboard.is_current_era(entry):
-            prev = None   # set under older GT7 physics -- not a fair target
-        return prev is None or new_time < prev
+        return rec_core.is_new_pb(runtime_config.LAPS_FOLDER, track, car_safe, new_time)
 
     def _write_personal_best(self, track, car_safe, car_display, new_time, ts):
-        bests = self._load_personal_bests(track)
-        bests[car_safe] = {
-            "lap_time_s":  round(new_time, 3),
-            "car_display": car_display,
-            "recorded_at": ts,
-            "physics_era": leaderboard.PHYSICS_ERA,
-        }
-        self._save_json(self._personal_bests_path(track), bests, "personal best", fallback=False)
+        rec_core.write_pb(runtime_config.LAPS_FOLDER, track, car_safe, car_display, new_time, ts, self.log_msg)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Lap history row

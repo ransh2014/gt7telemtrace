@@ -129,7 +129,8 @@ gt7telem/         The TRACE package itself (same source that ships on
   race_charts.py    The Race Analyst's race loading and chart code, 17 groups (no tkinter either)
   core/             UI-free core shared by the Tk windows and the terminal UI: registry.py
                     (the one list of chart groups and tools), charts.py (headless chart
-                    rendering), figspec.py (a chart as plain data)
+                    rendering), figspec.py (a chart as plain data), recorder.py (lap and
+                    race recording) and live.py (the per-frame Live logic)
   tui/              The terminal edition of TRACE (Textual): Live, Laps, Race, Records and
                     Settings. Start it with `python launcher.py tui`. It draws the same
                     chart groups and tools as the windows, from the core/ registry.

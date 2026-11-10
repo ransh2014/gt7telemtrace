@@ -24,6 +24,7 @@ from textual.widgets import (
     Header,
     Input,
     Label,
+    RichLog,
     Select,
     Static,
     Switch,
@@ -32,9 +33,11 @@ from textual.widgets import (
 )
 from textual_plotext import PlotextPlot
 
-from .. import __version__, config, records, udp, voice, webui_server
+from .. import __version__, config, records, udp, webui_server
 from .. import labels as L
 from ..core import charts, registry
+from ..core.live import LiveEngine
+from ..core.recorder import Hooks
 from .chartview import ChartGrid
 
 BAR = "█"
@@ -87,19 +90,39 @@ class ReportScreen(ModalScreen):
 # ── Live ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 class LivePane(Vertical):
     DEFAULT_CSS = """
-    LivePane #conn { height: 3; }
-    LivePane #conn Input { width: 24; }
+    LivePane #conn, LivePane #rec { height: 3; }
+    LivePane #conn Input { width: 22; }
+    LivePane #rec Input { width: 24; }
     LivePane #body { height: 1fr; }
     LivePane #gauges { width: 1fr; padding: 0 1; }
-    LivePane #map { width: 44; }
+    LivePane #side { width: 46; }
+    LivePane #map { height: 1fr; }
+    LivePane #log { height: 10; border: round $primary 30%; }
+    LivePane #offer { height: 3; display: none; background: $primary 20%; }
     """
 
     def __init__(self):
         super().__init__()
-        self._strategy = udp.StintTracker()
-        self._announcer = voice.AlertAnnouncer()
         self._trail = deque(maxlen=1500)
-        self._last_lap = None
+        self.engine = None
+
+    def _make_engine(self):
+        def cfg(k, dflt=True):
+            return bool(config.load().get(k, dflt))
+
+        hooks = Hooks(
+            laps_folder=laps_folder,
+            track=lambda: self.query_one("#track", Input).value,
+            car=lambda: self.query_one("#car", Input).value,
+            rate=lambda: int(config.load().get("SAMPLE_RATE", 30) or 30),
+            log=self._log,
+            state=self._on_state,
+            auto_lap_enabled=lambda: cfg("AUTO_LAP_ENABLED", False),
+            notify=lambda title, msg: self._ui(self.app.notify, f"{title}: {msg}"),
+            gear_info=lambda: (list(udp.get("gear_ratios") or []), float(udp.get("tyre_radius_m") or 0.0)),
+        )
+        return LiveEngine(hooks, voice_enabled=lambda: cfg("VOICE_ENABLED"), ghost_enabled=lambda: cfg("GHOST_ENABLED"),
+                          analytics_enabled=lambda: cfg("ANALYTICS_ENABLED", False))
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="conn"):
@@ -108,13 +131,54 @@ class LivePane(Vertical):
             yield Button("Connect", id="connect", variant="primary")
             yield Button("Auto-detect", id="detect")
             yield Static("", id="status")
+        with Horizontal(id="rec"):
+            yield Label(" Car ")
+            yield Input(placeholder="car name", id="car")
+            yield Label(" Track ")
+            yield Input(placeholder="track name", id="track")
+            yield Button("Record Lap", id="reclap")
+            yield Button("Record Race", id="recrace")
+        with Horizontal(id="offer"):
+            yield Static("", id="offer-text")
+            yield Button("Use it", id="offer-yes", variant="success")
+            yield Button("Not this", id="offer-no")
         with Horizontal(id="body"):
             yield Static("Waiting for telemetry...", id="gauges")
-            yield PlotextPlot(id="map")
+            with Vertical(id="side"):
+                yield PlotextPlot(id="map")
+                yield RichLog(id="log", wrap=True, markup=False)
 
     def on_mount(self):
+        self.engine = self._make_engine()
+        self.engine.start()
         self.set_interval(0.1, self.refresh_live)
 
+    # -- hooks (may be called from worker threads) -----------------------------------------------
+    def _ui(self, fn, *args):
+        try:
+            self.app.call_from_thread(fn, *args)
+        except Exception:
+            fn(*args)
+
+    def _log(self, msg):
+        def write():
+            self.query_one("#log", RichLog).write(f"{time.strftime('%H:%M:%S')}  {msg}")
+        self._ui(write)
+
+    def _on_state(self, kind):
+        labels = {"armed": ("Waiting for start line", "warning"), "recording": ("Stop recording", "error"),
+                  "idle": ("Record Lap", "default"), "race": ("Stop race", "error"),
+                  "race_idle": ("Record Race", "default")}
+        if kind not in labels:
+            return
+        text, variant = labels[kind]
+
+        def apply():
+            btn = self.query_one("#recrace" if kind.startswith("race") else "#reclap", Button)
+            btn.label, btn.variant = text, variant
+        self._ui(apply)
+
+    # -- buttons ---------------------------------------------------------------------------------
     @on(Button.Pressed, "#connect")
     def _connect(self):
         ip = self.query_one("#ip", Input).value.strip()
@@ -139,36 +203,57 @@ class LivePane(Vertical):
         else:
             self.app.notify("No console found. Is it on and on this network?", severity="warning")
 
+    @on(Button.Pressed, "#reclap")
+    def _reclap(self):
+        self.engine.toggle_lap()
+
+    @on(Button.Pressed, "#recrace")
+    def _recrace(self):
+        self.engine.toggle_race()
+
+    @on(Button.Pressed, "#offer-yes")
+    def _offer_yes(self):
+        name = self.engine.accept_track()
+        if name:
+            self.query_one("#track", Input).value = name
+
+    @on(Button.Pressed, "#offer-no")
+    def _offer_no(self):
+        self.engine.decline_track()
+
+    # -- frame -----------------------------------------------------------------------------------
     def refresh_live(self):
         try:
+            out = self.engine.poll()
             d = udp.get_snapshot()
         except Exception:
             return
-        connected = bool(udp.is_connected())
         self.query_one("#status", Static).update(
-            Text(" ● connected" if connected else " ○ waiting", style="green" if connected else "yellow"))
-        if not d or not connected:
+            Text(" ● connected" if out["connected"] else " ○ waiting", style="green" if out["connected"] else "yellow"))
+        self.query_one("#offer").display = bool(out["track_offer"])
+        if out["track_offer"]:
+            self.query_one("#offer-text", Static).update(f" Looks like {out['track_offer']} - use it as the track?")
+        if not d or not out["connected"]:
             return
-        temps = tuple(d.get(k) or 0 for k in ("tyre_temp_fl", "tyre_temp_fr", "tyre_temp_rl", "tyre_temp_rr"))
-        try:
-            self._strategy.update(int(d.get("lap_number") or 0), int(d.get("total_laps") or 0),
-                                  float(d.get("fuel_remaining") or 0), d.get("last_lap_ms"), temps,
-                                  float(d.get("speed_kmh") or 0))
-            snap = self._strategy.snapshot()
-        except Exception:
-            snap = {}
-        f = webui_server.build_frame(d, {"connected": True, "strategy": snap,
-                                         "car": d.get("car_name"), "track": d.get("track_name")})
-        self.query_one("#gauges", Static).update(self._gauges(f, snap))
+        f = webui_server.build_frame(d, {"connected": True, "strategy": out["strategy"], "delta": out["delta"],
+                                         "vs_top": out["gap"], "cur_ms": int(out["cur_elapsed"] * 1000) or None,
+                                         "car": self.query_one("#car", Input).value or d.get("car_name"),
+                                         "track": self.query_one("#track", Input).value or d.get("track_name"),
+                                         "coach": out["cue"]})
+        self.query_one("#gauges", Static).update(self._gauges(f, out))
         if f["x"] or f["z"]:
             if f["spd"] > 1:
                 self._trail.append((f["x"], f["z"]))
             self._draw_map(f)
-        self._speak(f, snap)
 
-    def _gauges(self, f, snap):
+    def _gauges(self, f, out):
         t = Text()
         t.append(f"{f['car'] or 'Car'}  -  {f['track'] or 'Track'}\n", style="bold")
+        for show, label, colour in ((out["recording"], "REC LAP", "red"), (out["armed"], "ARMED", "dark_orange"),
+                                    (out["race_recording"], "REC RACE", "red"), (out["paused"], "PAUSED", "dark_orange")):
+            if show:
+                t.append(f" {label} ", style=f"bold white on {colour}").append(" ")
+        t.append("\n")
         t.append(f"  {f['spd']:6.0f} km/h   gear {f['gear'] if f['gear'] > 0 else 'N'}"
                  f"{'  (shift to ' + str(f['sug']) + ')' if f['sug'] else ''}\n\n")
         mx = f["maxrpm"] or 8000
@@ -183,6 +268,8 @@ class LivePane(Vertical):
                  f"   best {fmt_ms(f['best'])}\n")
         if f["delta"] is not None:
             t.append(f"  Delta vs reference {f['delta']:+.2f}s\n", style="green" if f["delta"] <= 0 else "red")
+        if f["top"] is not None:
+            t.append(f"  Gap to top lap     {f['top']:+.2f}s\n", style="green" if f["top"] <= 0 else "red")
         t.append(f"  Fuel {f['fuel']:.1f}/{f['cap']:.0f}")
         if f["fl"] is not None:
             t.append(f"   {f['fl']:.1f} laps left   {f['fpl'] or 0:.2f}/lap")
@@ -191,8 +278,13 @@ class LivePane(Vertical):
         t.append("\n")
         if f["tyre"]:
             t.append(f"  Tyres: {f['tyre']}   pace loss {f['loss'] or 0:.2f}s   stint {f['stint']} laps\n")
+        if out["alerts"]:
+            names = {"fuel": "FUEL LOW", "hot": "TYRES HOT", "cold": "TYRES COLD"}
+            t.append("  " + "  ".join(names[a] for a in out["alerts"]) + "\n", style="bold yellow")
         if f["tcs"] or f["asm"]:
             t.append("  " + ("TCS " if f["tcs"] else "") + ("ASM" if f["asm"] else "") + "\n", style="yellow")
+        if f["coach"]:
+            t.append(f"\n  >> {f['coach']}\n", style="bold cyan")
         return t
 
     def _draw_map(self, f):
@@ -207,16 +299,6 @@ class LivePane(Vertical):
         plt.xticks([])
         plt.yticks([])
         plot.refresh()
-
-    def _speak(self, f, snap):
-        if not config.load().get("VOICE_ENABLED", True):
-            return
-        fuel_laps = f["fl"] if f["fl"] is not None else 99
-        active = set()
-        if fuel_laps < 2:
-            active.add("fuel")
-        for line in self._announcer.update(active, time.monotonic(), fuel_laps=fuel_laps):
-            voice.speak(line)
 
 
 # ── Analyst panes (Laps and Race share one implementation; only the data source differs) ──────────────────────
