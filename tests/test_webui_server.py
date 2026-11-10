@@ -157,3 +157,27 @@ def test_settings_defaults_and_persistence(tmp_path, monkeypatch):
     config.save(WEBUI_ENABLED=True, WEBUI_BIND_ALL=True, WEBUI_PORT=8123)
     d = config.load()
     assert d["WEBUI_ENABLED"] is True and d["WEBUI_BIND_ALL"] is True and d["WEBUI_PORT"] == 8123
+
+
+def test_browser_preconnect_is_not_logged_but_bad_requests_are(caplog):
+    """A browser's unused "preconnect" socket (open, then close without a request) used to print a scary
+    'opening handshake failed' traceback; it is noise and must stay quiet. A malformed request is still logged."""
+    import logging
+    import time
+    port = _free_port()
+    assert webui_server.start(port)
+    with caplog.at_level(logging.ERROR, logger="gt7telem.webui"):
+        socket.create_connection(("127.0.0.1", port), timeout=2).close()
+        time.sleep(0.4)
+        assert "opening handshake failed" not in caplog.text
+        with socket.create_connection(("127.0.0.1", port), timeout=2) as s:
+            s.sendall(b"NOT HTTP AT ALL\r\n\r\n")
+            try:
+                s.recv(100)
+            except OSError:
+                pass
+        for _ in range(20):
+            if "opening handshake failed" in caplog.text:
+                break
+            time.sleep(0.1)
+        assert "opening handshake failed" in caplog.text

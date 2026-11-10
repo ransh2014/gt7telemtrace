@@ -4,6 +4,7 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+- Desktop WEB UI: no more `opening handshake failed ... did not receive a valid HTTP request` traceback in the console when a browser opens a spare connection to port 8080 and closes it unused (Chrome does this to load pages faster). It was harmless noise; real web UI errors are still shown.
 
 ## [1.1.0] - 2026-11-09
 **A passcode for the phone web dashboard, and much smaller downloads.**

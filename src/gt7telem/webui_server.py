@@ -21,6 +21,7 @@ udp.get_snapshot() (or samples from a saved lap file).
 """
 import asyncio
 import json
+import logging
 import math
 import socket
 import threading
@@ -55,6 +56,27 @@ _auth = webui_auth.Auth()
 _remote = [False]
 _LOOPBACK_BYPASS = True      # tests turn this off to exercise the remote path from 127.0.0.1
 _AUTH_RECHECK_S = 1.0        # how often an open /ws re-checks its login (LOG OUT ALL DEVICES closes it)
+
+
+class _QuietClosedHandshakes(logging.Filter):
+    """Drop websockets' "opening handshake failed" traceback when the client simply closed the connection before
+    sending a request. Browsers do that all the time (a spare "preconnect" socket they never use), so it is noise,
+    not an error. Any other handshake failure is still logged."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.getMessage() != "opening handshake failed" or not record.exc_info:
+            return True
+        e = record.exc_info[1]
+        while e is not None:
+            if isinstance(e, (EOFError, ConnectionResetError, ConnectionAbortedError)):
+                return False
+            e = e.__cause__ or e.__context__
+        return True
+
+
+_ws_log = logging.getLogger("gt7telem.webui")
+_ws_log.addFilter(_QuietClosedHandshakes())
+
 _SEC_HEADERS = (("X-Content-Type-Options", "nosniff"), ("X-Frame-Options", "DENY"), ("Referrer-Policy", "no-referrer"))
 
 
@@ -381,7 +403,7 @@ async def _serve(port, addr, hz, ready, result):
 
     try:
         server = await serve(handler, addr, port, process_request=process_request,
-                             process_response=process_response,
+                             process_response=process_response, logger=_ws_log,
                              max_size=1024, ping_interval=20, ping_timeout=20)
     except Exception as e:
         result["error"] = f"{type(e).__name__}: {e}"
