@@ -145,7 +145,7 @@ def test_export_csv_round_trip_and_failure_keeps_the_old_file(tmp_path, monkeypa
     def boom(*a, **k):
         raise PermissionError("open in Excel")
 
-    monkeypatch.setattr(la.os, "replace", boom)
+    monkeypatch.setattr("gt7telem.lap_charts.os.replace", boom)
     with pytest.raises(PermissionError):
         la.export_csv(df, out)
     assert out.read_text() == before and not list(tmp_path.glob("*.tmp"))

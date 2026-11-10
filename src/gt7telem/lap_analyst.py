@@ -2,9 +2,7 @@
 # pip install pandas matplotlib numpy
 import base64
 import io
-import json
 import math
-import os
 import queue
 import threading
 import time
@@ -43,7 +41,7 @@ warnings.filterwarnings("ignore")
 
 runtime_config.install_mac_buttons()   # macOS ignores Button colours; no-op elsewhere
 
-from .core import registry  # noqa: E402
+from .core import actions, registry  # noqa: E402
 from .lap_charts import (  # noqa: F401, E402
     _L,
     _LAP_META_CACHE,
@@ -786,26 +784,13 @@ class AnalystApp(tk.Tk):
                 messagebox.showinfo("Lap Notes", "Load Lap A from a file first.")
             return False
         notes = self._notes.get("1.0", "end").strip()
-        path = Path(self._path_a)
-        tmp = path.with_name(path.name + ".tmp")
-        try:
-            with open(path, encoding="utf-8-sig") as f:
-                data = json.load(f)
-            data["notes"] = notes
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-            os.replace(tmp, path)
+        if actions.save_notes(self._path_a, notes):      # shared with the terminal UI (core/actions.py)
             self._da["notes"] = notes
             if not quiet:
                 messagebox.showinfo("Lap Notes", "Notes saved with this lap.")
             return True
-        except Exception as e:
-            try:
-                tmp.unlink()
-            except OSError:
-                pass
-            messagebox.showerror("Lap Notes", f"Couldn't save notes:\n{e}")
-            return False
+        messagebox.showerror("Lap Notes", "Couldn't save notes. Is the lap file read-only or open elsewhere?")
+        return False
 
     # ── overlay laps (3+ lap comparison) ────────────────────────────────────
     _OVERLAY_COLORS = [YLW, GRN, PRP, ORG, "#96949c", "#f2f0ec"]
@@ -1481,7 +1466,6 @@ class AnalystApp(tk.Tk):
         if problem:
             messagebox.showinfo("Submit to Leaderboard", problem); return
         lap_time_ms = int(round(_num(self._da.get("lap_time_s")) * 1000))
-        samples = self._da["samples"]
 
         if not runtime_config.SUPABASE_ACCESS_TOKEN:
             if not self._prompt_create_account():
@@ -1500,37 +1484,7 @@ class AnalystApp(tk.Tk):
         self._submitting = True
 
         def worker():
-            try:
-                ok, reason = leaderboard.submit_lap(
-                    car, track, lap_time_ms, psn, samples,
-                    access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
-                    user_id=runtime_config.SUPABASE_USER_ID)
-                if not ok and reason == "auth":
-                    # Expired/rejected access token: refresh once and retry.
-                    # Payload errors (400/422) and 5xx never come here, so they
-                    # no longer trigger a pointless refresh.
-                    session = auth.refresh_session(runtime_config.SUPABASE_REFRESH_TOKEN)
-                    if session:
-                        runtime_config.SUPABASE_ACCESS_TOKEN = session["access_token"]
-                        runtime_config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
-                        runtime_config.save(
-                            SUPABASE_ACCESS_TOKEN=session["access_token"],
-                            SUPABASE_REFRESH_TOKEN=session["refresh_token"],
-                        )
-                        ok, reason = leaderboard.submit_lap(
-                            car, track, lap_time_ms, psn, samples,
-                            access_token=runtime_config.SUPABASE_ACCESS_TOKEN,
-                            user_id=runtime_config.SUPABASE_USER_ID)
-                    elif auth.last_refresh_error == "invalid":
-                        # Only a clear "this refresh token is bad" verdict ends the
-                        # account; a rate limit or outage must not delete it.
-                        reason = "session"
-                    else:
-                        reason = "network"
-                    if reason == "auth":
-                        reason = "server"
-            except Exception:
-                ok, reason = False, "network"
+            ok, reason = actions.submit_lap(self._da, psn)      # shared with the terminal UI (core/actions.py)
             self._post(lambda: self._after_submit(ok, reason))
 
         threading.Thread(target=worker, daemon=True).start()

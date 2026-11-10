@@ -24,6 +24,23 @@ RACE_TOOLS = [
 ]
 REPLAY_EXPORT_LABEL = "Export 3D replay (HTML)"
 
+# (kind, label) for the actions on the analysts' sidebars. Wording comes from labels.py where the Tk windows already
+# had it, so a label can't read differently in the two front ends.
+LAP_ACTIONS = [
+    ("csv", L.EXPORT_CSV), ("html", L.EXPORT_CHART_HTML), ("card", L.EXPORT_LAP_CARD),
+    ("replay3d", REPLAY_EXPORT_LABEL), ("replay", "Replay (scrubber)"),
+    ("backup", L.BACKUP_ALL_LAPS), ("dups", L.FIND_DUPLICATE_LAPS),
+    ("community", L.LOAD_COMMUNITY_LINE), ("submit", L.SUBMIT_TO_LEADERBOARD),
+]
+RACE_ACTIONS = [("csv", L.EXPORT_CSV), ("html", L.EXPORT_CHART_HTML), ("card", L.EXPORT_RACE_CARD),
+                ("backup", L.BACKUP_ALL_LAPS)]
+ADD_OVERLAY_LABEL = L.ADD_OVERLAY_LAP
+
+
+def overlay_colors():
+    return [lap_charts.YLW, lap_charts.GRN, lap_charts.PRP, lap_charts.ORG, "#96949c", "#f2f0ec"]
+
+
 SCREENS = ["live", "laps", "race", "records", "settings"]
 
 # (config key, label) for the on/off preferences both front ends show. Wording comes from labels.py.

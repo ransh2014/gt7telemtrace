@@ -7,6 +7,7 @@ out; it contains no analysis of its own.
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 from collections import deque
@@ -30,12 +31,13 @@ from textual.widgets import (
     Switch,
     TabbedContent,
     TabPane,
+    TextArea,
 )
 from textual_plotext import PlotextPlot
 
 from .. import __version__, config, records, udp, webui_server
 from .. import labels as L
-from ..core import charts, registry
+from ..core import actions, charts, registry
 from ..core.live import LiveEngine
 from ..core.recorder import Hooks
 from .chartview import ChartGrid
@@ -301,15 +303,141 @@ class LivePane(Vertical):
         plot.refresh()
 
 
+class AskScreen(ModalScreen):
+    """Ask for one line of text (a file path, a name, a number)."""
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+    DEFAULT_CSS = """
+    AskScreen { align: center middle; }
+    AskScreen > Vertical { width: 80%; height: auto; border: round $accent; background: $surface; padding: 1 2; }
+    """
+
+    def __init__(self, prompt: str, default: str = ""):
+        super().__init__()
+        self._prompt, self._default = prompt, default
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label(Text(self._prompt))
+            yield Input(value=self._default, id="answer")
+            with Horizontal():
+                yield Button("OK", id="ok", variant="primary")
+                yield Button("Cancel", id="cancel")
+
+    def on_mount(self):
+        self.query_one("#answer", Input).focus()
+
+    @on(Input.Submitted)
+    def _submit(self):
+        self.dismiss(self.query_one("#answer", Input).value.strip() or None)
+
+    @on(Button.Pressed, "#ok")
+    def _ok(self):
+        self.dismiss(self.query_one("#answer", Input).value.strip() or None)
+
+    @on(Button.Pressed, "#cancel")
+    def action_cancel(self):
+        self.dismiss(None)
+
+
+class ReplayScreen(ModalScreen):
+    """Scrub through a lap: left/right step, space plays, +/- changes speed, escape closes."""
+
+    BINDINGS = [("escape", "dismiss", "Close"), ("space", "toggle", "Play/Pause"), ("left", "step(-1)", "Back"),
+                ("right", "step(1)", "Forward"), ("shift+left", "step(-20)", "Back 20"),
+                ("shift+right", "step(20)", "Forward 20"), ("plus", "speed(2)", "Faster"), ("minus", "speed(0.5)", "Slower"),
+                ("home", "seek(0)", "Start")]
+    DEFAULT_CSS = """
+    ReplayScreen { align: center middle; }
+    ReplayScreen > Vertical { width: 96%; height: 92%; border: round $accent; background: $surface; padding: 0 1; }
+    ReplayScreen #rp-info { height: 9; }
+    ReplayScreen #rp-map { height: 1fr; }
+    """
+
+    def __init__(self, df, title: str, dfb=None):
+        super().__init__()
+        self.df, self.dfb, self._title = df, dfb, title
+        self.i, self.playing, self.rate = 0, False, 1.0
+        self._t = df["t"].to_numpy(dtype=float)
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label(Text(f"Replay - {self._title}   (space play, arrows step, +/- speed, esc close)", style="bold"))
+            yield Static("", id="rp-info")
+            yield PlotextPlot(id="rp-map")
+
+    def on_mount(self):
+        self.set_interval(1 / 20, self._tick)
+        self._draw(full=True)
+
+    def action_toggle(self):
+        self.playing = not self.playing
+
+    def action_step(self, n: int):
+        self.playing = False
+        self.i = max(0, min(len(self.df) - 1, self.i + int(n)))
+        self._draw()
+
+    def action_seek(self, n: int):
+        self.i = int(n)
+        self._draw()
+
+    def action_speed(self, factor: float):
+        self.rate = max(0.125, min(16.0, self.rate * float(factor)))
+
+    def _tick(self):
+        if not self.playing:
+            return
+        target = self._t[self.i] + self.rate / 20
+        j = int(self._t.searchsorted(target))
+        self.i = min(j, len(self.df) - 1)
+        if self.i >= len(self.df) - 1:
+            self.playing = False
+        self._draw()
+
+    def _draw(self, full=False):
+        r = self.df.iloc[self.i]
+        t = Text()
+        t.append(f"  t {r['t']:7.2f}s   speed {r['speed_kmh']:5.0f} km/h   gear {int(r['gear'])}   rpm {r['rpm']:5.0f}"
+                 f"   pos {r['track_position']:6.0f} m   x{self.rate:g}\n")
+        t.append("  THR   ").append_text(bar(r["throttle"], 30, "green")).append("\n")
+        t.append("  BRK   ").append_text(bar(r["brake"], 30, "red")).append("\n")
+        t.append("  STEER ").append_text(bar((r["steering"] + 1) / 2, 30, "cyan")).append(f"  {r['steering']:+.2f}\n")
+        t.append(f"  Tyres C  {r['tyre_temp_fl']:.0f} {r['tyre_temp_fr']:.0f} / {r['tyre_temp_rl']:.0f} {r['tyre_temp_rr']:.0f}"
+                 f"    fuel {r['fuel_remaining']:.1f}\n")
+        t.append(f"  G  lat {r['lat_g']:+.2f}  long {r['long_g']:+.2f}\n")
+        if self.dfb is not None:
+            pos = r["track_position"]
+            j = int(abs(self.dfb["track_position"].to_numpy(dtype=float) - pos).argmin())
+            rb = self.dfb.iloc[j]
+            gap = r["t"] - rb["t"]
+            t.append(f"  vs Lap B at this spot: {gap:+.2f}s   B speed {rb['speed_kmh']:.0f} km/h\n",
+                     style="green" if gap <= 0 else "red")
+        self.query_one("#rp-info", Static).update(t)
+        plot = self.query_one("#rp-map", PlotextPlot)
+        plt = plot.plt
+        plt.clear_figure()
+        plt.theme("dark")
+        step = max(1, len(self.df) // 600)
+        plt.scatter(self.df["world_x"].to_numpy()[::step].tolist(), self.df["world_z"].to_numpy()[::step].tolist(),
+                    marker="braille", color=(95, 179, 168))
+        plt.scatter([float(r["world_x"])], [float(r["world_z"])], marker="dot", color=(226, 69, 90))
+        plt.title("Track")
+        plt.xticks([])
+        plt.yticks([])
+        plot.refresh()
+
+
 # ── Analyst panes (Laps and Race share one implementation; only the data source differs) ──────────────────────
 class AnalystPane(Vertical):
     DEFAULT_CSS = """
-    AnalystPane #side { width: 44; }
-    AnalystPane #files { height: 1fr; }
+    AnalystPane #side { width: 46; }
+    AnalystPane #files { height: 12; }
     AnalystPane #main { width: 1fr; }
     AnalystPane #bar { height: 3; }
-    AnalystPane #tools { height: auto; }
+    AnalystPane #tools, AnalystPane #actions { height: auto; }
     AnalystPane Button { min-width: 10; }
+    AnalystPane #notes { height: 6; }
     """
     KIND = "lap"
 
@@ -317,6 +445,9 @@ class AnalystPane(Vertical):
         super().__init__()
         self.data_a = self.df_a = self.data_b = self.df_b = None
         self.path_a = self.path_b = None
+        self.extra: list[dict] = []        # overlay laps: {"label", "df", "color"}
+        self.consensus = None
+        self.theory_disk = None
         self._rows: list[dict] = []
 
     # per-kind hooks -------------------------------------------------------------------------------------------
@@ -326,6 +457,9 @@ class AnalystPane(Vertical):
     def tools(self):
         return registry.LAP_TOOLS
 
+    def action_list(self):
+        return registry.LAP_ACTIONS
+
     def scan_files(self):
         from ..lap_charts import _scan_laps
         return _scan_laps(laps_folder())
@@ -334,24 +468,52 @@ class AnalystPane(Vertical):
         from ..lap_charts import load_lap
         return load_lap(path)
 
+    def compare_on(self) -> bool:
+        return bool(self.query_one("#compare", Switch).value)
+
     def chart_spec(self, group):
-        return charts.lap_chart(group, self.df_a, self.df_b)
+        dfb = self.df_b if self.compare_on() else None
+        extra = [(e["label"], e["df"], e["color"]) for e in self.extra]
+        pool = actions.theory_pool(self.df_a, self.df_b, [(e["label"], e["df"]) for e in self.extra], self.theory_disk)
+        if group == "Dyno & Tune":
+            self._ensure_mass()
+        return charts.lap_chart(group, self.df_a, dfb, extra=extra, consensus=self.consensus, pool=pool)
 
     def run_tool(self, kind):
         from .. import analysis_tools
-        return analysis_tools.lap_tool(kind, self.df_a, self.df_b, self.data_a, self.data_b)
+        return analysis_tools.lap_tool(kind, self.df_a, self.df_b, self.data_a, self.data_b,
+                                       [e["df"] for e in self.extra])
+
+    def _ensure_mass(self):
+        for df in (self.df_a, self.df_b if self.compare_on() else None):
+            if df is not None:
+                df.attrs["mass_kg"] = actions.car_weight(df.attrs.get("car") or "")
 
     # layout --------------------------------------------------------------------------------------------------
     def compose(self) -> ComposeResult:
         with Horizontal():
-            with Vertical(id="side"):
-                yield Label("Files (a = load as A, b = load as B)")
+            with VerticalScroll(id="side"):
+                yield Label("Files (a = load as A, b = load as B, o = add overlay)")
                 yield DataTable(id="files", cursor_type="row")
                 yield Static("A: -   B: -", id="loaded")
+                with Horizontal():
+                    yield Switch(value=False, id="compare")
+                    yield Label("  Compare A with B")
                 yield Label("Analysis tools")
                 with Vertical(id="tools"):
                     for kind, label, _c in self.tools():
                         yield Button(label, id=f"tool-{kind}")
+                yield Label("Actions")
+                with Vertical(id="actions"):
+                    for kind, label in self.action_list():
+                        yield Button(label, id=f"act-{kind}")
+                    if self.KIND == "lap":
+                        yield Button(registry.ADD_OVERLAY_LABEL, id="act-overlay")
+                        yield Button("Set car weight (kg)", id="act-weight")
+                if self.KIND == "lap":
+                    yield Label("Lap notes")
+                    yield TextArea("", id="notes")
+                    yield Button("Save notes", id="act-notes")
             with Vertical(id="main"):
                 with Horizontal(id="bar"):
                     yield Select([(g, g) for g in self.groups()], value=self.groups()[0], allow_blank=False,
@@ -382,6 +544,14 @@ class AnalystPane(Vertical):
     async def key_b(self):
         await self._load_slot("b")
 
+    async def key_o(self):
+        await self._load_slot("o")
+
+    def _status(self):
+        self.query_one("#loaded", Static).update(
+            f"A: {Path(self.path_a).name if self.path_a else '-'}   B: {Path(self.path_b).name if self.path_b else '-'}"
+            f"   overlays: {len(self.extra)}")
+
     async def _load_slot(self, slot):
         row = self._selected()
         if not row:
@@ -393,14 +563,39 @@ class AnalystPane(Vertical):
             return
         if slot == "a":
             self.data_a, self.df_a, self.path_a = data, df, row["path"]
-        else:
+            self.consensus, self.theory_disk = None, None
+            if self.KIND == "lap":
+                self.query_one("#notes", TextArea).text = str(data.get("notes") or "")
+                self._start_theory()
+        elif slot == "b":
             self.data_b, self.df_b, self.path_b = data, df, row["path"]
-        self.query_one("#loaded", Static).update(
-            f"A: {Path(self.path_a).name if self.path_a else '-'}   B: {Path(self.path_b).name if self.path_b else '-'}")
+        else:
+            colors = registry.overlay_colors()
+            self.extra.append({"label": Path(row["path"]).stem[:24], "df": df,
+                               "color": colors[len(self.extra) % len(colors)]})
+        self._status()
         await self.draw()
+
+    def _start_theory(self):
+        data, path = dict(self.data_a), self.path_a
+
+        def work():
+            found = actions.saved_theory_laps(data, path)
+            self.app.call_from_thread(self._theory_done, path, found)
+        threading.Thread(target=work, daemon=True).start()
+
+    async def _theory_done(self, path, found):
+        if path == self.path_a:
+            self.theory_disk = found
+            if self.query_one("#group", Select).value == "Theoretical":
+                await self.draw()
 
     @on(Select.Changed, "#group")
     async def _group(self):
+        await self.draw()
+
+    @on(Switch.Changed, "#compare")
+    async def _compare(self):
         await self.draw()
 
     @on(Button.Pressed, "#reload")
@@ -418,23 +613,181 @@ class AnalystPane(Vertical):
         except Exception as e:
             await grid.show(None, f"Couldn't draw this chart: {e}")
 
+    # buttons ------------------------------------------------------------------------------------------------
     @on(Button.Pressed)
-    def _tool(self, event: Button.Pressed):
+    async def _button(self, event: Button.Pressed):
         bid = event.button.id or ""
-        if not bid.startswith("tool-"):
+        if bid.startswith("tool-"):
+            try:
+                title, body = self.run_tool(bid[5:])
+            except Exception as e:
+                title, body = "Analysis tools", f"Couldn't run that tool: {e}"
+            self.app.push_screen(ReportScreen(title, body))
+        elif bid.startswith("act-"):
+            try:
+                await self.do_action(bid[4:])
+            except Exception as e:
+                self.app.notify(f"{bid[4:]} failed: {e}", severity="error")
+
+    def _default_path(self, suffix):
+        d = self.data_a or {}
+        name = "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in
+                       str(d.get("track") or "lap") + "_" + str(d.get("recorded_at") or "x"))
+        out = laps_folder() / "_exports"
+        out.mkdir(parents=True, exist_ok=True)
+        return str(out / f"{name}{suffix}")
+
+    async def _ask(self, prompt, default=""):
+        return await self.app.push_screen_wait(AskScreen(prompt, default))
+
+    async def do_action(self, kind):
+        if kind in ("backup",):
+            self.app.notify("Backing up your laps...")
+            threading.Thread(target=self._backup_worker, daemon=True).start()
             return
+        if kind == "dups":
+            await self._dups()
+            return
+        if self.df_a is None:
+            self.app.notify("Load Lap A first.", severity="warning")
+            return
+        group = self.query_one("#group", Select).value
+        dfb = self.df_b if self.compare_on() else None
+        if kind == "csv":
+            path = await self._ask("Save CSV as:", self._default_path(".csv"))
+            if path:
+                self.export_csv(path)
+                self.app.notify(f"Saved {path}")
+        elif kind == "html":
+            path = await self._ask("Save chart page as:", self._default_path(f"_{group.replace(' ', '_')}.html"))
+            if path:
+                self.export_html(path, group, dfb)
+                self.app.notify(f"Saved {path}")
+        elif kind == "card":
+            path = await self._ask("Save card (PNG) as:", self._default_path("_card.png"))
+            if path:
+                self.export_card(path)
+                self.app.notify(f"Saved {path}")
+        elif kind == "replay3d":
+            from .. import analysis_tools
+            if not analysis_tools.replay_ok(self.df_a):
+                self.app.notify("This lap has no position data to replay.", severity="warning")
+                return
+            path = await self._ask("Save 3D replay (HTML) as:", self._default_path("_replay.html"))
+            if path:
+                analysis_tools.write_replay(path, self.df_a, self.df_b)
+                self.app.notify(f"Saved {path}")
+        elif kind == "replay":
+            self.app.push_screen(ReplayScreen(self.df_a, Path(self.path_a or "lap").stem,
+                                              self.df_b if self.compare_on() else None))
+        elif kind == "community":
+            d = self.data_a or {}
+            car = d.get("car_display") or d.get("car", "?")
+            track = d.get("track_display") or d.get("track", "?")
+            self.app.notify("Loading the community line...")
+            path = self.path_a
+
+            def work():
+                rows = actions.consensus_rows(car, track)
+                self.app.call_from_thread(self._community_done, path, rows)
+            threading.Thread(target=work, daemon=True).start()
+        elif kind == "submit":
+            await self._submit()
+        elif kind == "overlay":
+            await self.key_o()
+        elif kind == "weight":
+            await self._weight()
+        elif kind == "notes":
+            ok = actions.save_notes(self.path_a, self.query_one("#notes", TextArea).text) if self.path_a else False
+            self.app.notify("Notes saved with this lap." if ok else "Couldn't save notes.",
+                            severity="information" if ok else "error")
+
+    # per-kind exports (lap) -----------------------------------------------------------------------------------
+    def export_csv(self, path):
+        actions.export_csv(self.df_a, path)
+
+    def export_html(self, path, group, dfb):
+        extra = [(e["label"], e["df"], e["color"]) for e in self.extra]
+        actions.export_chart_html(path, "lap", group, self.df_a, dfb, extra=extra, consensus=self.consensus,
+                                  pool=actions.theory_pool(self.df_a, self.df_b, [], self.theory_disk))
+
+    def export_card(self, path):
+        actions.export_lap_card(self.data_a, self.df_a, path)
+
+    # long actions ---------------------------------------------------------------------------------------------
+    def _backup_worker(self):
+        path, err = actions.backup_laps()
+        msg = f"Backup saved: {path}" if path else f"Backup failed: {err or 'unknown error'}"
+        self.app.call_from_thread(self.app.notify, msg)
+
+    async def _dups(self):
+        folder = laps_folder()
+        groups = await asyncio.to_thread(actions.find_duplicates, folder)
+        extras = [p for _keep, ps in groups for p in ps]
+        if not extras:
+            self.app.notify("No duplicate laps found.")
+            return
+        ans = await self._ask(f"Found {len(extras)} extra cop{'y' if len(extras) == 1 else 'ies'} of laps you already "
+                              "have. Type YES to move them to _duplicates (nothing is deleted):")
+        if (ans or "").strip().upper() == "YES":
+            moved, errors = actions.move_duplicates(groups, folder)
+            self.app.notify(f"Moved {len(moved)} file(s)." + (f" {len(errors)} could not be moved." if errors else ""))
+
+    def _community_done(self, path, rows):
+        if path != self.path_a:
+            return
+        if not rows:
+            self.app.notify("No community data yet for this car and track (or the server couldn't be reached).",
+                            severity="warning")
+            return
+        self.consensus = rows
+        self.run_worker(self.draw())
+
+    async def _weight(self):
+        car = self.df_a.attrs.get("car") or ""
+        if not car:
+            self.app.notify("This lap has no car name to attach a weight to.", severity="warning")
+            return
+        cur = actions.car_weight(car)
+        ans = await self._ask(f"Weight of the {car} in kg (300-5000):", "" if cur is None else f"{cur:g}")
         try:
-            title, body = self.run_tool(bid[5:])
-        except Exception as e:
-            title, body = "Analysis tools", f"Couldn't run that tool: {e}"
-        self.app.push_screen(ReportScreen(title, body))
+            kg = float(ans) if ans else None
+        except ValueError:
+            kg = None
+        if kg and 300 <= kg <= 5000 and actions.set_car_weight(self.df_a, kg):
+            await self.draw()
+        elif ans:
+            self.app.notify("Enter a number between 300 and 5000.", severity="warning")
+
+    async def _submit(self):
+        problem = actions.submission_problem(self.data_a)
+        if problem:
+            self.app.notify(problem, severity="warning")
+            return
+        d = self.data_a
+        car = d.get("car_display") or d.get("car", "?")
+        track = d.get("track_display") or d.get("track", "?")
+        if not actions.signed_in():
+            name = await self._ask("Create a free leaderboard account. Display name (this is public):",
+                                   config.load().get("PSN_NAME", "") or "")
+            if not name:
+                return
+            ok, msg = await asyncio.to_thread(actions.create_account, name)
+            self.app.notify(msg, severity="information" if ok else "error")
+            if not ok:
+                return
+        psn = await self._ask(f"Submit {car} @ {track} - {float(d.get('lap_time_s') or 0):.3f}s to the PUBLIC "
+                              "leaderboard. PSN name:", config.load().get("PSN_NAME", "") or "")
+        if not psn:
+            return
+        ok, reason = await asyncio.to_thread(actions.submit_lap, d, psn)
+        self.app.notify("Submitted! If it's a new top time it'll appear on the leaderboard shortly." if ok
+                        else actions.SUBMIT_MESSAGES.get(reason, "Submission failed."),
+                        severity="information" if ok else "error")
 
 
 class LapsPane(AnalystPane):
     KIND = "lap"
-
-    def compose(self) -> ComposeResult:
-        yield from super().compose()
 
 
 class RacePane(AnalystPane):
@@ -445,6 +798,9 @@ class RacePane(AnalystPane):
 
     def tools(self):
         return registry.RACE_TOOLS
+
+    def action_list(self):
+        return registry.RACE_ACTIONS
 
     def scan_files(self):
         rows = []
@@ -460,12 +816,22 @@ class RacePane(AnalystPane):
         return load_race(path)
 
     def chart_spec(self, group):
-        return charts.race_chart(group, self.df_a, self.df_b)
+        return charts.race_chart(group, self.df_a, self.df_b if self.compare_on() else None)
 
     def run_tool(self, kind):
         from .. import analysis_tools
         from ..race_charts import race_lap_frames
         return "Race analysis", analysis_tools.race_report(kind, race_lap_frames(self.df_a))
+
+    def export_csv(self, path):
+        from ..race_charts import export_csv
+        export_csv(self.df_a, path)
+
+    def export_html(self, path, group, dfb):
+        actions.export_chart_html(path, "race", group, self.df_a, dfb)
+
+    def export_card(self, path):
+        actions.export_race_card(self.data_a, self.df_a, path)
 
 
 # ── Records and settings ─────────────────────────────────────────────────────────────────────────────────────────
@@ -510,6 +876,21 @@ class SettingsPane(VerticalScroll):
 
 
 # ── App ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+HELP = """1-5      switch screen (Live, Laps, Race, Records, Settings)
+?        this help          q   quit          ctrl+p   command palette
+
+Live     type the console IP and Connect (or Auto-detect). Record Lap arms at the next start line;
+         Record Race records until you stop it. Fill Car and Track so laps save in the right folder.
+         When the track is unknown TRACE offers a guess from where the lap starts: Use it / Not this.
+
+Laps and Race
+         pick a file in the list, then:  a = load as A,  b = load as B,  o = add an overlay lap (Laps)
+         Compare turns lap B into the reference for every chart. The group box picks the chart.
+         Analysis tools and Actions are on the left: exports, replay (space plays, arrows step),
+         notes, car weight, community line, submit to the leaderboard (public, asks you first).
+Records  best lap per car and track.        Settings   the same switches as the desktop app."""
+
+
 class TraceApp(App):
     TITLE = "TRACE - GT7 Telemetry"
     CSS = """
@@ -517,9 +898,11 @@ class TraceApp(App):
     Header { background: #c8102e; }
     TabbedContent { height: 1fr; }
     .setting { height: 3; }
+    .compact AnalystPane #side { width: 34; }
+    .compact LivePane #side { width: 30; }
     """
     BINDINGS = [("q", "quit", "Quit"), ("1", "tab('live')", "Live"), ("2", "tab('laps')", "Laps"),
-                ("3", "tab('race')", "Race"), ("4", "tab('records')", "Records"), ("5", "tab('settings')", "Settings")]
+                ("3", "tab('race')", "Race"), ("4", "tab('records')", "Records"), ("5", "tab('settings')", "Settings"), ("question_mark", "help", "Help")]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -535,6 +918,12 @@ class TraceApp(App):
             with TabPane("Settings", id="settings"):
                 yield SettingsPane()
         yield Footer()
+
+    def on_resize(self, event):
+        self.set_class(event.size.width < 120, "compact")     # narrow terminals: slimmer side panels
+
+    def action_help(self):
+        self.push_screen(ReportScreen("TRACE terminal - keys", HELP))
 
     def action_tab(self, name: str):
         self.query_one(TabbedContent).active = name
