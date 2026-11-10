@@ -1,0 +1,493 @@
+{
+ "lap/Braking": {
+  "axes": 9,
+  "fp": "7247b76b7c6ce9f8",
+  "lines": 10,
+  "titles": [
+   "Brake Trace",
+   "Brake Pressure Dist",
+   "Trail Braking Overlap",
+   "Brake Intensity (Map)",
+   "Long G (Deceleration)",
+   "Speed at Brake Points",
+   "Brake Zone Duration",
+   "Brake Release Rate",
+   "Rear Slip vs Brake %"
+  ]
+ },
+ "lap/Consensus": {
+  "axes": 4,
+  "fp": "9c6a5c1a0e2d4c41",
+  "lines": 0,
+  "titles": [
+   "",
+   "",
+   "",
+   ""
+  ]
+ },
+ "lap/Corners": {
+  "axes": 2,
+  "fp": "39a3c09cd0b7020c",
+  "lines": 1,
+  "titles": [
+   "Time vs reference per corner (above 0 = lost, s)",
+   ""
+  ]
+ },
+ "lap/Dynamics": {
+  "axes": 9,
+  "fp": "791c036d4f006948",
+  "lines": 33,
+  "titles": [
+   "All Suspension mm",
+   "Front Suspension mm",
+   "Rear Suspension mm",
+   "Ride Height mm",
+   "Yaw Rate (ang_y)",
+   "Lateral Vel X",
+   "Vertical Vel Y",
+   "Long G",
+   "Lat G"
+  ]
+ },
+ "lap/Dyno & Tune": {
+  "axes": 1,
+  "fp": "15f365da9e76466b",
+  "lines": 0,
+  "titles": [
+   ""
+  ]
+ },
+ "lap/Engine": {
+  "axes": 10,
+  "fp": "0d0e49168e6bccc5",
+  "lines": 16,
+  "titles": [
+   "RPM",
+   "RPM + Gear",
+   "Boost",
+   "Oil Temp (GT7 constant)",
+   "Water Temp (GT7 constant)",
+   "Oil Pressure",
+   "RPM @ Clutch",
+   "RPM Distribution",
+   "Gear Usage",
+   ""
+  ]
+ },
+ "lap/Extended": {
+  "axes": 9,
+  "fp": "c50c82de5c837c79",
+  "lines": 0,
+  "titles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ]
+ },
+ "lap/Fuel": {
+  "axes": 6,
+  "fp": "f637970657586f80",
+  "lines": 4,
+  "titles": [
+   "Fuel Remaining",
+   "Fuel Burn Rate",
+   "Coasting Zones",
+   "Throttle Distribution",
+   "Brake Distribution",
+   "Speed vs Brake"
+  ]
+ },
+ "lap/G-Force": {
+  "axes": 4,
+  "fp": "bb1b981f7c40c95a",
+  "lines": 12,
+  "titles": [
+   "Longitudinal G",
+   "Lateral G",
+   "G-G Diagram",
+   "Total G"
+  ]
+ },
+ "lap/Heat Maps": {
+  "axes": 8,
+  "fp": "abff79e97914efa7",
+  "lines": 0,
+  "titles": [
+   "A \u2014 Speed",
+   "B \u2014 Speed",
+   "A \u2014 Throttle",
+   "B \u2014 Throttle",
+   "A \u2014 Brake",
+   "B \u2014 Brake",
+   "A \u2014 Lat G",
+   "B \u2014 Lat G"
+  ]
+ },
+ "lap/Inputs": {
+  "axes": 9,
+  "fp": "f0e82f47ce829435",
+  "lines": 17,
+  "titles": [
+   "Speed",
+   "Throttle",
+   "Brake",
+   "Throttle + Brake",
+   "Gear",
+   "Steering",
+   "Clutch",
+   "Speed Distribution",
+   "Speed vs Throttle"
+  ]
+ },
+ "lap/Maps": {
+  "axes": 4,
+  "fp": "f6da7d516c8002ec",
+  "lines": 0,
+  "titles": [
+   "Speed (km/h)",
+   "Throttle",
+   "Brake",
+   "Gear"
+  ]
+ },
+ "lap/Ratings": {
+  "axes": 4,
+  "fp": "4016cf33b5dab44e",
+  "lines": 7,
+  "titles": [
+   "Driver Ratings",
+   "Performance Radar",
+   "Rolling Throttle / Brake",
+   "Grade"
+  ]
+ },
+ "lap/Sectors": {
+  "axes": 9,
+  "fp": "f75094606281945c",
+  "lines": 11,
+  "titles": [
+   "Sector Times",
+   "Avg Speed/Sector",
+   "Top Speed/Sector",
+   "Sector \u0394 B\u2212A  |  Theo best: 77.298s",
+   "Speed Heatmap by Sector",
+   "Avg Brake%/Sector",
+   "Track Sector Map",
+   "Avg Throttle%/Sector",
+   "Max |Lat G|/Sector"
+  ]
+ },
+ "lap/Style": {
+  "axes": 4,
+  "fp": "c9c39d156ec4ecf3",
+  "lines": 2,
+  "titles": [
+   "Driving Style (Smooth \u2194 Aggressive)",
+   "Cornering Balance (\u2190 Understeer | Oversteer \u2192)",
+   "Balance Through Corners",
+   "Style Summary"
+  ]
+ },
+ "lap/Tele Diff": {
+  "axes": 9,
+  "fp": "47bafd565a7e3315",
+  "lines": 18,
+  "titles": [
+   "\u0394 Speed (B\u2212A)",
+   "\u0394 Throttle (B\u2212A)",
+   "\u0394 Brake (B\u2212A)",
+   "\u0394 RPM (B\u2212A)",
+   "\u0394 Steering (B\u2212A)",
+   "\u0394 Lat G (B\u2212A)",
+   "\u0394 Time  (final +9.958s)",
+   "\u0394 Long G (B\u2212A)",
+   "Speed Overlay"
+  ]
+ },
+ "lap/Theoretical": {
+  "axes": 4,
+  "fp": "0c657fd218f18445",
+  "lines": 1,
+  "titles": [
+   "Time left on the table along the lap (s)",
+   "Where your best lap loses time (per ~100 m zone, s)",
+   "Which lap holds the fastest time in each part of the track",
+   "Theoretical best lap"
+  ]
+ },
+ "lap/Timeline": {
+  "axes": 2,
+  "fp": "a1141890d5cbdc71",
+  "lines": 0,
+  "titles": [
+   "Lap Timeline \u2014 A",
+   "Lap Timeline \u2014 B"
+  ]
+ },
+ "lap/Traction": {
+  "axes": 6,
+  "fp": "a3ce887ef27ebcfa",
+  "lines": 10,
+  "titles": [
+   "G-G Traction Circle",
+   "Lateral G",
+   "Total G",
+   "|Lat G| vs Speed",
+   "|Lat G| Entry/Mid/Exit",
+   "Long G Distribution"
+  ]
+ },
+ "lap/Tyres": {
+  "axes": 9,
+  "fp": "ec9ab281b67c5d70",
+  "lines": 43,
+  "titles": [
+   "All Tyre Temps",
+   "Front Temps \u00b0C",
+   "Rear Temps \u00b0C",
+   "Front vs Rear Avg \u00b0C",
+   "All Slip Ratios",
+   "Front Slip",
+   "Rear Slip",
+   "L\u2212R Balance \u00b0C",
+   "Rear-R Slip vs Speed"
+  ]
+ },
+ "race/Braking": {
+  "axes": 9,
+  "fp": "e3ea923db4cd960f",
+  "lines": 7,
+  "titles": [
+   "Brake Trace",
+   "Brake Pressure Dist",
+   "Trail Braking Overlap",
+   "Brake Intensity (Map)",
+   "Long G (Deceleration)",
+   "Speed at Brake Points",
+   "Brake Zone Duration",
+   "Brake Release Rate",
+   "Rear Slip vs Brake %"
+  ]
+ },
+ "race/Consistency": {
+  "axes": 4,
+  "fp": "46b3eefdfad444fc",
+  "lines": 4,
+  "titles": [
+   "Lap time by lap (band = \u00b11 std)",
+   "Lap vs your average (clean laps, s)",
+   "Corner time spread across laps (lower = more consistent)",
+   "Consistency report"
+  ]
+ },
+ "race/Corners": {
+  "axes": 2,
+  "fp": "78cbad17de1134ee",
+  "lines": 1,
+  "titles": [
+   "Time lost (red) / gained (green) per corner, s",
+   "Average per corner over the race (above 0 = slower than the baseline, s)"
+  ]
+ },
+ "race/Dynamics": {
+  "axes": 9,
+  "fp": "af29755c7c7470b1",
+  "lines": 19,
+  "titles": [
+   "All Suspension mm",
+   "Front Suspension mm",
+   "Rear Suspension mm",
+   "Ride Height mm",
+   "Yaw Rate (ang_y)",
+   "Lateral Vel X",
+   "Vertical Vel Y",
+   "Long G",
+   "Lat G"
+  ]
+ },
+ "race/Engine": {
+  "axes": 10,
+  "fp": "834a5a01110bcc7e",
+  "lines": 8,
+  "titles": [
+   "RPM",
+   "RPM + Gear",
+   "Boost",
+   "Oil Temp (GT7 constant)",
+   "Water Temp (GT7 constant)",
+   "Oil Pressure",
+   "RPM @ Clutch",
+   "RPM Distribution",
+   "Gear Usage",
+   ""
+  ]
+ },
+ "race/Fuel": {
+  "axes": 6,
+  "fp": "22b2ac7680ee7883",
+  "lines": 2,
+  "titles": [
+   "Fuel Remaining",
+   "Fuel Burn Rate",
+   "Coasting Zones",
+   "Throttle Distribution",
+   "Brake Distribution",
+   "Speed vs Brake"
+  ]
+ },
+ "race/G-Force": {
+  "axes": 4,
+  "fp": "771207cfdebd4c3f",
+  "lines": 9,
+  "titles": [
+   "Longitudinal G",
+   "Lateral G",
+   "G-G Diagram",
+   "Total G"
+  ]
+ },
+ "race/Heat Maps": {
+  "axes": 9,
+  "fp": "5ab6f2e815438ba1",
+  "lines": 0,
+  "titles": [
+   "Speed (km/h)",
+   "Throttle",
+   "Brake",
+   "Lat G",
+   "Long G",
+   "Total G",
+   "Tyre Temp FL",
+   "RPM",
+   "Steering"
+  ]
+ },
+ "race/Inputs": {
+  "axes": 9,
+  "fp": "6b6c8a02c3fee6bf",
+  "lines": 9,
+  "titles": [
+   "Speed",
+   "Throttle",
+   "Brake",
+   "Throttle + Brake",
+   "Gear",
+   "Steering",
+   "Clutch",
+   "Speed Distribution",
+   "Speed vs Throttle"
+  ]
+ },
+ "race/Laps": {
+  "axes": 9,
+  "fp": "50ed6952a1dffb0d",
+  "lines": 5,
+  "titles": [
+   "Lap Times",
+   "Avg Speed/Lap",
+   "Top Speed/Lap",
+   "Cumulative Race Time",
+   "Speed Heatmap by Lap",
+   "Avg Brake%/Lap",
+   "Lap Lines (first 4)",
+   "Avg Throttle%/Lap",
+   "Max |Lat G|/Lap"
+  ]
+ },
+ "race/Maps": {
+  "axes": 4,
+  "fp": "41ff8e7107352ef9",
+  "lines": 0,
+  "titles": [
+   "Speed (km/h) \u2014 all laps",
+   "Throttle \u2014 all laps",
+   "Brake \u2014 all laps",
+   "Gear \u2014 all laps"
+  ]
+ },
+ "race/Race": {
+  "axes": 4,
+  "fp": "40693b88e19cb9fa",
+  "lines": 2,
+  "titles": [
+   "",
+   "Pit Stops (A: 0)",
+   "Fuel Over Race",
+   "Lap Time Trend"
+  ]
+ },
+ "race/Ratings": {
+  "axes": 4,
+  "fp": "7ef6a0450b80e0e0",
+  "lines": 4,
+  "titles": [
+   "Driver Ratings",
+   "Performance Radar",
+   "Rolling Throttle / Brake",
+   "Grade"
+  ]
+ },
+ "race/Tele Diff": {
+  "axes": 9,
+  "fp": "e28c121b5e6cecd4",
+  "lines": 0,
+  "titles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   ""
+  ]
+ },
+ "race/Timeline": {
+  "axes": 3,
+  "fp": "9c6f0c1a38780ce1",
+  "lines": 2,
+  "titles": [
+   "Race Timeline \u2014 A  (orange band = pit)",
+   "Speed Trace",
+   "Gear"
+  ]
+ },
+ "race/Traction": {
+  "axes": 6,
+  "fp": "f3ef5184d124aa9f",
+  "lines": 8,
+  "titles": [
+   "G-G Traction Circle",
+   "Lateral G",
+   "Total G",
+   "|Lat G| vs Speed",
+   "|Lat G| Early/Mid/Late",
+   "Long G Distribution"
+  ]
+ },
+ "race/Tyres": {
+  "axes": 9,
+  "fp": "c2472faf2dbb2a9f",
+  "lines": 24,
+  "titles": [
+   "All Tyre Temps",
+   "Front Temps \u00b0C",
+   "Rear Temps \u00b0C",
+   "Front vs Rear Avg \u00b0C",
+   "All Slip Ratios",
+   "Front Slip",
+   "Rear Slip",
+   "L\u2212R Balance \u00b0C",
+   "Rear-R Slip vs Speed"
+  ]
+ }
+}

@@ -185,7 +185,8 @@ def test_race_card_survives_a_bare_recording(tmp_path):
 
 
 def test_lap_and_race_cards_share_one_renderer():
-    assert la.share_card is ra.share_card is share_card
+    from gt7telem import lap_charts, race_charts
+    assert lap_charts.share_card is race_charts.share_card is share_card
     assert la._fmt_laptime(59.9996) == share_card.fmt_time(59.9996) == "1:00.000"
     assert share_card.fmt_time(None) == "--:--.---"
 

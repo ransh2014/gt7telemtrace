@@ -112,3 +112,30 @@ def race_report(kind: str, laps: list) -> str:
                          " ".join(i.text for i in r["issues"])))
         return "\n".join(lines)
     return "Unknown tool."
+
+
+# ---- the Lap Analyst's tools, by kind (so the Tk window and the terminal UI run exactly the same thing) ------
+def lap_tool(kind: str, dfa, dfb=None, data_a: dict | None = None, data_b: dict | None = None,
+             extra: list | None = None) -> tuple[str, str]:
+    """(window title, report text) for one registry LAP_TOOLS kind. `extra` is the overlay laps' frames."""
+    extra = extra or []
+    if kind == "coach":
+        return "Coach", coach_report(dfa, dfb)
+    if kind == "setup":
+        return "Setup advisor", setup_report(dfa)
+    if kind == "dna":
+        return "Driver DNA", dna_report(dfa, [dfb] + list(extra), save=True)
+    if kind == "plan":
+        def secs(d, data):
+            try:
+                return float((data or {}).get("lap_time_s") or 0) or float(d["t"].iloc[-1] - d["t"].iloc[0])
+            except Exception:
+                return 0.0
+        laps = [(dfa, secs(dfa, data_a)), (dfb, secs(dfb, data_b))] if dfb is not None else [(dfa, secs(dfa, data_a))]
+        laps += [(f, secs(f, None)) for f in extra]
+        return "Practice plan", plan_report(laps)
+    if kind == "validate":
+        return "Lap validation", validate_report(dfa, data_a)
+    if kind == "dyno":
+        return "Dyno comparison", dyno_compare_report(dfa, dfb)
+    raise KeyError(kind)

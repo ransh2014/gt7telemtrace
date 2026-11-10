@@ -124,6 +124,12 @@ gt7telem/         The TRACE package itself (same source that ships on
   groups.py         Friends groups, weekly challenges and sector boards, shared as
                     pasteable codes (no server)
   overlay_page.py   The transparent OBS overlay served at /overlay by the web UI
+  lap_charts.py     The Lap Analyst's lap loading and its 20 chart groups, with no tkinter -- the
+                    Tk window and the terminal UI both draw from this one module
+  race_charts.py    The Race Analyst's race loading and chart code, 17 groups (no tkinter either)
+  core/             UI-free core shared by the Tk windows and the terminal UI: registry.py
+                    (the one list of chart groups and tools), charts.py (headless chart
+                    rendering), figspec.py (a chart as plain data)
   analysis_tools.py The ANALYSIS TOOLS buttons' reports in the Lap and Race Analyst (coach,
                     setup advisor, driver DNA, practice plan, validation, dyno compare)
   cli.py            gt7telem-tools: all of the above from the command line
