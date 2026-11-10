@@ -97,8 +97,20 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Desktop notifications (with a sound where the system supports one) on a new personal best and when a race recording ends automatically. Switch them off with the **`NOTIFICATIONS`** checkbox in the Live Dashboard header
 - **Keep awake** — the **`KEEP AWAKE`** checkbox in the Live Dashboard header (on by default) stops Windows, macOS and Linux from idle-sleeping or hibernating the whole time the Dashboard is open, and lets the PC sleep again the moment you close it. Untick it to stay awake only while telemetry is flowing. The Android app does the same (it holds the phone awake while open), and both warn you with a red bar and a siren if the battery drops below 20% while a lap or race is recording on battery power
 - Dark / light theme toggle in the Launcher footer (applies the next time you open a tool)
-- Update check — the Launcher shows its version (e.g. `v1.1.0`) and, after one quiet background look at the latest GitHub release, either `current` (green) or `update available: vX` (blue, click to open the release page). Drafts and pre-releases are ignored and nothing is shown offline. Tick **`Ignore update checks`** on the Launcher (or untick **`CHECK FOR UPDATES`** in the Live Dashboard header — the same setting) to stop it (see [Privacy & analytics](#privacy--analytics))
+- Update check — the Launcher shows its version (e.g. `v1.3.0`) and, after one quiet background look at the latest GitHub release, either `current` (green) or `update available: vX` (blue, click to open the release page). Drafts and pre-releases are ignored and nothing is shown offline. Tick **`Ignore update checks`** on the Launcher (or untick **`CHECK FOR UPDATES`** in the Live Dashboard header — the same setting) to stop it (see [Privacy & analytics](#privacy--analytics))
 - **Ask TRACE (website chat)** — the [website](https://gt7trace.netlify.app) has an AI support chat for setup and how-to questions. It only sends something when you type a question, it never runs in the desktop app, and nothing is stored. Answers are AI-generated and can be wrong; open an issue if it can't help. Details on the [Privacy](https://gt7trace.netlify.app/privacy.html) page
+
+### Coaching and analysis tools
+- **Driving coach** — after every lap with a reference, up to three ranked tips ("Brake 14 m later at T4"), spoken as a short cue before each corner on the next lap (the `VOICE ALERTS` switch mutes it)
+- **Setup advisor** — reads understeer, oversteer, wheelspin, front lock-ups and bottoming-out from one lap and suggests changes in GT7's own units; an A/B check compares laps before and after a change
+- **Race engineer** — pit window, undercut and overcut, a simulated finishing position and live "Pit next lap" / "Box this lap" calls. Estimates only: GT7 sends no tyre wear and no pit-lane flag
+- **3D lap replay**, **Driver DNA**, **practice planner**, **friends groups and weekly challenges** (pasteable codes, no server), **lap validation**, **dyno overlay**, and an OBS **stream overlay** at `/overlay` on the web UI
+- `gt7telem-tools` runs the same tools on saved lap files from a terminal: `coach`, `setup`, `ab`, `plan`, `validate`, `replay`, `dna`, `dyno-compare`, `challenge`
+
+### Terminal edition
+- `gt7telem tui` (or `python -m gt7telem.tui`, or the **Terminal UI** link in the Launcher footer) runs TRACE inside a terminal on Windows, macOS and Linux (not Android). It is part of the normal install; Textual and textual-plotext come with it. With no display (for example over SSH) plain `gt7telem` opens it automatically
+- Five screens, keys `1`-`5`, `?` for help: **Live** (telemetry, track map, lap and race recording, auto lap, delta, top-lap gap, coach cues, pit calls, track detection), **Lap Analyst**, **Race Analyst**, **Records** and **Settings**
+- It is built from the same code as the windows, not a copy: the chart drawing, the chart groups, the analysis tools, the exports (CSV, chart HTML, lap and race cards), notes, replay, leaderboard submit, car weight, backup and duplicate clean-up are shared, and `tests/test_parity.py` fails the build if the two ever differ. Charts in the terminal are drawn from the same matplotlib draw functions, rendered as braille plots
 
 ### Android app (sideload)
 - A standalone phone version of all three tools — Live Dashboard, Lap Analyst and Race Analyst — with the same features, layout, colours and fonts, tweaked for a touch screen. The phone receives your PS5's telemetry itself over Wi-Fi, so no PC is needed
@@ -135,7 +147,7 @@ The importable module is **`gt7telem`** (not `gt7tracetelem`) — the PyPI distr
 import gt7telem
 gt7telem.get_snapshot()
 ```
-Or just run `gt7telem` from a terminal to launch the GUI menu.
+Or just run `gt7telem` from a terminal to launch the GUI menu. Run `gt7telem tui` for the terminal edition.
 
 > If you already have an unrelated package that installs a top-level `gt7telem` module, the two will conflict. Check first with `pip show gt7telem`.
 
