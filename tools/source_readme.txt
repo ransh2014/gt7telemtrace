@@ -124,6 +124,8 @@ gt7telem/         The TRACE package itself (same source that ships on
   groups.py         Friends groups, weekly challenges and sector boards, shared as
                     pasteable codes (no server)
   overlay_page.py   The transparent OBS overlay served at /overlay by the web UI
+  analysis_tools.py The ANALYSIS TOOLS buttons' reports in the Lap and Race Analyst (coach,
+                    setup advisor, driver DNA, practice plan, validation, dyno compare)
   cli.py            gt7telem-tools: all of the above from the command line
   cars.py           Car ID -> name lookup (car_ids.csv)
   tracks.py         Track ID -> name lookup (course_ids.csv), plus track

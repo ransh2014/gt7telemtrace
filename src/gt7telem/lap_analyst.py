@@ -19,6 +19,7 @@ import pandas as pd
 
 from . import (
     __version__,
+    analysis_tools,
     auth,
     corners,
     dyno,
@@ -2302,6 +2303,18 @@ class AnalystApp(tk.Tk):
                   bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
+        ft = _section("ANALYSIS TOOLS", GRN)
+        for text, kind, colour in (
+                ("Coach (A vs B)", "coach", GRN), ("Setup advisor", "setup", CYN),
+                ("Driver DNA", "dna", PRP), ("Practice plan (all loaded laps)", "plan", YLW),
+                ("Validate lap", "validate", ACC), ("Compare dyno (A vs B)", "dyno", CYN)):
+            tk.Button(ft, text=text, command=lambda k=kind: self._show_tool(k),
+                      bg=DIM2, fg=colour, relief="flat", font=FONTL, padx=8, pady=2,
+                      cursor="hand2").pack(anchor="w", padx=8, pady=(2, 2))
+        tk.Button(ft, text="Export 3D replay (HTML)", command=self._export_replay3d,
+                  bg=DIM2, fg=GRN, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(2, 4))
+
         fl = _section("LEADERBOARD", YLW)
         tk.Button(fl, text=L.SUBMIT_TO_LEADERBOARD, command=self._submit_leaderboard,
                   bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
@@ -2416,6 +2429,55 @@ class AnalystApp(tk.Tk):
             err = runtime_config.last_backup_error
             self._post(lambda: self._after_backup(path, err))
         threading.Thread(target=worker, daemon=True).start()
+
+    # ── analysis tools (coach, setup advisor, DNA, planner, validation, dyno compare, 3D replay) ──────────
+    def _tool_text(self, kind):
+        a, b = self._dfa, self._dfb
+        if kind == "coach":
+            return "Coach", analysis_tools.coach_report(a, b)
+        if kind == "setup":
+            return "Setup advisor", analysis_tools.setup_report(a)
+        if kind == "dna":
+            return "Driver DNA", analysis_tools.dna_report(a, [self._dfb] + [e["df"] for e in self._extra], save=True)
+        if kind == "plan":
+            laps = [(self._dfa, _num((self._da or {}).get("lap_time_s"))),
+                    (self._dfb, _num((self._db or {}).get("lap_time_s")))]
+            laps += [(e["df"], float(e["df"]["t"].iloc[-1] - e["df"]["t"].iloc[0])) for e in self._extra]
+            return "Practice plan", analysis_tools.plan_report(laps)
+        if kind == "validate":
+            return "Lap validation", analysis_tools.validate_report(a, self._da)
+        return "Dyno comparison", analysis_tools.dyno_compare_report(a, b)
+
+    def _show_tool(self, kind):
+        try:
+            title, text = self._tool_text(kind)
+        except Exception as e:
+            messagebox.showerror("Analysis tools", f"Couldn't run that tool on this lap: {e}")
+            return
+        win = tk.Toplevel(self)
+        win.title(f"TRACE - {title}")
+        win.configure(bg=BG)
+        theme.fit_window(win, 760, 460, 480, 280)
+        box = tk.Text(win, bg=PNL2, fg=FG, font=FONT, wrap="word", relief="flat", padx=12, pady=10)
+        box.pack(fill="both", expand=True)
+        box.insert("1.0", text)
+        box.config(state="disabled")
+
+    def _export_replay3d(self):
+        if not analysis_tools.replay_ok(self._dfa):
+            messagebox.showinfo("3D replay", "Load Lap A first. It needs a lap with position data (not a leaderboard ghost).")
+            return
+        path = filedialog.asksaveasfilename(title="Export 3D replay", defaultextension=".html",
+                                            filetypes=[("HTML", "*.html"), ("All", "*.*")])
+        if not path:
+            return
+        try:
+            analysis_tools.write_replay(path, self._dfa, self._dfb if analysis_tools.replay_ok(self._dfb) else None,
+                                        title=f"TRACE replay - {lap_label(self._da or {})}")
+        except Exception as e:
+            messagebox.showerror("3D replay", f"Couldn't write the replay: {e}")
+            return
+        messagebox.showinfo("3D replay", f"Saved. Open it in any browser: {path}")
 
     def _find_duplicate_laps(self):
         """Scan the laps folder for identical lap files and offer to move the extra

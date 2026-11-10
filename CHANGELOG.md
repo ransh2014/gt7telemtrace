@@ -19,7 +19,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Lap validation (`validate.py`).** Flags teleports, shortcuts, impossible acceleration, backwards clocks, off-track stretches and wall hits as clean, suspect or invalid.
 - **Dyno overlay (`dyno_compare.py`).** Two cars' (or tunes') power curves on one axis, and final-drive advice from a lap's speed trace.
 - **`gt7telem-tools` command (`cli.py`).** All of the above on saved lap files: `coach`, `setup`, `ab`, `plan`, `validate`, `replay`, `dna`, `dyno-compare` and `challenge`.
-- Not yet in the windows: the Lap Analyst / Race Analyst and Android app do not have buttons for these tools yet; the Dashboard (coach cues, pit calls) and the web UI overlay are wired in, the rest is reached through `gt7telem-tools` and the Python modules.
+- **In the windows too.** The Lap Analyst sidebar has an ANALYSIS TOOLS section (Coach A vs B, Setup advisor, Driver DNA, Practice plan, Validate lap, Compare dyno, Export 3D replay) and the Race Analyst has Coach (slowest vs best lap), Practice plan, Driver DNA and Validate laps. The Android app does not have them yet.
 
 ## [1.1.0] - 2026-11-09
 **A passcode for the phone web dashboard, and much smaller downloads.**

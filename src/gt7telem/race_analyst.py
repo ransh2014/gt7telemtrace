@@ -28,6 +28,7 @@ warnings.filterwarnings("ignore")
 
 from . import (  # noqa: E402
     __version__,
+    analysis_tools,
     consistency,
     corners,
     leaderboard,
@@ -1896,6 +1897,13 @@ class AnalystApp(tk.Tk):
                   bg=DIM2, fg=PRP, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
+        ft = _section("ANALYSIS TOOLS", GRN)
+        for text, kind in (("Coach (slowest vs best lap)", "coach"), ("Practice plan", "plan"),
+                           ("Driver DNA", "dna"), ("Validate laps", "validate")):
+            tk.Button(ft, text=text, command=lambda k=kind: self._show_tool(k),
+                      bg=DIM2, fg=GRN, relief="flat", font=FONTL, padx=8, pady=2,
+                      cursor="hand2").pack(anchor="w", padx=8, pady=(2, 2))
+
         tk.Label(p, text=L.LAP_SPLITS_RACE_A, fg=DIM, bg=PNL2,
                  font=FONTL).pack(anchor="w", padx=12, pady=(6,2))
         self._sec_outer = tk.Frame(p, bg=PNL2); self._sec_outer.pack(fill="both", padx=6, expand=False)
@@ -2058,6 +2066,25 @@ class AnalystApp(tk.Tk):
                     if self._cfigs[k]: plt.close(self._cfigs[k])
                     self._cfigs[k] = None
                 self._draw_active_chart()
+
+    # ── analysis tools across this race's laps ────────────────────────────────
+    def _show_tool(self, kind):
+        if self._dfa is None:
+            messagebox.showinfo("Analysis tools", "Load Race A first.")
+            return
+        try:
+            text = analysis_tools.race_report(kind, race_lap_frames(self._dfa))
+        except Exception as e:
+            messagebox.showerror("Analysis tools", f"Couldn't run that tool on this race: {e}")
+            return
+        win = tk.Toplevel(self)
+        win.title("TRACE - Analysis tools")
+        win.configure(bg=BG)
+        theme.fit_window(win, 760, 460, 480, 280)
+        box = tk.Text(win, bg=PNL2, fg=FG, font=FONT, wrap="word", relief="flat", padx=12, pady=10)
+        box.pack(fill="both", expand=True)
+        box.insert("1.0", text)
+        box.config(state="disabled")
 
     # ── exports ───────────────────────────────────────────────────────────────
     def _export_csv(self):
