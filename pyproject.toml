@@ -49,6 +49,8 @@ dependencies = [
     "pycryptodome>=3.19,<5",
     "prometheus_client>=0.20,<1",
     "websockets>=13,<16",
+    "textual>=1.0,<9",
+    "textual-plotext>=1.0,<2",
 ]
 
 [project.urls]

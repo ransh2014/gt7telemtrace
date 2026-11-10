@@ -29,6 +29,9 @@ def _thin(arr, n=MAX_POINTS):
     return arr[idx]
 
 
+IMAGE_MAX = 6000          # heat maps keep every cell up to this many so the terminal can redraw the grid
+
+
 def _clean(arr):
     """JSON-safe list: NaN/inf become None, floats rounded to _ROUND significant digits."""
     out = []
@@ -111,10 +114,11 @@ def axes_spec(ax) -> dict:
         elif name in ("QuadMesh", "PolyCollection"):
             arr = col.get_array()
             if arr is not None:
-                spec["images"].append({"shape": list(np.shape(arr)), "values": _clean(_thin(_num(arr)))})
+                spec["images"].append({"shape": list(np.shape(arr)),
+                                       "values": _clean(_thin(_num(arr), IMAGE_MAX))})
     for im in ax.images:
         a = np.asarray(im.get_array(), dtype=float)
-        spec["images"].append({"shape": list(a.shape), "values": _clean(_thin(a.ravel()))})
+        spec["images"].append({"shape": list(a.shape), "values": _clean(_thin(a.ravel(), IMAGE_MAX))})
     for t in ax.texts:
         s = t.get_text()
         if s:

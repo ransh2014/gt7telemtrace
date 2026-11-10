@@ -12,7 +12,7 @@
 import os
 import sys
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 import gt7telem
 
@@ -89,8 +89,11 @@ a = Analysis(
         (os.path.join(PKG_DIR, "car_ids.csv"), "gt7telem"),
         (os.path.join(PKG_DIR, "course_ids.csv"), "gt7telem"),
         (os.path.join(PKG_DIR, "fonts"), "gt7telem/fonts"),   # every TRACE font + OFL.txt, untouched
-    ],
-    hiddenimports=collect_submodules("websockets"),
+    ] + collect_data_files("textual") + collect_data_files("textual_plotext") + collect_data_files("plotext"),
+    # the terminal edition (gt7telem/tui): Textual loads its .tcss styles and widgets by name, so keep all of it
+    hiddenimports=(collect_submodules("websockets") + collect_submodules("textual")
+                   + collect_submodules("textual_plotext") + collect_submodules("plotext")
+                   + collect_submodules("rich") + collect_submodules("gt7telem")),
     hookspath=[],
     runtime_hooks=[],
     excludes=EXCLUDES,

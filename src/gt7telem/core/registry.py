@@ -4,6 +4,7 @@ front end forgets it."""
 
 from __future__ import annotations
 
+from .. import labels as L
 from .. import lap_charts, race_charts
 
 # (kind, label, colour key used by the Tk sidebar). Wording lives here once; Tk and the terminal both read it.
@@ -23,7 +24,19 @@ RACE_TOOLS = [
 ]
 REPLAY_EXPORT_LABEL = "Export 3D replay (HTML)"
 
-SCREENS = ["live", "laps", "race", "tools", "records", "settings", "connect"]
+SCREENS = ["live", "laps", "race", "records", "settings"]
+
+# (config key, label) for the on/off preferences both front ends show. Wording comes from labels.py.
+SETTINGS = [
+    ("VOICE_ENABLED", L.PREF_VOICE_ALERTS),
+    ("NOTIFY_ENABLED", L.PREF_NOTIFICATIONS),
+    ("GHOST_ENABLED", L.PREF_TOP_LAP_GHOST),
+    ("UPDATE_CHECK_ENABLED", L.PREF_CHECK_FOR_UPDATES),
+    ("ANALYTICS_ENABLED", L.PREF_SHARE_USAGE_DATA),
+    ("DEBUG_LOG", L.PREF_DEBUG_LOG),
+    ("AUTO_LAP_ENABLED", L.PREF_AUTO_LAP),
+    ("KEEP_AWAKE_ENABLED", L.PREF_KEEP_AWAKE),
+]
 
 
 def lap_groups() -> list[str]:

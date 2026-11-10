@@ -130,6 +130,9 @@ gt7telem/         The TRACE package itself (same source that ships on
   core/             UI-free core shared by the Tk windows and the terminal UI: registry.py
                     (the one list of chart groups and tools), charts.py (headless chart
                     rendering), figspec.py (a chart as plain data)
+  tui/              The terminal edition of TRACE (Textual): Live, Laps, Race, Records and
+                    Settings. Start it with `python launcher.py tui`. It draws the same
+                    chart groups and tools as the windows, from the core/ registry.
   analysis_tools.py The ANALYSIS TOOLS buttons' reports in the Lap and Race Analyst (coach,
                     setup advisor, driver DNA, practice plan, validation, dyno compare)
   cli.py            gt7telem-tools: all of the above from the command line

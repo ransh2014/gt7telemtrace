@@ -501,7 +501,7 @@ def _track_map(ax, df, col, cmap="turbo", title=""):
     lc.set_array(v)
     ax.add_collection(lc); ax.autoscale(); ax.set_aspect("equal")
     ax.set_title(title, color=FG, fontsize=9); ax.axis("off")
-    cb = plt.colorbar(lc, ax=ax, pad=0.02, fraction=0.04)
+    cb = ax.figure.colorbar(lc, ax=ax, pad=0.02, fraction=0.04)
     cb.ax.tick_params(labelsize=6, colors=DIM)
 
 # ── Chart groups ──────────────────────────────────────────────────────────────
@@ -691,7 +691,7 @@ def draw_gforce(fig, df, dfb=None):
     th = np.linspace(0, 2*np.pi, 100)
     for r in [1.0, 2.0]: axs[1,0].plot(np.cos(th)*r, np.sin(th)*r, color=DIM, lw=0.6, ls="--")
     _ax(axs[1,0], "G-G Diagram", xl="Lat G", yl="Long G"); axs[1,0].grid(False)
-    plt.colorbar(sc, ax=axs[1,0], fraction=0.04, pad=0.02).ax.tick_params(labelsize=6, colors=DIM)
+    axs[1,0].figure.colorbar(sc, ax=axs[1,0], fraction=0.04, pad=0.02).ax.tick_params(labelsize=6, colors=DIM)
     _L(axs[1,1], df, x, "total_g", CYN, fill=True); _ax(axs[1,1], "Total G", yl="g")
     if dfb is not None:
         _Lb(axs[0,0], dfb, x, "long_g"); _Lb(axs[0,1], dfb, x, "lat_g")
@@ -870,7 +870,7 @@ def draw_sectors(fig, df, dfb=None):
                       color="white", fontsize=6, fontweight="bold")
     axs[1,1].set_yticks([]); axs[1,1].set_xticks([])
     axs[1,1].set_title("Speed Heatmap by Sector", color=FG, fontsize=9)
-    plt.colorbar(im, ax=axs[1,1], fraction=0.04).ax.tick_params(labelsize=5, colors=DIM)
+    axs[1,1].figure.colorbar(im, ax=axs[1,1], fraction=0.04).ax.tick_params(labelsize=5, colors=DIM)
 
     bars2(axs[1,2], brk_a, brk_b, "Avg Brake%/Sector",   yl="%", col_a=ACC, col_b=PRP)
 
@@ -911,7 +911,7 @@ def draw_traction(fig, df, dfb=None):
         axs[0,0].plot(np.cos(th)*r, np.sin(th)*r, color=DIM, lw=0.5, ls="--", alpha=0.7)
     axs[0,0].set_xlim(-3.5, 3.5); axs[0,0].set_ylim(-3.5, 3.5)
     _ax(axs[0,0], "G-G Traction Circle", xl="Lat G", yl="Long G"); axs[0,0].grid(False)
-    plt.colorbar(sc, ax=axs[0,0], fraction=0.04, pad=0.02).ax.tick_params(labelsize=6, colors=DIM)
+    axs[0,0].figure.colorbar(sc, ax=axs[0,0], fraction=0.04, pad=0.02).ax.tick_params(labelsize=6, colors=DIM)
 
     # Lateral G trace
     _L(axs[0,1], df, x, "lat_g", PRP); axs[0,1].axhline(0,color=DIM,lw=0.8,ls="--")
@@ -929,7 +929,7 @@ def draw_traction(fig, df, dfb=None):
     if dfb is not None:
         axs[1,0].scatter(dfb["lat_g"].abs(), dfb["speed_kmh"], c=ACC, s=1.5, alpha=0.18)
     _ax(axs[1,0], "|Lat G| vs Speed", xl="|Lat G|", yl="km/h"); axs[1,0].grid(False)
-    plt.colorbar(sc2, ax=axs[1,0], fraction=0.04, pad=0.02).ax.tick_params(labelsize=6, colors=DIM)
+    axs[1,0].figure.colorbar(sc2, ax=axs[1,0], fraction=0.04, pad=0.02).ax.tick_params(labelsize=6, colors=DIM)
 
     # Entry / mid / exit |Lat G| distribution
     n = len(df); e = n // 3

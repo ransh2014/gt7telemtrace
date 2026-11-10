@@ -4,6 +4,7 @@ All notable changes to TRACE are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+- **Terminal edition (in progress, not released).** `gt7telem tui` (also `python -m gt7telem.tui`, a "Terminal UI" link on the launcher, and automatically on a machine with no display) opens TRACE in the terminal: Live telemetry with a track map, the Lap Analyst and Race Analyst chart groups, the analysis tools, Records and Settings. It is built into the same install (Textual and textual-plotext are normal dependencies). The chart code moved out of `lap_analyst.py` / `race_analyst.py` into `lap_charts.py` / `race_charts.py` (no tkinter) and a shared `core/` registry, so the windows and the terminal always show the same chart groups and tools; `tests/test_parity.py` fails the build if they ever differ.
 
 ## [1.2.0] - 2026-11-10
 **A driving coach, a setup advisor, a race engineer and more.** Ten new tools built on the corner, ghost, dyno and strategy code TRACE already had.

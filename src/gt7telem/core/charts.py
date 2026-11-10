@@ -9,13 +9,15 @@ import matplotlib
 if "matplotlib.pyplot" not in sys.modules:       # no Tk window around: draw to memory, never to a screen
     matplotlib.use("Agg")
 
+from matplotlib.backends.backend_agg import FigureCanvasAgg  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 
 from . import figspec, registry  # noqa: E402
 
 
 def _draw(fn, size, theme_bg, *args, **kw) -> dict:
-    fig = Figure(figsize=size, facecolor=theme_bg)
+    fig = Figure(figsize=size, facecolor=theme_bg)         # never a pyplot figure: no GUI backend, no leaked windows
+    FigureCanvasAgg(fig)
     try:
         fn(fig, *args, **kw)
         return figspec.figure_spec(fig)

@@ -22,6 +22,7 @@ if __name__ == "__main__" and (not __package__):
     __package__ = _pkg_dir.name                      # "gt7telem"
 
 import queue
+import sys
 import threading
 import tkinter as tk
 import webbrowser
@@ -164,6 +165,16 @@ def _launch(tool, app_cls):
     app.mainloop()
     if getattr(app, "_to_menu", False):
         main()   # "Menu" button: pick another tool without restarting
+
+
+def launch_tui():
+    """The terminal edition (Textual), from the launcher's footer link. Comes back to the menu when it quits."""
+    global _content
+    root.destroy()
+    _content = None
+    from .tui import main as tui_main
+    tui_main()
+    main()
 
 
 def launch_dashboard():
@@ -392,6 +403,10 @@ def _show_menu():
     theme_lbl.pack(side="right", padx=(0, 24))
     theme_lbl.bind("<Button-1>", lambda e: _toggle_theme())
 
+    tui_lbl = tk.Label(foot, text="Terminal UI", font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG, cursor="hand2")
+    tui_lbl.pack(side="right", padx=(0, 24))
+    tui_lbl.bind("<Button-1>", lambda e: launch_tui())
+
     records_lbl = tk.Label(foot, text=L.RECORDS,
                            font=(theme.BODY, 9, "underline"), fg=DIM, bg=BG,
                            cursor="hand2")
@@ -525,10 +540,21 @@ def _build_card(parent, title, desc, color, cmd):
         w.bind("<Leave>", on_leave)
 
 
-def main():
+def main(argv=None):
+    """Open the TRACE launcher. `gt7telem tui` (or --tui) opens the terminal edition instead, and so does a machine
+    with no display (for example an SSH session), where the desktop windows can't open."""
     global root
+    args = sys.argv[1:] if argv is None else list(argv)
+    if "tui" in args or "--tui" in args:
+        from .tui import main as tui_main
+        sys.exit(tui_main())
     theme.enable_dpi_awareness()
-    root = tk.Tk()
+    try:
+        root = tk.Tk()
+    except tk.TclError:
+        from .tui import main as tui_main
+        print("No display found: opening the terminal edition.")
+        sys.exit(tui_main())
     root.title(L.window_title(L.LAUNCHER_WINDOW_TOOL, __version__))
     root.configure(bg=BG)
     root.resizable(True, True)

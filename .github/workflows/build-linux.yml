@@ -83,6 +83,7 @@ jobs:
             --add-data "$PKG_DIR/course_ids.csv:gt7telem" \
             --add-data "$PKG_DIR/fonts:gt7telem/fonts" \
             --collect-submodules websockets \
+            --collect-all textual --collect-all textual_plotext --collect-all plotext \
             entrypoint.py
 
       - name: Zip the binary
