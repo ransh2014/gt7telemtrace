@@ -31,6 +31,15 @@ def folder(tmp_path, monkeypatch):
     return tmp_path
 
 
+async def settled(pilot, pane, tries=40):
+    """Wait for the chart grid to be redrawn (a group change removes the old plots, then mounts the new ones)."""
+    for _ in range(tries):
+        await pilot.pause(0.05)
+        if pane.query_one("#chart").children:
+            return True
+    return False
+
+
 def run(coro):
     return asyncio.run(coro)
 
@@ -64,8 +73,7 @@ def test_laps_screen_lists_files_and_draws_every_chart_group(folder):
             assert pane.df_a is not None and pane.df_b is not None
             for g in registry.lap_groups():          # the same list the Tk window builds its tabs from
                 pane.query_one("#group", Select).value = g
-                await pilot.pause()
-                assert pane.query_one("#chart").children, g
+                assert await settled(pilot, pane), g
     run(go())
 
 
@@ -82,8 +90,7 @@ def test_race_screen_and_tools(folder):
             assert pane.df_a is not None
             for g in registry.race_groups():
                 pane.query_one("#group", Select).value = g
-                await pilot.pause()
-                assert pane.query_one("#chart").children, g
+                assert await settled(pilot, pane), g
             for kind, _label, _c in registry.RACE_TOOLS:
                 title, body = pane.run_tool(kind)
                 assert body.strip()
