@@ -18,6 +18,7 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
+from textual.theme import Theme
 from textual.widgets import (
     Button,
     DataTable,
@@ -891,18 +892,59 @@ Laps and Race
 Records  best lap per car and track.        Settings   the same switches as the desktop app."""
 
 
+_TRACE_THEME = Theme(
+    name="trace", primary="#c8102e", secondary="#3b82f6", accent="#f5b301", success="#22c55e", warning="#f5b301",
+    error="#ef4444", background="#08080a", surface="#111115", panel="#1c1c22", foreground="#e8e8ec", dark=True,
+)
+
+
 class TraceApp(App):
     TITLE = "TRACE - GT7 Telemetry"
     CSS = """
-    Screen { background: #08080a; }
-    Header { background: #c8102e; }
-    TabbedContent { height: 1fr; }
-    .setting { height: 3; }
+    Screen { background: $background; }
+    Header { background: $primary; color: white; text-style: bold; }
+    Footer { background: $panel; }
+    Footer .footer-key--key { background: $primary; color: white; }
+    TabbedContent { height: 1fr; padding: 0 1; }
+    Tabs { background: $background; }
+    Tab { padding: 0 3; color: $text-muted; }
+    Tab.-active { color: white; text-style: bold; background: $primary 25%; }
+    Underline > .underline--bar { color: $primary; background: $panel; }
+    TabPane { padding: 1 0 0 0; }
+    Button { border: none; height: 3; min-width: 12; background: $panel; color: $text; text-style: bold; }
+    Button:hover { background: $primary 40%; }
+    Button.-primary { background: $primary; color: white; }
+    Button.-primary:hover { background: $primary 80%; }
+    Input { border: tall $panel; background: $surface; }
+    Input:focus { border: tall $primary; }
+    Select > SelectCurrent { border: tall $panel; background: $surface; }
+    Select:focus > SelectCurrent { border: tall $primary; }
+    DataTable { background: $surface; border: round $panel; }
+    DataTable > .datatable--header { background: $panel; color: $text; text-style: bold; }
+    DataTable > .datatable--cursor { background: $primary 50%; color: white; }
+    TextArea { border: tall $panel; background: $surface; }
+    #gauges, #map, #log, #chart, #files, #notes { border: round $panel; border-title-color: $primary; border-title-style: bold; }
+    #status { padding: 1 2; color: $text-muted; }
+    .setting { height: 3; padding: 0 1; }
     .compact AnalystPane #side { width: 34; }
     .compact LivePane #side { width: 30; }
     """
     BINDINGS = [("q", "quit", "Quit"), ("1", "tab('live')", "Live"), ("2", "tab('laps')", "Laps"),
                 ("3", "tab('race')", "Race"), ("4", "tab('records')", "Records"), ("5", "tab('settings')", "Settings"), ("question_mark", "help", "Help")]
+
+    def on_mount(self) -> None:
+        try:
+            self.register_theme(_TRACE_THEME)
+            self.theme = "trace"
+        except Exception:
+            pass
+        for sel, title in (("#gauges", "Gauges"), ("#map", "Track"), ("#log", "Log"),
+                           ("#files", "Saved files"), ("#notes", "Notes")):
+            for w in self.query(sel):
+                try:
+                    w.border_title = title
+                except Exception:
+                    pass
 
     def compose(self) -> ComposeResult:
         yield Header()
