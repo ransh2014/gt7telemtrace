@@ -109,6 +109,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 ### Terminal edition
 - `gt7telem tui` (or `python -m gt7telem.tui`, or the **Terminal UI** link in the Launcher footer) runs TRACE inside a terminal on Windows, macOS and Linux (not Android). It is part of the normal install; Textual and textual-plotext come with it. With no display (for example over SSH) plain `gt7telem` opens it automatically
+- **On Windows, use [Windows Terminal](https://aka.ms/terminal)** (the default terminal on Windows 11; free from the Microsoft Store on Windows 10): run `TRACE.exe tui` or `gt7telem tui` from a Windows Terminal tab for full colour, crisp charts and mouse support. The Launcher's "Terminal UI" link opens the older plain console window, which works but looks rougher
 - Five screens, keys `1`-`5`, `?` for help: **Live** (telemetry, track map, lap and race recording, auto lap, delta, top-lap gap, coach cues, pit calls, track detection), **Lap Analyst**, **Race Analyst**, **Records** and **Settings**
 - It is built from the same code as the windows, not a copy: the chart drawing, the chart groups, the analysis tools, the exports (CSV, chart HTML, lap and race cards), notes, replay, leaderboard submit, car weight, backup and duplicate clean-up are shared, and `tests/test_parity.py` fails the build if the two ever differ. Charts in the terminal are drawn from the same matplotlib draw functions, rendered as braille plots
 
