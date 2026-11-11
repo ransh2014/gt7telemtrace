@@ -337,6 +337,95 @@ class Hooks:
     gear_info: callable = lambda: ([], 0.0)         # (gear ratios, tyre radius)
 
 
+class AutoLapState:
+    """The auto-lap bookkeeping, one set of fields for both front ends."""
+    def __init__(self):
+        self.since = None          # when "driving in a non-race session" began
+        self.off_since = None      # when the session was left, while an auto lap is armed
+        self.active = False        # the current Record Lap arming was done automatically
+        self.block = False         # the user stopped an auto lap: stay off until the session is left
+
+    def reset(self):
+        self.active = False
+        self.since = self.off_since = None
+
+
+def auto_lap_decide(s, st, d, now, enabled):
+    """One ~10 Hz look at the auto-lap rules. Returns None, ("disarm", why) or ("arm",). The caller does the side
+    effects (button text, log, start_lap); `st` is updated here. Shared by the Dashboard and the terminal Recorder."""
+    if not enabled:
+        st.since = None
+        return ("disarm", "turned off") if st.active else None
+    in_session = auto_lap_in_session(d)
+    if not in_session:
+        st.block = False
+    if st.active:
+        if in_session:
+            st.off_since = None
+        elif st.off_since is None:
+            st.off_since = now
+        elif now - st.off_since >= AUTO_LAP_LEAVE_HOLD_S:
+            return ("disarm", "session ended")
+        return None
+    if s.recording or s.waiting or s.race_recording or s.paused or st.block:
+        st.since = None
+        return None
+    if not auto_lap_can_arm(d):
+        st.since = None
+        return None
+    if st.since is None:
+        st.since = now
+    elif now - st.since >= AUTO_LAP_ARM_HOLD_S:
+        st.since = st.off_since = None
+        st.active = True
+        return ("arm",)
+    return None
+
+
+def race_begin(s, now):
+    """Start a race recording in the Session. Returns the start time."""
+    s.race_samples, s.race_start_t, s.race_recording = [], now, True
+    return now
+
+
+def race_end(s):
+    """Stop the race recording in the Session and hand back the recorded samples."""
+    s.race_recording = False
+    samples, s.race_samples = s.race_samples, []
+    return samples
+
+
+def race_step(s, d, now, rate, log, stop, on_sample=None):
+    """Append one race sample, warn when the recording gets large and stop at the hard limit. Returns True if a
+    sample was recorded. Shared by the Dashboard and the terminal Recorder."""
+    if not s.race_recording:
+        return False
+    s.race_samples.append(sample_dict(d, s.race_start_t, now))
+    if on_sample is not None:
+        on_sample()
+    n = len(s.race_samples)
+    if n == RACE_SAMPLE_WARN:
+        mins = n / max(rate, 1) / 60
+        log(f"Race recording is large ({n:,} samples, ~{mins:.0f} min at {rate} Hz). It is held in memory until the "
+            f"race ends -- consider stopping to save, or recording at a lower REC RATE.")
+    elif n >= RACE_SAMPLE_MAX:
+        log(f"Race recording hit the {RACE_SAMPLE_MAX:,}-sample limit -- stopping and saving now so the recording "
+            f"isn't lost to memory pressure.")
+        stop()
+    return True
+
+
+def pause_shift(s, now):
+    """On resume: move the recording clocks forward by the pause length. Returns the gap in seconds."""
+    gap = 0.0
+    if s.paused and s.paused_at is not None:
+        gap = max(0.0, now - s.paused_at)
+        s.start_t += gap
+        s.race_start_t += gap
+    s.paused_at, s.paused = None, False
+    return gap
+
+
 def lap_step(s, d, now, log, on_state, save):
     """One packet of the lap recording state machine. Used by the terminal Recorder AND the Tk Dashboard, so the two
     cannot drift. `s` is a Session; `log(msg)`; `on_state("recording"|"armed")` on a transition; `save(samples,
@@ -383,8 +472,7 @@ class Recorder:
         self.q = deque(maxlen=RECORD_QUEUE_MAX)
         self.rec_due = self.rec_due_race = 0.0
         self.lap_since = self.race_since = 0.0
-        self.auto_since = self.auto_off_since = None
-        self.auto_active = self.auto_block = False
+        self.auto = AutoLapState()
         self.last_sig = None
         self.refs = ReferenceStore(lambda: self.h.laps_folder())
         self.last_saved: list[Path] = []
@@ -444,6 +532,12 @@ class Recorder:
         else:
             self.h.log("Stopped -- no samples recorded.")
 
+    # the auto-lap fields live in self.auto (shared with the Dashboard); these keep the old names working
+    auto_active = property(lambda self: self.auto.active, lambda self, v: setattr(self.auto, "active", v))
+    auto_block = property(lambda self: self.auto.block, lambda self, v: setattr(self.auto, "block", v))
+    auto_since = property(lambda self: self.auto.since, lambda self, v: setattr(self.auto, "since", v))
+    auto_off_since = property(lambda self: self.auto.off_since, lambda self, v: setattr(self.auto, "off_since", v))
+
     def record_sample(self, d, now=None):
         lap_step(self.s, d, time.monotonic() if now is None else now, log=self.h.log, on_state=self.h.state,
                  save=lambda samples, ms, incomplete: self.save_lap(samples, ms, incomplete=incomplete, background=True))
@@ -451,33 +545,22 @@ class Recorder:
     # -- race ------------------------------------------------------------------------------------
     def start_race(self):
         s = self.s
-        s.race_samples, s.race_start_t = [], time.monotonic()
+        race_begin(s, time.monotonic())
         self.race_since, self.rec_due_race = s.race_start_t, 0.0
-        s.race_recording = True
         self.h.state("race")
         self.h.log("Race recording started")
 
     def stop_race(self, notify_end=False):
-        s = self.s
-        s.race_recording = False
+        self.s.race_recording = False
         self.h.state("race_idle")
-        samples, s.race_samples = s.race_samples, []
+        samples = race_end(self.s)
         if samples:
             self.save_race(samples, background=True, notify_end=notify_end)
         else:
             self.h.log("Race recording stopped -- no samples recorded.")
 
     def record_race_sample(self, d, now=None):
-        s = self.s
-        if not s.race_recording:
-            return
-        s.race_samples.append(sample_dict(d, s.race_start_t, now))
-        n = len(s.race_samples)
-        if n == RACE_SAMPLE_WARN:
-            self.h.log(f"Race recording is large ({n:,} samples). It is held in memory until the race ends.")
-        elif n >= RACE_SAMPLE_MAX:
-            self.h.log(f"Race recording hit the {RACE_SAMPLE_MAX:,}-sample limit -- stopping and saving now.")
-            self.stop_race()
+        race_step(self.s, d, now, self.h.rate(), self.h.log, self.stop_race)
 
     def on_race_start(self):
         if not self.s.race_recording:
@@ -497,12 +580,7 @@ class Recorder:
         self.h.log("Auto: game paused -- recording frozen")
 
     def resume(self):
-        s = self.s
-        if s.paused and s.paused_at is not None:
-            gap = max(0.0, time.monotonic() - s.paused_at)
-            s.start_t += gap
-            s.race_start_t += gap
-        s.paused_at, s.paused = None, False
+        pause_shift(self.s, time.monotonic())
         self.h.log("Auto: game resumed -- recording continues")
 
     # -- auto lap --------------------------------------------------------------------------------
@@ -511,40 +589,17 @@ class Recorder:
         n = len(s.samples)
         s.recording = s.waiting = False
         s.samples = []
-        self.auto_active = False
-        self.auto_since = self.auto_off_since = None
+        self.auto.reset()
         self.h.state("idle")
         self.h.log(f"Auto lap: {why}" + (f" -- partial lap ({n} samples) discarded" if n else ""))
 
     def auto_lap_step(self, d, now):
-        s = self.s
-        if not self.h.auto_lap_enabled():
-            if self.auto_active:
-                self.auto_lap_disarm("turned off")
-            self.auto_since = None
+        act = auto_lap_decide(self.s, self.auto, d, now, self.h.auto_lap_enabled())
+        if act is None:
             return
-        in_session = auto_lap_in_session(d)
-        if not in_session:
-            self.auto_block = False
-        if self.auto_active:
-            if in_session:
-                self.auto_off_since = None
-            elif self.auto_off_since is None:
-                self.auto_off_since = now
-            elif now - self.auto_off_since >= AUTO_LAP_LEAVE_HOLD_S:
-                self.auto_lap_disarm("session ended")
-            return
-        if s.recording or s.waiting or s.race_recording or s.paused or self.auto_block:
-            self.auto_since = None
-            return
-        if not auto_lap_can_arm(d):
-            self.auto_since = None
-            return
-        if self.auto_since is None:
-            self.auto_since = now
-        elif now - self.auto_since >= AUTO_LAP_ARM_HOLD_S:
-            self.auto_since = self.auto_off_since = None
-            self.auto_active = True
+        if act[0] == "disarm":
+            self.auto_lap_disarm(act[1])
+        else:
             self.start_lap()
             self.h.log("Auto lap: armed -- recording starts at the next start/finish crossing")
 

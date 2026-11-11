@@ -5,10 +5,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-11
+**The Dashboard and the terminal now run on one recorder, completely.** 1.5.1 shared only the lap-recording rules; this finishes the job.
+- **Race recording is shared.** Starting and stopping a race recording, adding each sample, the "this recording is large" warning, the hard sample limit that stops and saves, and the pause clock shift are now `race_begin`, `race_end`, `race_step` and `pause_shift` in `core/recorder.py`, called by both the Tk Dashboard and the terminal `Recorder`.
+- **Auto lap is shared.** The rules for arming Record Lap while you drive in a non-race session, disarming when you leave it, and staying off after you stop one yourself are now `auto_lap_decide` (with `AutoLapState`), used by both.
+- **Tests.** `tests/test_record_parity.py` now feeds the same race, limit, pause and auto-lap sequences through both the Dashboard and the Recorder and fails if the log lines, saves or states differ. The terminal's race-size warning now shows the Dashboard's fuller message.
+- What is still Dashboard-only: the Tk dialogs and buttons around recording, the personal-best prompts and the save-to-disk wrappers (they call the same helpers).
+
 ## [1.5.1] - 2026-11-11
 **Microsoft Store release, one recorder for both front ends, a friendlier terminal.**
 - **TRACE is on the Microsoft Store.** Windows users can install it from the [Store](https://apps.microsoft.com/detail/9P0QR11CD0NF) and get automatic updates with no SmartScreen warning. The Store listing and the MSIX use the name "TRACE: Racing Telemetry & Lap Analysis" (`msix/AppxManifest.xml`), and "Build MSIX" now runs on every release tag, like the PyPI, WinGet and Chocolatey workflows, waiting for the Windows zip.
-- **The Dashboard and the terminal now record laps with the same code.** The lap-recording state machine (arming on the start line, lap complete, lap-counter reset, partial laps) is now one function, `core.recorder.lap_step`, called by both the Tk Dashboard and the terminal `Recorder`, instead of two copies. `tests/test_record_parity.py` feeds one packet stream through both and fails if the log lines, state changes or saved laps differ. The race-recording and auto-lap code in the Dashboard is still its own copy.
+- **The Dashboard and the terminal now record laps with the same code.** The lap-recording state machine (arming on the start line, lap complete, lap-counter reset, partial laps) is now one function, `core.recorder.lap_step`, called by both the Tk Dashboard and the terminal `Recorder`, instead of two copies. `tests/test_record_parity.py` feeds one packet stream through both and fails if the log lines, state changes or saved laps differ. The race-recording and auto-lap code in the Dashboard was still its own copy in 1.5.1 (shared in 1.5.2).
 - **Terminal.** The Live screen now tells you what to do while it waits (start GT7, enter the console IP or press Auto-detect, press Connect). On terminals narrower than 90 columns the Live side panel is hidden and the Lap and Race side panels and buttons shrink.
 - **Docs.** README, the website setup page and the support bot's docs mention the Store install.
 

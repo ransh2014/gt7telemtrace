@@ -2390,35 +2390,19 @@ class App(tk.Tk):
 
     def _auto_lap_step(self, d, now):
         """~10 Hz, UI thread. Arms Record Lap while driving in a non-race session
-        and disarms it when the session is left. Never touches a lap the user armed."""
-        if not runtime_config.AUTO_LAP_ENABLED:
-            if self._auto_lap_active:
-                self._auto_lap_disarm("turned off")
-            self._auto_lap_since = None
+        and disarms it when the session is left. Never touches a lap the user armed.
+        The rules are core.recorder.auto_lap_decide, shared with the terminal Recorder."""
+        st = rec_core.AutoLapState()
+        st.since, st.off_since = self._auto_lap_since, self._auto_lap_off_since
+        st.active, st.block = self._auto_lap_active, self._auto_lap_block
+        act = rec_core.auto_lap_decide(session, st, d, now, bool(runtime_config.AUTO_LAP_ENABLED))
+        self._auto_lap_since, self._auto_lap_off_since = st.since, st.off_since
+        self._auto_lap_active, self._auto_lap_block = st.active, st.block
+        if act is None:
             return
-        in_session = auto_lap_in_session(d)
-        if not in_session:
-            self._auto_lap_block = False
-        if self._auto_lap_active:
-            if in_session:
-                self._auto_lap_off_since = None
-            elif self._auto_lap_off_since is None:
-                self._auto_lap_off_since = now
-            elif now - self._auto_lap_off_since >= AUTO_LAP_LEAVE_HOLD_S:
-                self._auto_lap_disarm("session ended")
-            return
-        if (session.recording or session.waiting or session.race_recording
-                or session.paused or self._auto_lap_block):
-            self._auto_lap_since = None
-            return
-        if not auto_lap_can_arm(d):
-            self._auto_lap_since = None
-            return
-        if self._auto_lap_since is None:
-            self._auto_lap_since = now
-        elif now - self._auto_lap_since >= AUTO_LAP_ARM_HOLD_S:
-            self._auto_lap_since = self._auto_lap_off_since = None
-            self._auto_lap_active = True
+        if act[0] == "disarm":
+            self._auto_lap_disarm(act[1])
+        else:
             self._start_record()
             self.log_msg("Auto lap: armed -- recording starts at the next start/finish crossing")
             self._warn_no_track(False)
@@ -2491,14 +2475,9 @@ class App(tk.Tk):
         # Shift the recording clocks forward by the pause length, so sample
         # `t`, the elapsed-time lap fallback and race_duration_s all exclude
         # time spent in the pause menu instead of showing a gap / inflating it.
-        if session.paused and session.paused_at is not None:
-            gap = max(0.0, time.monotonic() - session.paused_at)
-            session.start_t      += gap
-            session.race_start_t += gap
-            if self._delta_lap_start_t is not None:
-                self._delta_lap_start_t += gap
-        session.paused_at = None
-        session.paused = False
+        gap = rec_core.pause_shift(session, time.monotonic())
+        if gap and self._delta_lap_start_t is not None:
+            self._delta_lap_start_t += gap
         self.log_msg("Auto: game resumed -- recording continues")
 
     def _on_debug_state(self, snap):
@@ -2525,19 +2504,16 @@ class App(tk.Tk):
             self._warn_no_track(True)
 
     def _start_record_race(self):
-        session.race_samples   = []
-        session.race_start_t   = time.monotonic()
+        rec_core.race_begin(session, time.monotonic())
         self._race_rec_since   = session.race_start_t
         self._rec_due_race = 0.0
-        session.race_recording = True
         self._td_race_reset()
         self.race_btn.config(text=L.STOP_RACE_RECORDING, bg=theme.RED_2)
         self.log_msg("Race recording started")
 
     def _stop_record_race(self, notify_end=False):
-        session.race_recording = False
         self.race_btn.config(text=L.RECORD_RACE, bg=theme.BG3)
-        samples, session.race_samples = session.race_samples, []
+        samples = rec_core.race_end(session)
         if samples:
             self._save_race(samples, background=True, notify_end=notify_end)
         else:
@@ -2546,30 +2522,11 @@ class App(tk.Tk):
                 notify.notify("🏁 Race Ended", "No samples were recorded.", root=self)
 
     def _record_race_sample(self, d, now=None):
-        # Re-check the flag here rather than trusting the caller: _stop_record_race()
-        # below can fire from inside this very method, and an already-queued tick
-        # must not append (or re-trip the limit) after the race has been saved.
-        if not session.race_recording:
-            return
-        session.race_samples.append(self._sample_dict(d, session.race_start_t, now))
-        step = getattr(self, "_td_race_step", None)
-        if step is not None:
-            step()
-
-        n = len(session.race_samples)
-        if n == RACE_SAMPLE_WARN:
-            mins = n / max(self._record_rate, 1) / 60
-            self.log_msg(
-                f"Race recording is large ({n:,} samples, ~{mins:.0f} min at "
-                f"{self._record_rate} Hz). It is held in memory until the race ends -- "
-                f"consider stopping to save, or recording at a lower REC RATE."
-            )
-        elif n >= RACE_SAMPLE_MAX:
-            self.log_msg(
-                f"Race recording hit the {RACE_SAMPLE_MAX:,}-sample limit -- "
-                f"stopping and saving now so the recording isn't lost to memory pressure."
-            )
-            self._stop_record_race()
+        # race_step re-checks the flag: _stop_record_race() can fire from inside this very method, and an
+        # already-queued tick must not append (or re-trip the limit) after the race has been saved.
+        # The append / warn / limit rules are core.recorder.race_step, shared with the terminal Recorder.
+        rec_core.race_step(session, d, now, self._record_rate, self.log_msg, self._stop_record_race,
+                           on_sample=getattr(self, "_td_race_step", None))
 
     def _maybe_submit_unknown_track(self, ui_track):
         """GT7 never exposes a track ID over telemetry, so the only way to
