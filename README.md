@@ -133,6 +133,8 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 
 ## Install
 
+> **Windows: TRACE is now on the [Microsoft Store](https://apps.microsoft.com/detail/9P0QR11CD0NF).** Install it from there for automatic updates and no SmartScreen warning. The options below still work on every platform.
+
 ### Option 1 — pip
 ```bash
 pip install gt7tracetelem
