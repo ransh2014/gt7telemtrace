@@ -15,7 +15,7 @@
     ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>GT7trace:Telemetry and Analysis Tool for GT7</DisplayName>
+    <DisplayName>TRACE: Racing Telemetry &amp; Lap Analysis</DisplayName>
     <PublisherDisplayName>ransh2014</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
