@@ -2746,62 +2746,31 @@ class App(tk.Tk):
     def _record_sample(self, d, now=None):
         if now is None:
             now = time.monotonic()
-        lap_raw = d.get("lap_number")
-        try:
-            lap = int(lap_raw) if lap_raw is not None else session.prev_lap
-        except (TypeError, ValueError):
-            lap = session.prev_lap
 
-        if session.waiting:
-            if lap > session.prev_lap:
-                session.waiting   = False
-                session.recording = True
-                session.start_t   = now
-                session.prev_lap  = lap
+        def on_state(state):
+            if state == "recording":
                 self.rec_btn.config(text=L.STOP_RECORDING, bg=theme.RED_2)
-                self.log_msg(f"Start line crossed -- recording lap {lap}")
             else:
-                session.prev_lap = lap
-            return
+                self.rec_btn.config(text=L.WAITING_FOR_START_LINE, bg=theme.GOLD)
 
-        if lap < session.prev_lap:
-            # Lap counter went backwards: the session/race was restarted.
-            n = len(session.samples)
-            if n >= 100:
-                self.log_msg(f"Lap counter reset (lap {session.prev_lap} -> {lap}) -- "
-                             f"saving the partial lap ({n} samples)")
-                self._save_lap(session.samples, lap_time_ms=None, incomplete=True,
-                               prompt=False, background=True)
+        def save(samples, lap_time_ms, incomplete):
+            if incomplete:
+                self._save_lap(samples, lap_time_ms=None, incomplete=True, prompt=False, background=True)
             else:
-                self.log_msg("Lap counter reset -- discarded a short partial lap")
-            session.samples   = []
-            session.prev_lap  = lap
-            session.recording = False
-            session.waiting   = True
-            self.rec_btn.config(text=L.WAITING_FOR_START_LINE, bg=theme.GOLD)
-            return
+                self._save_lap(samples, lap_time_ms=lap_time_ms, background=True)
 
-        if lap > session.prev_lap:
-            n = len(session.samples)
-            if n >= 100:
-                self.log_msg(f"Lap complete -- {n} samples")
-                last_ms = int(d.get("last_lap_ms") or 0)
-                self._save_lap(session.samples,
-                               lap_time_ms=last_ms if last_ms > 0 else None,
-                               background=True)
-            else:
-                # Used to fall through and keep appending, merging two laps.
-                self.log_msg(f"Lap changed after only {n} samples -- not saved")
-            session.samples = []
-            session.start_t = now
-            # No telem.reset_lap() here: udp.py restarts track_position itself,
-            # at the exact packet where the lap counter changes.
-        session.prev_lap = lap
-
-        session.samples.append(self._sample_dict(d, session.start_t, now))
-        step = getattr(self, "_td_step", None)
-        if step is not None:
-            step(lap)
+        # The state machine is shared with the terminal Recorder (core/recorder.py), so the two cannot drift.
+        # No telem.reset_lap() on a lap change: udp.py restarts track_position itself at the exact packet.
+        rec_core.lap_step(session, d, now, self.log_msg, on_state, save)
+        if session.recording and not session.waiting:
+            step = getattr(self, "_td_step", None)
+            if step is not None and session.samples:
+                lap_raw = d.get("lap_number")
+                try:
+                    lap = int(lap_raw) if lap_raw is not None else session.prev_lap
+                except (TypeError, ValueError):
+                    lap = session.prev_lap
+                step(lap)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Save lap

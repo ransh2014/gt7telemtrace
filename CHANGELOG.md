@@ -5,6 +5,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-11
+**Microsoft Store release, one recorder for both front ends, a friendlier terminal.**
+- **TRACE is on the Microsoft Store.** Windows users can install it from the [Store](https://apps.microsoft.com/detail/9P0QR11CD0NF) and get automatic updates with no SmartScreen warning. The Store listing and the MSIX use the name "TRACE: Racing Telemetry & Lap Analysis" (`msix/AppxManifest.xml`), and "Build MSIX" now runs on every release tag, like the PyPI, WinGet and Chocolatey workflows, waiting for the Windows zip.
+- **The Dashboard and the terminal now record laps with the same code.** The lap-recording state machine (arming on the start line, lap complete, lap-counter reset, partial laps) is now one function, `core.recorder.lap_step`, called by both the Tk Dashboard and the terminal `Recorder`, instead of two copies. `tests/test_record_parity.py` feeds one packet stream through both and fails if the log lines, state changes or saved laps differ. The race-recording and auto-lap code in the Dashboard is still its own copy.
+- **Terminal.** The Live screen now tells you what to do while it waits (start GT7, enter the console IP or press Auto-detect, press Connect). On terminals narrower than 90 columns the Live side panel is hidden and the Lap and Race side panels and buttons shrink.
+- **Docs.** README, the website setup page and the support bot's docs mention the Store install.
+
 ## [1.5.0] - 2026-11-10
 **The terminal edition.**
 - **Terminal UI works from the Windows `TRACE.exe`.** The exe has no console of its own, so it now attaches to the one it was started from, or opens a console window, and closes it when you quit. For the best look on Windows, run `tui` from Windows Terminal.

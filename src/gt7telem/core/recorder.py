@@ -337,6 +337,45 @@ class Hooks:
     gear_info: callable = lambda: ([], 0.0)         # (gear ratios, tyre radius)
 
 
+def lap_step(s, d, now, log, on_state, save):
+    """One packet of the lap recording state machine. Used by the terminal Recorder AND the Tk Dashboard, so the two
+    cannot drift. `s` is a Session; `log(msg)`; `on_state("recording"|"armed")` on a transition; `save(samples,
+    lap_time_ms_or_None, incomplete)` is called when a lap is finished or a partial lap must be kept."""
+    try:
+        lap = int(d.get("lap_number")) if d.get("lap_number") is not None else s.prev_lap
+    except (TypeError, ValueError):
+        lap = s.prev_lap
+    if s.waiting:
+        if lap > s.prev_lap:
+            s.waiting, s.recording, s.start_t, s.prev_lap = False, True, now, lap
+            on_state("recording")
+            log(f"Start line crossed -- recording lap {lap}")
+        else:
+            s.prev_lap = lap
+        return
+    if lap < s.prev_lap:
+        n = len(s.samples)
+        if n >= 100:
+            log(f"Lap counter reset (lap {s.prev_lap} -> {lap}) -- saving the partial lap ({n} samples)")
+            save(s.samples, None, True)
+        else:
+            log("Lap counter reset -- discarded a short partial lap")
+        s.samples, s.prev_lap, s.recording, s.waiting = [], lap, False, True
+        on_state("armed")
+        return
+    if lap > s.prev_lap:
+        n = len(s.samples)
+        if n >= 100:
+            log(f"Lap complete -- {n} samples")
+            last_ms = int(d.get("last_lap_ms") or 0)
+            save(s.samples, last_ms if last_ms > 0 else None, False)
+        else:
+            log(f"Lap changed after only {n} samples -- not saved")
+        s.samples, s.start_t = [], now
+    s.prev_lap = lap
+    s.samples.append(sample_dict(d, s.start_t, now))
+
+
 class Recorder:
     def __init__(self, hooks: Hooks | None = None, session_obj: Session | None = None):
         self.h = hooks or Hooks()
@@ -406,41 +445,8 @@ class Recorder:
             self.h.log("Stopped -- no samples recorded.")
 
     def record_sample(self, d, now=None):
-        s = self.s
-        now = time.monotonic() if now is None else now
-        try:
-            lap = int(d.get("lap_number")) if d.get("lap_number") is not None else s.prev_lap
-        except (TypeError, ValueError):
-            lap = s.prev_lap
-        if s.waiting:
-            if lap > s.prev_lap:
-                s.waiting, s.recording, s.start_t, s.prev_lap = False, True, now, lap
-                self.h.state("recording")
-                self.h.log(f"Start line crossed -- recording lap {lap}")
-            else:
-                s.prev_lap = lap
-            return
-        if lap < s.prev_lap:
-            n = len(s.samples)
-            if n >= 100:
-                self.h.log(f"Lap counter reset (lap {s.prev_lap} -> {lap}) -- saving the partial lap ({n} samples)")
-                self.save_lap(s.samples, None, incomplete=True, background=True)
-            else:
-                self.h.log("Lap counter reset -- discarded a short partial lap")
-            s.samples, s.prev_lap, s.recording, s.waiting = [], lap, False, True
-            self.h.state("armed")
-            return
-        if lap > s.prev_lap:
-            n = len(s.samples)
-            if n >= 100:
-                self.h.log(f"Lap complete -- {n} samples")
-                last_ms = int(d.get("last_lap_ms") or 0)
-                self.save_lap(s.samples, last_ms if last_ms > 0 else None, background=True)
-            else:
-                self.h.log(f"Lap changed after only {n} samples -- not saved")
-            s.samples, s.start_t = [], now
-        s.prev_lap = lap
-        s.samples.append(sample_dict(d, s.start_t, now))
+        lap_step(self.s, d, time.monotonic() if now is None else now, log=self.h.log, on_state=self.h.state,
+                 save=lambda samples, ms, incomplete: self.save_lap(samples, ms, incomplete=incomplete, background=True))
 
     # -- race ------------------------------------------------------------------------------------
     def start_race(self):

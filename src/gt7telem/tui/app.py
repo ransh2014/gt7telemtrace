@@ -90,6 +90,18 @@ class ReportScreen(ModalScreen):
         self.dismiss()
 
 
+WAITING_HINT = (
+    "Waiting for telemetry...\n"
+    "\n"
+    "  1. Start Gran Turismo 7 on your PS4 or PS5 and be in a race or time trial.\n"
+    "  2. Type the console IP above (PlayStation: Settings > Network > View Connection Status),\n"
+    "     or press Auto-detect.\n"
+    "  3. Press Connect. This panel fills in as soon as packets arrive.\n"
+    "\n"
+    "  Press ? for the key list."
+)
+
+
 # ── Live ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 class LivePane(Vertical):
     DEFAULT_CSS = """
@@ -146,7 +158,7 @@ class LivePane(Vertical):
             yield Button("Use it", id="offer-yes", variant="success")
             yield Button("Not this", id="offer-no")
         with Horizontal(id="body"):
-            yield Static("Waiting for telemetry...", id="gauges")
+            yield Static(WAITING_HINT, id="gauges")
             with Vertical(id="side"):
                 yield PlotextPlot(id="map")
                 yield RichLog(id="log", wrap=True, markup=False)
@@ -936,6 +948,9 @@ class TraceApp(App):
     .setting { height: 3; padding: 0 1; }
     .compact AnalystPane #side { width: 34; }
     .compact LivePane #side { width: 30; }
+    .tiny LivePane #side { display: none; }
+    .tiny AnalystPane #side { width: 26; }
+    .tiny Button { min-width: 8; }
     """
     BINDINGS = [("q", "quit", "Quit"), ("1", "tab('live')", "Live"), ("2", "tab('laps')", "Laps"),
                 ("3", "tab('race')", "Race"), ("4", "tab('records')", "Records"), ("5", "tab('settings')", "Settings"), ("question_mark", "help", "Help")]
@@ -971,6 +986,7 @@ class TraceApp(App):
 
     def on_resize(self, event):
         self.set_class(event.size.width < 120, "compact")     # narrow terminals: slimmer side panels
+        self.set_class(event.size.width < 90, "tiny")         # very narrow: hide the Live side panel, shrink the rest
 
     def action_help(self):
         self.push_screen(ReportScreen("TRACE terminal - keys", HELP))
