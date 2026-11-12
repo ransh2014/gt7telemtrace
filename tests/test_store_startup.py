@@ -6,10 +6,12 @@ from pathlib import Path
 from gt7telem import config
 
 
-def test_store_install_folder_is_never_portable(monkeypatch):
-    store_exe = r"C:\Program Files\WindowsApps\ransh2014.GT7trace_1.5.2.0_x64__rddnpbedzc7se\TRACE.exe"
+def test_store_install_folder_is_never_portable(monkeypatch, tmp_path):
+    # A real path on any OS whose folders look like the Store's: .../WindowsApps/<package>/TRACE.exe
+    store_exe = tmp_path / "Program Files" / "WindowsApps" / "ransh2014.GT7trace_1.5.2.0_x64__rddnpbedzc7se" / "TRACE.exe"
+    store_exe.parent.mkdir(parents=True)
     monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "executable", store_exe)
+    monkeypatch.setattr(sys, "executable", str(store_exe))
     probed = []
     monkeypatch.setattr(config, "_is_writable_dir", lambda d: probed.append(d) or True)
     assert config._portable_dir() is None
