@@ -13,6 +13,7 @@ import ssl
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_RATE", "KNOWN_IPS", "DEBUG_LOG",
@@ -31,13 +32,20 @@ _ENC_PREFIX = "enc:v1:"
 # owns rather than a folder the user picked: Chocolatey's lib folder
 # (admin-write-only on Windows) and WinGet's Packages folder are both
 # replaced wholesale on upgrade.
-_MANAGED_INSTALL_MARKERS = ("chocolatey", "winget")
+# "windowsapps" is the Microsoft Store (MSIX) install folder: read-only, and probing it for writability used to
+# spin for minutes (see _is_writable_dir), so a Store build never reached its window.
+_MANAGED_INSTALL_MARKERS = ("chocolatey", "winget", "windowsapps")
 
 
 def _is_writable_dir(d: Path) -> bool:
+    """One attempt to create (and remove) a file in `d`. Deliberately not tempfile: on Windows tempfile treats
+    "access denied" as "that name exists" and retries up to 10,000 random names, which hangs for minutes in a
+    read-only folder such as the Microsoft Store install folder."""
+    p = Path(d) / (".trace_write_test_" + uuid.uuid4().hex)
     try:
-        with tempfile.TemporaryFile(dir=d):
-            pass
+        fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+        os.unlink(p)
         return True
     except OSError:
         return False

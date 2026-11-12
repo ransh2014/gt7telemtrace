@@ -5,6 +5,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-11-12
+**Fixes the Microsoft Store build not opening.**
+- **The Store version hung at startup.** At launch TRACE checks whether its own folder is writable, to decide where to keep settings. In the Store package that folder is read-only, and the check used Python's `tempfile`, which on Windows treats "access denied" as "name taken" and retries up to 10,000 random file names. The app sat at 100% CPU for many minutes before showing its window (or never did). The Store install folder (`WindowsApps`) is now recognised by its path and never probed, and the writability check makes a single attempt (`config._is_writable_dir`). The Store package was the only build affected; the zip, pip, Chocolatey, WinGet and Android builds were not. `tests/test_store_startup.py` covers both.
+
 ## [1.5.2] - 2026-11-11
 **The Dashboard and the terminal now run on one recorder, completely.** 1.5.1 shared only the lap-recording rules; this finishes the job.
 - **Race recording is shared.** Starting and stopping a race recording, adding each sample, the "this recording is large" warning, the hard sample limit that stops and saves, and the pause clock shift are now `race_begin`, `race_end`, `race_step` and `pause_shift` in `core/recorder.py`, called by both the Tk Dashboard and the terminal `Recorder`.
