@@ -91,4 +91,28 @@ def test_golden4_is_up_to_date_with_the_python_modules(tmp_path):
                          capture_output=True, text=True, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     assert out.returncode == 0, out.stderr[-2000:]
     after = (TEST / "resources" / "golden4.json.gz").read_bytes()
-    assert gzip.decompress(before) == gzip.decompress(after), "golden4.json.gz is stale: run  python android/tools/make_fixtures4.py"
+    # Strings, ints, keys and structure must match exactly. Floats are compared to 1e-6 (relative), like the Kotlin tests do:
+    # numpy/pandas on another Python version or platform can differ in the last digits of a long float, which is not "stale".
+    problems = _json_diff(json.loads(gzip.decompress(before)), json.loads(gzip.decompress(after)), "$")
+    assert not problems, "golden4.json.gz is stale: run  python android/tools/make_fixtures4.py  (" + "; ".join(problems[:5]) + ")"
+
+
+def _json_diff(a, b, path):
+    if isinstance(a, bool) or isinstance(b, bool) or a is None or b is None:
+        return [] if a == b else [f"{path}: {a!r} != {b!r}"]
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return [] if abs(a - b) <= 1e-6 * max(1.0, abs(a), abs(b)) else [f"{path}: {a} != {b}"]
+    if isinstance(a, dict) and isinstance(b, dict):
+        if a.keys() != b.keys():
+            return [f"{path}: keys differ {sorted(set(a) ^ set(b))[:5]}"]
+        return [p for k in a for p in _json_diff(a[k], b[k], f"{path}.{k}")]
+    if isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            return [f"{path}: length {len(a)} != {len(b)}"]
+        out = []
+        for i, (x, y) in enumerate(zip(a, b, strict=True)):
+            out += _json_diff(x, y, f"{path}[{i}]")
+            if len(out) > 5:
+                break
+        return out
+    return [] if a == b else [f"{path}: {str(a)[:60]!r} != {str(b)[:60]!r}"]
