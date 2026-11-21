@@ -4,6 +4,7 @@ import base64
 import io
 import math
 import os
+import threading
 import time
 import tkinter as tk
 from pathlib import Path
@@ -25,6 +26,7 @@ warnings.filterwarnings("ignore")
 from . import (  # noqa: E402
     __version__,
     analysis_tools,
+    llm,
     theme,  # noqa: E402
     uiscroll,
 )
@@ -621,7 +623,7 @@ class AnalystApp(tk.Tk):
                   bg=DIM2, fg=PRP, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
-        ft = _section("ANALYSIS TOOLS", GRN)
+        ft = _section(L.ANALYSIS_TOOLS, GRN)
         for kind, text, colour in registry.RACE_TOOLS:
             tk.Button(ft, text=text, command=lambda k=kind: self._show_tool(k),
                       bg=DIM2, fg=globals()[colour], relief="flat", font=FONTL, padx=8, pady=2,
@@ -808,6 +810,26 @@ class AnalystApp(tk.Tk):
         box.pack(fill="both", expand=True)
         box.insert("1.0", text)
         box.config(state="disabled")
+        if kind == "coach" and llm.is_ready():
+            box.config(state="normal")
+            box.insert("end", "\n\n(local AI wording in progress...)")
+            box.config(state="disabled")
+            laps = race_lap_frames(self._dfa)
+
+            def work():
+                try:
+                    out = analysis_tools.race_report(kind, laps, worder=llm.default_worder())
+                except Exception:
+                    return
+
+                def put():
+                    if box.winfo_exists():
+                        box.config(state="normal")
+                        box.delete("1.0", "end")
+                        box.insert("1.0", out)
+                        box.config(state="disabled")
+                self.after(0, put)
+            threading.Thread(target=work, daemon=True, name="trace-ai-wording").start()
 
     # ── exports ───────────────────────────────────────────────────────────────
     def _export_csv(self):

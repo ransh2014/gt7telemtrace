@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ANDROID = ROOT / "android" / "app" / "src" / "main"
 STRINGS = ANDROID / "res" / "values" / "strings.xml"
 KOTLIN = sorted((ANDROID / "kotlin").rglob("*.kt"))
-DESKTOP = [p for p in (ROOT / "src" / "gt7telem").glob("*.py") if p.name != "labels.py"]
+DESKTOP = [p for p in (ROOT / "src" / "gt7telem").rglob("*.py") if p.name != "labels.py"]
 
 
 def _gen():
@@ -151,6 +151,31 @@ def test_webui_login_asset_and_qr_golden_match_the_desktop():
         "run  python tools/gen_android_webui.py"
     golden = ROOT / "android" / "telemetry" / "src" / "test" / "resources" / "qr_golden.json"
     assert golden.read_text(encoding="utf-8") == mod.render_qr_golden(), "run  python tools/gen_android_webui.py"
+
+
+def test_overlay_and_replay_assets_match_the_desktop_and_are_served():
+    mod = _gen_webui()
+    overlay = (ANDROID / "assets" / "overlay.html").read_text(encoding="utf-8")
+    replay = (ANDROID / "assets" / "replay3d.html").read_text(encoding="utf-8")
+    assert overlay == mod.render_overlay(), "run  python tools/gen_android_webui.py"
+    assert replay == mod.render_replay(), "run  python tools/gen_android_webui.py"
+    srv = (ANDROID / "kotlin" / "app" / "trace" / "WebUiServer.kt").read_text(encoding="utf-8")
+    assert '"/overlay"' in srv and 'put("coach"' in srv and 'put("radio"' in srv
+    # the overlay is behind the same passcode check as the feed: it sits after the authed() gate
+    assert srv.index('"/overlay"') > srv.index('if (path == "/session")')
+    ctl = (ANDROID / "kotlin" / "app" / "trace" / "LiveController.kt").read_text(encoding="utf-8")
+    assert "overlay.html" in ctl and "LiveCoach" in ctl and "Engineer.pitCall" in ctl and "if (voiceOn) alerts.speak(it)" in ctl
+
+
+def test_android_setup_advisor_fix_strings_match_the_desktop():
+    """The setup suggestions contain unicode minus signs; the Kotlin port must carry every one verbatim."""
+    import re as _re
+    py = (ROOT / "src" / "gt7telem" / "setup_advisor.py").read_text(encoding="utf-8")
+    kt = (ROOT / "android" / "telemetry" / "src" / "main" / "kotlin" / "app" / "trace" / "telemetry" / "SetupAdvisor.kt").read_text(encoding="utf-8")
+    fixes = {s for s in _re.findall('"([A-Z][^"\\n]*)"', py)
+             if _re.search("[+−]\\d", s) and not s.startswith(("The", "Understeer", "Oversteer"))}
+    assert len(fixes) >= 20
+    assert [s for s in fixes if f'"{s}"' not in kt] == []
 
 
 def test_webui_passcode_rules_match_the_desktop():

@@ -1,0 +1,21 @@
+TRACE third-party notices
+=========================
+
+Llama 3.2
+---------
+Built with Llama.
+
+Llama 3.2 is licensed under the Llama 3.2 Community License, Copyright (c) Meta Platforms, Inc. All Rights Reserved.
+
+TRACE's optional local AI wording (the PC "LOCAL AI WORDING" switch and the TRACE AI Android app) uses the model
+Llama 3.2 1B Instruct (Q4_K_M). It is not part of this repository's MIT licence; it is downloaded from its official
+host on the PC, or bundled inside gt7telem-android-ai.apk.
+
+The full Llama 3.2 Community License Agreement (version release date: September 25, 2024) is at
+https://www.llama.com/llama3_2/license/
+and use of the model must comply with Meta's Acceptable Use Policy:
+https://www.llama.com/llama3_2/use-policy/
+
+llama.cpp
+---------
+The llama-server program that runs the model is from llama.cpp (https://github.com/ggml-org/llama.cpp), MIT licence.

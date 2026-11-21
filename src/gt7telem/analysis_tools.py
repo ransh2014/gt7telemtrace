@@ -8,17 +8,20 @@ from __future__ import annotations
 
 import datetime as _dt
 
-from . import coach, driver_dna, dyno, dyno_compare, planner, replay3d, setup_advisor, validate
+from . import coach, driver_dna, dyno, dyno_compare, llm, planner, replay3d, setup_advisor, validate
+from . import labels as L
 
 
 def _need(df, what):
     return None if df is not None else f"Load Lap A first ({what})."
 
 
-def coach_report(dfa, dfb) -> str:
+def coach_report(dfa, dfb, worder=None) -> str:
+    """The coach's tips for Lap A against Lap B. `worder` (llm.TipWorder) rewords them when local AI wording is on;
+    the guard keeps the rules text for any tip it can't reword safely."""
     if dfa is None or dfb is None:
         return "The coach compares Lap A with a reference.\nLoad Lap A, then load your best lap (or a top lap) as Lap B."
-    return coach.describe(coach.analyse(dfa, dfb, max_tips=5))
+    return llm.describe_with_ai(coach.analyse(dfa, dfb, max_tips=5), worder)[0]
 
 
 def setup_report(dfa) -> str:
@@ -85,7 +88,7 @@ def write_replay(path, dfa, dfb=None, title: str = "TRACE lap replay"):
 
 
 # ---- Race Analyst: the same tools across the laps of one race ------------------------------------------------
-def race_report(kind: str, laps: list) -> str:
+def race_report(kind: str, laps: list, worder=None) -> str:
     """`laps` is race_analyst.race_lap_frames(df): [(lap number, time_s, frame), ...] for the complete laps."""
     if len(laps) < 2:
         return "Needs at least two complete laps in this race."
@@ -93,7 +96,7 @@ def race_report(kind: str, laps: list) -> str:
     if kind == "coach":
         worst_n, worst_t, worst_f = max(laps, key=lambda x: x[1])
         head = f"Slowest lap (lap {worst_n}, +{worst_t - best_t:.2f}s) against your best (lap {best_n}):\n"
-        return head + coach.describe(coach.analyse(worst_f, best_f, max_tips=5))
+        return head + llm.describe_with_ai(coach.analyse(worst_f, best_f, max_tips=5), worder)[0]
     if kind == "plan":
         return planner.plan([f for _, _, f in laps], [t for _, t, _ in laps])["text"]
     if kind == "dna":
@@ -116,15 +119,15 @@ def race_report(kind: str, laps: list) -> str:
 
 # ---- the Lap Analyst's tools, by kind (so the Tk window and the terminal UI run exactly the same thing) ------
 def lap_tool(kind: str, dfa, dfb=None, data_a: dict | None = None, data_b: dict | None = None,
-             extra: list | None = None) -> tuple[str, str]:
+             extra: list | None = None, worder=None) -> tuple[str, str]:
     """(window title, report text) for one registry LAP_TOOLS kind. `extra` is the overlay laps' frames."""
     extra = extra or []
     if kind == "coach":
-        return "Coach", coach_report(dfa, dfb)
+        return L.REPORT_COACH, coach_report(dfa, dfb, worder)
     if kind == "setup":
-        return "Setup advisor", setup_report(dfa)
+        return L.REPORT_SETUP, setup_report(dfa)
     if kind == "dna":
-        return "Driver DNA", dna_report(dfa, [dfb] + list(extra), save=True)
+        return L.REPORT_DNA, dna_report(dfa, [dfb] + list(extra), save=True)
     if kind == "plan":
         def secs(d, data):
             try:
@@ -133,9 +136,9 @@ def lap_tool(kind: str, dfa, dfb=None, data_a: dict | None = None, data_b: dict 
                 return 0.0
         laps = [(dfa, secs(dfa, data_a)), (dfb, secs(dfb, data_b))] if dfb is not None else [(dfa, secs(dfa, data_a))]
         laps += [(f, secs(f, None)) for f in extra]
-        return "Practice plan", plan_report(laps)
+        return L.REPORT_PLAN, plan_report(laps)
     if kind == "validate":
-        return "Lap validation", validate_report(dfa, data_a)
+        return L.REPORT_VALIDATE, validate_report(dfa, data_a)
     if kind == "dyno":
-        return "Dyno comparison", dyno_compare_report(dfa, dfb)
+        return L.REPORT_DYNO, dyno_compare_report(dfa, dfb)
     raise KeyError(kind)

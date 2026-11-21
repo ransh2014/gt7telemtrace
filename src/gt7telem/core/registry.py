@@ -9,28 +9,33 @@ from .. import lap_charts, race_charts
 
 # (kind, label, colour key used by the Tk sidebar). Wording lives here once; Tk and the terminal both read it.
 LAP_TOOLS = [
-    ("coach", "Coach (A vs B)", "GRN"),
-    ("setup", "Setup advisor", "CYN"),
-    ("dna", "Driver DNA", "PRP"),
-    ("plan", "Practice plan (all loaded laps)", "YLW"),
-    ("validate", "Validate lap", "ACC"),
-    ("dyno", "Compare dyno (A vs B)", "CYN"),
+    ("coach", L.TOOL_COACH_AB, "GRN"),
+    ("setup", L.TOOL_SETUP_ADVISOR, "CYN"),
+    ("dna", L.TOOL_DRIVER_DNA, "PRP"),
+    ("plan", L.TOOL_PRACTICE_PLAN_ALL, "YLW"),
+    ("validate", L.TOOL_VALIDATE_LAP, "ACC"),
+    ("dyno", L.TOOL_COMPARE_DYNO, "CYN"),
 ]
 RACE_TOOLS = [
-    ("coach", "Coach (slowest vs best lap)", "GRN"),
-    ("plan", "Practice plan", "GRN"),
-    ("dna", "Driver DNA", "GRN"),
-    ("validate", "Validate laps", "GRN"),
+    ("coach", L.RACE_TOOL_COACH, "GRN"),
+    ("plan", L.RACE_TOOL_PLAN, "GRN"),
+    ("dna", L.RACE_TOOL_DNA, "GRN"),
+    ("validate", L.RACE_TOOL_VALIDATE, "GRN"),
 ]
-REPLAY_EXPORT_LABEL = "Export 3D replay (HTML)"
+REPLAY_EXPORT_LABEL = L.TOOL_EXPORT_REPLAY3D
+
+MOTEC_EXPORT_LABEL = "Export to MoTeC (.ld)"   # desktop and terminal UI only; the Android app has no MoTeC export
+
+VIDEO_EXPORT_LABEL = "Export video overlay"    # desktop and terminal UI only; the Android app has no video export
 
 # (kind, label) for the actions on the analysts' sidebars. Wording comes from labels.py where the Tk windows already
 # had it, so a label can't read differently in the two front ends.
 LAP_ACTIONS = [
     ("csv", L.EXPORT_CSV), ("html", L.EXPORT_CHART_HTML), ("card", L.EXPORT_LAP_CARD),
-    ("replay3d", REPLAY_EXPORT_LABEL), ("replay", "Replay (scrubber)"),
+    ("motec", MOTEC_EXPORT_LABEL), ("video", VIDEO_EXPORT_LABEL), ("replay3d", REPLAY_EXPORT_LABEL), ("replay", "Replay (scrubber)"),
     ("backup", L.BACKUP_ALL_LAPS), ("dups", L.FIND_DUPLICATE_LAPS),
     ("community", L.LOAD_COMMUNITY_LINE), ("submit", L.SUBMIT_TO_LEADERBOARD),
+    ("share", L.SHARE_LAP_LINK), ("unshare", L.SHARE_DELETE),
 ]
 RACE_ACTIONS = [("csv", L.EXPORT_CSV), ("html", L.EXPORT_CHART_HTML), ("card", L.EXPORT_RACE_CARD),
                 ("backup", L.BACKUP_ALL_LAPS)]
@@ -53,6 +58,7 @@ SETTINGS = [
     ("DEBUG_LOG", L.PREF_DEBUG_LOG),
     ("AUTO_LAP_ENABLED", L.PREF_AUTO_LAP),
     ("KEEP_AWAKE_ENABLED", L.PREF_KEEP_AWAKE),
+    ("LLM_ENABLED", L.PREF_LOCAL_AI),
 ]
 
 

@@ -72,3 +72,15 @@ def test_ab_worse_and_needs_laps():
     r = sa.compare_ab([_lap()] * 3, [_lap(yaw_gain=0.5)] * 3)
     assert r["verdict"] == "worse"
     assert "at least two" in sa.compare_ab([_lap()], [_lap()])["text"]
+
+
+def test_balance_is_measured_from_the_saved_lap_columns():
+    """Saved laps carry the front wheels as wheel_steering_angle_l / _r, not one combined column."""
+    d = _lap(yaw_gain=0.4)
+    ang = [a for a, _ in d["wheel_steering_angle"]]
+    d = d.drop(columns=["wheel_steering_angle"])
+    d["wheel_steering_angle_l"], d["wheel_steering_angle_r"] = ang, ang
+    r = sa.diagnose(d)
+    assert r["balance"] and any(f.key.startswith("under") for f in r["findings"])
+    d2 = d.drop(columns=["wheel_base"])
+    assert "can't be measured" in sa.diagnose(d2)["msg"]

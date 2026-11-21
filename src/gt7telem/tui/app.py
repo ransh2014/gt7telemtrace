@@ -36,7 +36,7 @@ from textual.widgets import (
 )
 from textual_plotext import PlotextPlot
 
-from .. import __version__, config, records, udp, webui_server
+from .. import __version__, config, llm, records, udp, webui_server
 from .. import labels as L
 from ..core import actions, charts, registry
 from ..core.live import LiveEngine
@@ -82,12 +82,52 @@ class ReportScreen(ModalScreen):
         with Vertical():
             yield Label(Text(self._title, style="bold"))
             with VerticalScroll():
-                yield Static(Text(self._body))
+                yield Static(Text(self._body), id="report-body")
             yield Button("Close", id="close")
+
+    def set_body(self, body: str):
+        """Replace the text (used when local AI wording finishes in the background)."""
+        self._body = body
+        self.query_one("#report-body", Static).update(Text(body))
 
     @on(Button.Pressed, "#close")
     def _close(self):
         self.dismiss()
+
+
+class ConfirmScreen(ModalScreen):
+    """A yes / no question with a body of text. Dismisses with True (yes) or False."""
+
+    BINDINGS = [("escape", "no", "No")]
+    DEFAULT_CSS = """
+    ConfirmScreen { align: center middle; }
+    ConfirmScreen > Vertical { width: 90%; height: 85%; border: round $accent; background: $surface; padding: 1 2; }
+    ConfirmScreen VerticalScroll { height: 1fr; }
+    """
+
+    def __init__(self, title: str, body: str, yes: str, no: str, yes_enabled: bool = True):
+        super().__init__()
+        self._title, self._body, self._yes, self._no, self._enabled = title, body, yes, no, yes_enabled
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label(Text(self._title, style="bold"))
+            with VerticalScroll():
+                yield Static(Text(self._body))
+            with Horizontal():
+                yield Button(self._yes, id="yes", variant="primary", disabled=not self._enabled)
+                yield Button(self._no, id="no")
+
+    def action_no(self):
+        self.dismiss(False)
+
+    @on(Button.Pressed, "#yes")
+    def _yes_pressed(self):
+        self.dismiss(True)
+
+    @on(Button.Pressed, "#no")
+    def _no_pressed(self):
+        self.dismiss(False)
 
 
 WAITING_HINT = (
@@ -492,10 +532,10 @@ class AnalystPane(Vertical):
             self._ensure_mass()
         return charts.lap_chart(group, self.df_a, dfb, extra=extra, consensus=self.consensus, pool=pool)
 
-    def run_tool(self, kind):
+    def run_tool(self, kind, worder=None):
         from .. import analysis_tools
         return analysis_tools.lap_tool(kind, self.df_a, self.df_b, self.data_a, self.data_b,
-                                       [e["df"] for e in self.extra])
+                                       [e["df"] for e in self.extra], worder=worder)
 
     def _ensure_mass(self):
         for df in (self.df_a, self.df_b if self.compare_on() else None):
@@ -626,6 +666,86 @@ class AnalystPane(Vertical):
         except Exception as e:
             await grid.show(None, f"Couldn't draw this chart: {e}")
 
+    # video overlay -------------------------------------------------------------------------------------------
+    async def _video(self):
+        running = getattr(self, "_video_job", None)
+        if running is not None:
+            running.cancel()
+            self.app.notify("Cancelling the video export...")
+            return
+        """Lap A (Lap B as reference when Compare is on) burned into a gameplay video, through the same videosync code as the
+        desktop window. The preview is saved as a PNG you can open; the export runs on a worker thread with progress notes."""
+        from .. import videosync
+        if not actions.video_ffmpeg():
+            self.app.notify(videosync.INSTALL_HINT, severity="warning")
+            return
+        video = (await self._ask("Gameplay video file:", "") or "").strip()
+        if not video or not Path(video).is_file():
+            self.app.notify("Pick an existing video file.", severity="warning")
+            return
+        sync = (await self._ask("Seconds into the video where the lap starts (add a fine offset like 12.5+0.3 if needed):", "0") or "0").strip()
+        try:
+            base, _, fine = sync.partition("+")
+            sync_s, offset_s = float(base), float(fine or 0)
+        except ValueError:
+            self.app.notify("The sync time must be a number of seconds.", severity="warning")
+            return
+        ref = self.df_b if self.compare_on() else None
+        try:
+            png = Path(self._default_path("_hud_preview.png"))
+            actions.video_preview(self.df_a, ref, video, sync_s, offset_s).convert("RGB").save(png)
+            self.app.notify(f"Preview of the sync point saved: {png}")
+        except Exception as e:
+            self.app.notify(f"Couldn't make a preview: {e}", severity="error")
+            return
+        out = await self._ask("Save video as:", self._default_path("_hud.mp4"))
+        if not out:
+            return
+        if Path(out).resolve() == Path(video).resolve():
+            self.app.notify("Choose a different file name: the export can't overwrite the original video.", severity="error")
+            return
+        try:
+            job = actions.make_video_job(self.df_a, ref, video, out, sync_s, offset_s)
+        except Exception as e:
+            self.app.notify(f"Can't start the export: {e}", severity="error")
+            return
+        self.app.notify("Exporting the video overlay... (press the same action again to cancel)")
+        self._video_job = job
+        marks = [0]
+
+        def progress(f):
+            pct = int(f * 100) // 20 * 20
+            if pct > marks[0]:
+                marks[0] = pct
+                self.app.call_from_thread(self.app.notify, f"Video export {pct}%")
+
+        def work():
+            try:
+                rep = job.run(progress)
+                msg = "Video export cancelled." if rep.cancelled else f"Saved {out}"
+                self.app.call_from_thread(self.app.notify, msg)
+            except Exception as e:
+                self.app.call_from_thread(self.app.notify, f"Video export failed: {e}", severity="error")
+            finally:
+                self._video_job = None
+        threading.Thread(target=work, daemon=True, name="trace-video-export").start()
+
+    # local AI wording -----------------------------------------------------------------------------------------
+    def ai_tool_text(self, kind):
+        """The tool's text with the coach's tips reworded (slow: call it off the UI thread)."""
+        return self.run_tool(kind, llm.default_worder())[1]
+
+    def _reword_report(self, screen, kind):
+        screen.set_body(screen._body + "\n\n(local AI wording in progress...)")
+
+        def work():
+            try:
+                text = self.ai_tool_text(kind)
+            except Exception:
+                return
+            self.app.call_from_thread(screen.set_body, text)
+        threading.Thread(target=work, daemon=True, name="trace-ai-wording").start()
+
     # buttons ------------------------------------------------------------------------------------------------
     @on(Button.Pressed)
     async def _button(self, event: Button.Pressed):
@@ -635,7 +755,10 @@ class AnalystPane(Vertical):
                 title, body = self.run_tool(bid[5:])
             except Exception as e:
                 title, body = "Analysis tools", f"Couldn't run that tool: {e}"
-            self.app.push_screen(ReportScreen(title, body))
+            screen = ReportScreen(title, body)
+            self.app.push_screen(screen)
+            if bid == "tool-coach" and llm.is_ready():
+                self._reword_report(screen, bid[5:])
         elif bid.startswith("act-"):
             try:
                 await self.do_action(bid[4:])
@@ -681,6 +804,17 @@ class AnalystPane(Vertical):
             if path:
                 self.export_card(path)
                 self.app.notify(f"Saved {path}")
+        elif kind == "video":
+            await self._video()
+        elif kind == "motec":
+            path = await self._ask("Save MoTeC log (.ld) as:", self._default_path(".ld"))
+            if path:
+                try:
+                    rep = actions.export_motec(self.df_a, self.data_a, path)
+                except Exception as e:
+                    self.app.notify(f"Couldn't save the .ld file: {e}", severity="error")
+                else:
+                    self.app.notify(f"Saved {path} ({rep.text()})")
         elif kind == "replay3d":
             from .. import analysis_tools
             if not analysis_tools.replay_ok(self.df_a):
@@ -706,6 +840,10 @@ class AnalystPane(Vertical):
             threading.Thread(target=work, daemon=True).start()
         elif kind == "submit":
             await self._submit()
+        elif kind == "share":
+            await self._share()
+        elif kind == "unshare":
+            await self._unshare()
         elif kind == "overlay":
             await self.key_o()
         elif kind == "weight":
@@ -772,6 +910,54 @@ class AnalystPane(Vertical):
         elif ans:
             self.app.notify("Enter a number between 300 and 5000.", severity="warning")
 
+    async def _share(self):
+        """Share lap link: confirm first (nothing is uploaded until the answer is YES), then upload, copy and show the link."""
+        from .. import sharelink
+        d = self.data_a
+        if not d:
+            self.app.notify(L.SHARE_NEEDS_LAP, severity="warning")
+            return
+        problem = actions.share_problem(d)
+        if problem:
+            self.app.notify(problem, severity="warning")
+            return
+        ans = await self._ask(f"{sharelink.CONFIRM_TEXT}  Type YES to upload:", "")
+        if (ans or "").strip().upper() != "YES":
+            return
+        if not actions.signed_in():
+            name = await self._ask("Create a free account to share laps. Display name:", config.load().get("PSN_NAME", "") or "")
+            if not name:
+                return
+            ok, msg = await asyncio.to_thread(actions.create_account, name)
+            if not ok:
+                self.app.notify(msg, severity="error")
+                return
+        res = await asyncio.to_thread(actions.share_lap_link, d, confirmed=True)
+        if not res.ok:
+            self.app.notify(sharelink.reason_text(res.reason), severity="error")
+            return
+        try:
+            self.app.copy_to_clipboard(res.link)
+            self.app.notify(L.SHARE_COPIED.format(link=res.link))
+        except Exception:
+            self.app.notify(L.SHARE_LINK_IS.format(link=res.link))
+
+    async def _unshare(self):
+        from .. import sharelink
+        d = self.data_a
+        if not d:
+            self.app.notify(L.SHARE_NEEDS_LAP, severity="warning")
+            return
+        if not actions.shared_id(d):
+            self.app.notify(L.SHARE_NOTHING_TO_DELETE, severity="warning")
+            return
+        ans = await self._ask(f"{L.SHARE_DELETE_CONFIRM}  Type YES to delete:", "")
+        if (ans or "").strip().upper() != "YES":
+            return
+        res = await asyncio.to_thread(actions.delete_shared_lap, d)
+        self.app.notify(L.SHARE_DELETED if res.ok else sharelink.reason_text(res.reason),
+                        severity="information" if res.ok else "error")
+
     async def _submit(self):
         problem = actions.submission_problem(self.data_a)
         if problem:
@@ -831,10 +1017,10 @@ class RacePane(AnalystPane):
     def chart_spec(self, group):
         return charts.race_chart(group, self.df_a, self.df_b if self.compare_on() else None)
 
-    def run_tool(self, kind):
+    def run_tool(self, kind, worder=None):
         from .. import analysis_tools
         from ..race_charts import race_lap_frames
-        return "Race analysis", analysis_tools.race_report(kind, race_lap_frames(self.df_a))
+        return L.REPORT_RACE, analysis_tools.race_report(kind, race_lap_frames(self.df_a), worder=worder)
 
     def export_csv(self, path):
         from ..race_charts import export_csv
@@ -879,13 +1065,78 @@ class SettingsPane(VerticalScroll):
             with Horizontal(classes="setting"):
                 yield Switch(value=bool(cfg.get(key, False)), id=f"sw-{key}")
                 yield Label(f"  {label}")
+        yield Button(llm.REMOVE_LABEL, id="remove-ai")
         yield Label(f"\nTRACE {__version__}")
 
     @on(Switch.Changed)
     def _changed(self, e: Switch.Changed):
         key = (e.switch.id or "")[3:]
-        if key:
+        if key == "LLM_ENABLED":
+            self._llm_switch(e)
+        elif key:
             config.save(**{key: bool(e.value)})
+
+    def _llm_switch(self, e: Switch.Changed):
+        """Local AI wording: off by default. Turning it on shows the warning first; nothing is downloaded until a yes."""
+        if not e.value:
+            config.save(LLM_ENABLED=False)
+            return
+        if llm.status().ready:                   # already installed: nothing to download, just switch it on
+            config.save(LLM_ENABLED=True)
+            return
+        e.switch.value = False                   # stays off until the model is installed
+        flow = llm.EnableFlow()
+        w = flow.request()
+
+        def answered(yes):
+            if yes:
+                self._download_ai(flow)
+            else:
+                self.app.notify("Local AI wording stays off (Rules mode).")
+        self.app.push_screen(ConfirmScreen(w.title, w.body, "Download and turn on" if w.download_mb else "Turn on",
+                                           "Switch back to Rules mode", w.can_enable), answered)
+
+    def _download_ai(self, flow):
+        self.app.notify("Downloading the AI model... this can take a few minutes.")
+        marks = {"model": 0, "runtime": 0}
+
+        def progress(what, done, total):
+            pct = done * 100 // total if total else 0
+            if pct >= marks[what] + 25:
+                marks[what] = pct
+                self.app.call_from_thread(self.app.notify, f"Downloading the {what}... {pct}%")
+
+        def finished(ok, msg):
+            if ok:
+                config.save(LLM_ENABLED=True)
+                self.query_one("#sw-LLM_ENABLED", Switch).value = True
+            self.app.notify(msg, severity="information" if ok else "error")
+
+        def work():
+            try:
+                flow.confirm(progress)
+            except Exception as ex:
+                self.app.call_from_thread(finished, False, f"Local AI wording not enabled: {ex}")
+                return
+            self.app.call_from_thread(finished, True, "Local AI wording on. Rules text is always kept if the check fails.")
+        threading.Thread(target=work, daemon=True, name="trace-ai-download").start()
+
+    @on(Button.Pressed, "#remove-ai")
+    def _remove_ai(self):
+        def answered(yes):
+            if not yes:
+                return
+            llm.default_worder().close()
+            ok = llm.remove_model()
+            config.save(LLM_ENABLED=False)
+            self.query_one("#sw-LLM_ENABLED", Switch).value = False
+            self.app.notify("AI model removed. Back to Rules mode." if ok else "Some AI files could not be deleted.")
+        if not llm.llm_dir().exists():
+            self.app.notify("No AI model is installed.")
+            return
+        self.app.push_screen(ConfirmScreen("Remove AI model",
+                                           "Delete the downloaded AI model and runtime and go back to Rules mode? "
+                                           "You can download them again later.", "Remove", "Keep"), answered)
 
 
 # ── App ──────────────────────────────────────────────────────────────────────────────────────────────────────────

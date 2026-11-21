@@ -67,6 +67,7 @@ fun Launcher(a: AP, light: Boolean, lapsDir: java.io.File, version: String, igno
         }
         Text(stringResource(R.string.launcher_subtitle), Modifier.fillMaxWidth().padding(bottom = if (signed && psn.isNotEmpty()) 0.dp else 8.dp), color = sub,
             fontFamily = Mono, fontSize = 15.sp, textAlign = TextAlign.Center)
+        AiAbout(a)
         if (signed && psn.isNotEmpty()) Text(stringResource(R.string.signed_in_as_fmt, psn), Modifier.fillMaxWidth().padding(bottom = 8.dp), color = sub, fontFamily = Mono, fontSize = 12.sp, textAlign = TextAlign.Center)
         ToolCard(a, stringResource(R.string.tool_live), stringResource(R.string.card_live_desc), a.cyn) { onOpen(Tool.LIVE) }
         ToolCard(a, stringResource(R.string.tool_lap), stringResource(R.string.card_lap_desc), a.prp) { onOpen(Tool.LAPS) }

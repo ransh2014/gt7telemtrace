@@ -38,6 +38,21 @@ object Corners {
         return d
     }
 
+    /**
+     * corners.frame_from_samples: the columns corner analysis needs from a lap's raw sample maps (the Dashboard scores a
+     * lap with this, without loading the whole analyst). lat_g is yaw rate times speed, clipped to +-4 like the analysts.
+     */
+    fun frameFromSamples(samples: List<Map<String, Any?>>?): Frame? {
+        if (samples == null) return null
+        val rows = samples
+        val f = Frame(rows.size)
+        for (col in listOf("track_position", "speed_kmh", "throttle", "brake", "steering", "t", "ang_y"))
+            f[col] = DoubleArray(rows.size) { numOf(rows[it][col], 0.0) }
+        val spd = f["speed_kmh"]; val ay = f["ang_y"]
+        f["lat_g"] = DoubleArray(rows.size) { (ay[it] * spd[it] / 3.6 / 9.81).coerceIn(-4.0, 4.0) }
+        return f
+    }
+
     fun detectCorners(df: Frame?): List<Corner> {
         val d = prepare(df) ?: return emptyList()
         val pos = d["track_position"]; val spd = d["speed_kmh"]; val thr = d["throttle"]; val brk = d["brake"]

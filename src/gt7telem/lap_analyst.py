@@ -21,10 +21,14 @@ from . import (
     dyno,
     lapclean,
     leaderboard,
+    llm,
     records,
+    sharelink,
     theme,
     tracks,
     uiscroll,
+    video_ui,
+    videosync,
 )
 from . import config as runtime_config
 from . import labels as L
@@ -725,6 +729,16 @@ class AnalystApp(tk.Tk):
         tk.Button(fe, text=L.EXPORT_LAP_CARD, command=self._export_card,
                   bg=DIM2, fg=PRP, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
+        tk.Button(fe, text=registry.MOTEC_EXPORT_LABEL, command=self._export_motec,
+                  bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
+        _ff = actions.video_ffmpeg()
+        tk.Button(fe, text=registry.VIDEO_EXPORT_LABEL, command=self._export_video, state="normal" if _ff else "disabled",
+                  bg=DIM2, fg=GRN if _ff else DIM, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2" if _ff else "arrow").pack(anchor="w", padx=8, pady=(0, 4))
+        if not _ff:
+            tk.Label(fe, text=videosync.INSTALL_HINT, fg=DIM, bg=PNL, font=FONTL, wraplength=theme.px(236),
+                     justify="left").pack(anchor="w", padx=8, pady=(0, 4))
         tk.Button(fe, text=L.BACKUP_ALL_LAPS, command=self._backup_all_laps,
                   bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
@@ -732,7 +746,7 @@ class AnalystApp(tk.Tk):
                   bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
 
-        ft = _section("ANALYSIS TOOLS", GRN)
+        ft = _section(L.ANALYSIS_TOOLS, GRN)
         for kind, text, colour in registry.LAP_TOOLS:
             tk.Button(ft, text=text, command=lambda k=kind: self._show_tool(k),
                       bg=DIM2, fg=globals()[colour], relief="flat", font=FONTL, padx=8, pady=2,
@@ -745,6 +759,12 @@ class AnalystApp(tk.Tk):
         tk.Button(fl, text=L.SUBMIT_TO_LEADERBOARD, command=self._submit_leaderboard,
                   bg=DIM2, fg=YLW, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(2,4))
+        tk.Button(fl, text=L.SHARE_LAP_LINK, command=self._share_link,
+                  bg=DIM2, fg=GRN, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
+        tk.Button(fl, text=L.SHARE_DELETE, command=self._delete_shared,
+                  bg=DIM2, fg=ACC, relief="flat", font=FONTL, padx=8, pady=2,
+                  cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
         tk.Button(fl, text=L.LOAD_COMMUNITY_LINE, command=self._load_consensus,
                   bg=DIM2, fg=CYN, relief="flat", font=FONTL, padx=8, pady=2,
                   cursor="hand2").pack(anchor="w", padx=8, pady=(0,4))
@@ -862,10 +882,35 @@ class AnalystApp(tk.Tk):
         box.pack(fill="both", expand=True)
         box.insert("1.0", text)
         box.config(state="disabled")
+        if kind == "coach" and llm.is_ready():
+            self._reword_in_background(box, kind)
+
+    def _reword_in_background(self, box, kind):
+        """Local AI wording is on: the rules text is already showing; swap in the reworded tips when they are ready
+        (the model can take seconds, so never on the UI thread)."""
+        def put(text):
+            if box.winfo_exists():
+                box.config(state="normal")
+                box.delete("1.0", "end")
+                box.insert("1.0", text)
+                box.config(state="disabled")
+
+        box.config(state="normal")
+        box.insert("end", "\n\n(local AI wording in progress...)")
+        box.config(state="disabled")
+        args = (kind, self._dfa, self._dfb, self._da, self._db, [e["df"] for e in self._extra])
+
+        def work():
+            try:
+                _title, text = analysis_tools.lap_tool(*args, worder=llm.default_worder())
+            except Exception:
+                return
+            self.after(0, lambda: put(text))
+        threading.Thread(target=work, daemon=True, name="trace-ai-wording").start()
 
     def _export_replay3d(self):
         if not analysis_tools.replay_ok(self._dfa):
-            messagebox.showinfo("3D replay", "Load Lap A first. It needs a lap with position data (not a leaderboard ghost).")
+            messagebox.showinfo(L.REPLAY3D_TITLE, L.REPLAY3D_NEEDS_LAP)
             return
         path = filedialog.asksaveasfilename(title="Export 3D replay", defaultextension=".html",
                                             filetypes=[("HTML", "*.html"), ("All", "*.*")])
@@ -875,9 +920,9 @@ class AnalystApp(tk.Tk):
             analysis_tools.write_replay(path, self._dfa, self._dfb if analysis_tools.replay_ok(self._dfb) else None,
                                         title=f"TRACE replay - {lap_label(self._da or {})}")
         except Exception as e:
-            messagebox.showerror("3D replay", f"Couldn't write the replay: {e}")
+            messagebox.showerror(L.REPLAY3D_TITLE, f"Couldn't write the replay: {e}")
             return
-        messagebox.showinfo("3D replay", f"Saved. Open it in any browser: {path}")
+        messagebox.showinfo(L.REPLAY3D_TITLE, f"Saved. Open it in any browser: {path}")
 
     def _find_duplicate_laps(self):
         """Scan the laps folder for identical lap files and offer to move the extra
@@ -1272,6 +1317,29 @@ class AnalystApp(tk.Tk):
                    padx=14, pady=4, cursor="hand2").pack(pady=8)
         dlg.wait_window()
 
+    def _export_video(self):
+        """Lap A (with Lap B as the reference, if loaded) burned into a gameplay video: video_ui.py draws the dialog."""
+        if self._dfa is None:
+            messagebox.showinfo("Export", "Load Lap A first."); return
+        video_ui.open_dialog(self, self._dfa, self._dfb, self._da)
+
+    def _export_motec(self):
+        """Lap A as a MoTeC i2 .ld file (core/actions.export_motec, shared with the terminal UI)."""
+        if self._dfa is None:
+            messagebox.showinfo("Export", "Load Lap A first."); return
+        path = filedialog.asksaveasfilename(
+            title="Export to MoTeC", defaultextension=".ld",
+            initialfile=_safe_name(lap_label(self._da or {}, short=True)) + ".ld",
+            filetypes=[("MoTeC log", "*.ld"), ("All", "*.*")])
+        if not path:
+            return
+        try:
+            rep = actions.export_motec(self._dfa, self._da, path)
+        except Exception as e:
+            messagebox.showerror("Export to MoTeC", f"Couldn't save the .ld file:\n{e}")
+            return
+        messagebox.showinfo("Exported", f"Lap A  →  {Path(path).name}\n{rep.text()}")
+
     def _export_html(self):
         if self._dfa is None:
             messagebox.showinfo("Export", "Load Lap A first."); return
@@ -1486,6 +1554,57 @@ class AnalystApp(tk.Tk):
         def worker():
             ok, reason = actions.submit_lap(self._da, psn)      # shared with the terminal UI (core/actions.py)
             self._post(lambda: self._after_submit(ok, reason))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _share_link(self):
+        """Share lap link: the confirmation comes first and nothing is uploaded unless the user says yes."""
+        if self._da is None:
+            messagebox.showinfo(L.SHARE_TITLE, L.SHARE_NEEDS_LAP)
+            return
+        problem = actions.share_problem(self._da)
+        if problem:
+            messagebox.showinfo(L.SHARE_TITLE, problem)
+            return
+        if not messagebox.askyesno(L.SHARE_TITLE, sharelink.CONFIRM_TEXT, parent=self):
+            return
+        if not runtime_config.SUPABASE_ACCESS_TOKEN and not self._prompt_create_account():
+            return
+        data = self._da
+
+        def worker():
+            res = actions.share_lap_link(data, confirmed=True)
+            self._post(lambda: self._after_share(res))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _after_share(self, res):
+        if not res.ok:
+            messagebox.showerror(L.SHARE_TITLE, sharelink.reason_text(res.reason))
+            return
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(res.link)
+            self.update()
+            messagebox.showinfo(L.SHARE_TITLE, L.SHARE_COPIED.format(link=res.link))
+        except tk.TclError:
+            messagebox.showinfo(L.SHARE_TITLE, L.SHARE_LINK_IS.format(link=res.link))
+
+    def _delete_shared(self):
+        if self._da is None:
+            messagebox.showinfo(L.SHARE_DELETE, L.SHARE_NEEDS_LAP)
+            return
+        if not actions.shared_id(self._da):
+            messagebox.showinfo(L.SHARE_DELETE, L.SHARE_NOTHING_TO_DELETE)
+            return
+        if not messagebox.askyesno(L.SHARE_DELETE, L.SHARE_DELETE_CONFIRM, parent=self):
+            return
+        data = self._da
+
+        def worker():
+            res = actions.delete_shared_lap(data)
+            self._post(lambda: messagebox.showinfo(L.SHARE_DELETE, L.SHARE_DELETED) if res.ok
+                       else messagebox.showerror(L.SHARE_DELETE, sharelink.reason_text(res.reason)))
 
         threading.Thread(target=worker, daemon=True).start()
 

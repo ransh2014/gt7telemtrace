@@ -47,7 +47,9 @@ class MainActivity : ComponentActivity() {
                 if (t != null && live.analyticsOn) Analytics.track(when (t) { Tool.LIVE -> "dashboard"; Tool.LAPS -> "lap_analyst"; Tool.RACE -> "race_analyst" }, live.versionName())
             }
             BackHandler(enabled = tool != null || records) { if (records) records = false else tool = null }
-            if (records) { RecordsScreen(a, live.lapsDir) { records = false }; return@setContent }
+            // TRACE AI shows its warning screen once, before anything else; TRACE Lite passes straight through
+            AiGate(a) {
+            if (records) { RecordsScreen(a, live.lapsDir) { records = false } } else
             Column(Modifier.fillMaxSize().background(if (tool == Tool.LIVE) D.bg else a.bg)) {
                 Box(Modifier.weight(1f)) {
                     when (tool) {
@@ -58,6 +60,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 if (tool != null) NavBar(tool!!) { tool = it }
+            }
             }
         }
     }

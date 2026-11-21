@@ -16,6 +16,8 @@ class Recorder(
     private val log: (String) -> Unit,
     private val mono: () -> Double = { System.nanoTime() / 1e9 },
     private val onLapSaved: (LapMeta) -> Unit = {},
+    /** After a timed lap is saved: (this lap's samples, the reference lap's samples), before the reference is updated (core/recorder.on_lap_complete). */
+    private val onLapComplete: (List<Map<String, Any?>>, List<Map<String, Any?>>) -> Unit = { _, _ -> },
 ) {
     data class LapMeta(val lapNum: Int, val lapTimeS: Double, val track: String, val car: String, val incomplete: Boolean, val isPb: Boolean, val file: File?)
     data class Ctx(val track: String, val car: String, val gearRatios: List<Double>)
@@ -247,10 +249,17 @@ class Recorder(
         }
         val ref = referenceFile(track, carSafe)
         var refTime = 0.0
+        var refSamples: List<Map<String, Any?>>? = null
         if (ref.exists()) try {
             val rd = JSONObject(ref.readText())
-            if (TraceUtil.isCurrentEra(rd.optString("physics_era", null), rd.optString("recorded_at", null))) refTime = rd.optDouble("lap_time_s", 0.0)
-        } catch (_: Exception) { refTime = 0.0 }
+            if (TraceUtil.isCurrentEra(rd.optString("physics_era", null), rd.optString("recorded_at", null))) {
+                refTime = rd.optDouble("lap_time_s", 0.0)
+                refSamples = rd.optJSONArray("samples")?.let { arr ->
+                    List(arr.length()) { i -> val o = arr.getJSONObject(i); COACH_KEYS.associateWith { k -> if (o.has(k)) o.opt(k) else null } }
+                }
+            }
+        } catch (_: Exception) { refTime = 0.0; refSamples = null }
+        if (!refSamples.isNullOrEmpty()) try { onLapComplete(s, refSamples) } catch (_: Exception) {}
         if (refTime <= 0 || newTime < refTime) {
             if (saveJson(ref, data, "reference lap") != null)
                 log("Reference updated -> ${ref.name}${if (refTime > 0) "  (new best by ${"%.3f".format(Locale.ROOT, refTime - newTime)}s)" else "  (first lap)"}")
@@ -329,5 +338,8 @@ class Recorder(
         return curElapsed - rt
     }
 
-    companion object { const val RACE_SAMPLE_WARN = 150_000; const val RACE_SAMPLE_MAX = 400_000 }
+    companion object {
+        /** The channels corner analysis reads (Corners.frameFromSamples). */
+        val COACH_KEYS = listOf("track_position", "speed_kmh", "throttle", "brake", "steering", "t", "ang_y")
+        const val RACE_SAMPLE_WARN = 150_000; const val RACE_SAMPLE_MAX = 400_000 }
 }

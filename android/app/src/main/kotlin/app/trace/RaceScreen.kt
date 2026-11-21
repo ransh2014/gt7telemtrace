@@ -152,6 +152,7 @@ private fun RaceSetup(ctl: RaceController, a: AP, scope: kotlinx.coroutines.Coro
             Card(a, stringResource(R.string.race_notes), accent = a.yel) {
                 Field(a, ctl.notes, "notes (this session only)", Modifier.fillMaxWidth()) { ctl.notes = it }
             }
+            RaceToolsCard(s.df, a, scope)
             Card(a, stringResource(R.string.export_section), accent = a.cyn) {
                 TBtn(a, stringResource(R.string.export_csv), Modifier.fillMaxWidth(), color = a.grn) {
                     csv = RaceLoader.exportCsv(s.df)

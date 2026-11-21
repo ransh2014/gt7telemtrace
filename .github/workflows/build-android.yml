@@ -1,5 +1,10 @@
 name: android
 
+# Two APKs from one codebase:
+#   gt7telem-android.apk     TRACE Lite  - what has always shipped (the website's download buttons point at this name)
+#   gt7telem-android-ai.apk  TRACE AI    - Lite plus the local AI wording (arm64 only, bundles a 0.8 GB model)
+# The AI build runs after Lite, so a problem in it can never stop the Lite release.
+
 on:
   push:
     tags: ["v*"]
@@ -9,7 +14,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  lite:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,7 +27,7 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
-      - name: Telemetry unit tests (golden packets from Python)
+      - name: Telemetry unit tests (golden packets and tool output from Python)
         run: ./gradlew :telemetry:test --no-daemon
       - name: Decode keystore (if provided)
         env:
@@ -32,14 +37,14 @@ jobs:
             echo "$KS_B64" | tr -d "\r\n " | base64 -d > "$RUNNER_TEMP/trace.jks"
             echo "TRACE_KEYSTORE=$RUNNER_TEMP/trace.jks" >> "$GITHUB_ENV"
           fi
-      - name: Build release APK
+      - name: Build TRACE Lite release APK
         env:
           TRACE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           TRACE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           TRACE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleRelease --no-daemon
+        run: ./gradlew :app:assembleLiteRelease --no-daemon
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk gt7telem-android.apk
+        run: cp app/build/outputs/apk/lite/release/app-lite-release.apk gt7telem-android.apk
       - uses: actions/upload-artifact@v4
         with:
           name: TRACE-apk
@@ -48,10 +53,94 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: TRACE-apk-r8-mapping
-          path: android/app/build/outputs/mapping/release/mapping.txt
+          path: android/app/build/outputs/mapping/liteRelease/mapping.txt
           retention-days: 90
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: android/gt7telem-android.apk
+
+  ai:
+    needs: lite
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - name: Disk before the big files
+        run: df -h /
+
+      # 1. the model (0.8 GB). Cached by the pinned URL/hash in llm.py; always verified against the pinned SHA-256.
+      - name: Cache the model
+        uses: actions/cache@v4
+        with:
+          path: android/app/src/ai/assets
+          key: ai-model-${{ hashFiles('src/gt7telem/llm.py') }}
+      - name: Fetch and verify the model
+        working-directory: .
+        run: python tools/fetch_ai_assets.py android/app/src/ai/assets
+
+      # 2. llama-server for arm64, built from the same pinned llama.cpp release the desktop downloads (llm.SERVER_TAG).
+      #    Static, CPU only, no OpenMP/curl. Shipped as libllama_server.so and run from the app's native library folder.
+      - name: Build llama-server for arm64-v8a
+        working-directory: .
+        run: |
+          TAG=$(PYTHONPATH=src python -c "from gt7telem import llm; print(llm.SERVER_TAG)")
+          git clone --depth 1 --branch "$TAG" https://github.com/ggml-org/llama.cpp "$RUNNER_TEMP/llama.cpp"
+          cmake -S "$RUNNER_TEMP/llama.cpp" -B "$RUNNER_TEMP/llama-build" \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF -DGGML_OPENMP=OFF -DGGML_NATIVE=OFF -DLLAMA_CURL=OFF \
+            -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON
+          cmake --build "$RUNNER_TEMP/llama-build" --config Release --target llama-server -j "$(nproc)"
+          mkdir -p android/app/src/ai/jniLibs/arm64-v8a
+          cp "$(find "$RUNNER_TEMP/llama-build" -type f -name llama-server | head -n 1)" android/app/src/ai/jniLibs/arm64-v8a/libllama_server.so
+          file android/app/src/ai/jniLibs/arm64-v8a/libllama_server.so | tee /dev/stderr | grep -q "ARM aarch64"
+          ls -l android/app/src/ai/jniLibs/arm64-v8a android/app/src/ai/assets
+
+      - name: Decode keystore (if provided)
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | tr -d "\r\n " | base64 -d > "$RUNNER_TEMP/trace.jks"
+            echo "TRACE_KEYSTORE=$RUNNER_TEMP/trace.jks" >> "$GITHUB_ENV"
+          fi
+      - name: Build TRACE AI release APK
+        env:
+          TRACE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          TRACE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          TRACE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleAiRelease --no-daemon
+      - name: Rename APK
+        run: |
+          cp app/build/outputs/apk/ai/release/app-ai-release.apk gt7telem-android-ai.apk
+          ls -l gt7telem-android-ai.apk
+          df -h /
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TRACE-AI-apk
+          path: android/gt7telem-android-ai.apk
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TRACE-AI-apk-r8-mapping
+          path: android/app/build/outputs/mapping/aiRelease/mapping.txt
+          retention-days: 90
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/gt7telem-android-ai.apk

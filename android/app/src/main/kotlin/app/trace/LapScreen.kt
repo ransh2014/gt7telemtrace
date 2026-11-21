@@ -89,6 +89,10 @@ private fun SetupTab(ctl: LapController, a: AP, scope: kotlinx.coroutines.Corout
     val saveHtml = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { u: Uri? ->
         if (u != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(html.toByteArray()) } }
     }
+    var replayMsg by remember { mutableStateOf<String?>(null) }
+    val saveReplay = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { u: Uri? ->
+        if (u != null) scope.launch(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)?.use { it.write(html.toByteArray()) } }
+    }
     var dupGroups by remember { mutableStateOf<List<LapClean.Group>?>(null) }
     var dupMsg by remember { mutableStateOf<String?>(null) }
     var notes by remember(ctl.a) { mutableStateOf((ctl.a?.meta?.get("notes") as? String) ?: "") }
@@ -138,6 +142,16 @@ private fun SetupTab(ctl: LapController, a: AP, scope: kotlinx.coroutines.Corout
                     TBtn(a, stringResource(R.string.save_notes), Modifier.weight(1f)) { scope.launch { notesSaved = ctl.saveNotes(notes) } }
                     if (notesSaved) Lbl(a, "saved", a.grn, 11)
                     else if (s.file == null) Lbl(a, "imported lap: not saved", a.dim, 11)
+                }
+            }
+            LapToolsCard(ctl, a, scope) {
+                if (!ReplayHtml.usable(s.df)) replayMsg = ctx.getString(R.string.replay3d_needs_lap)
+                else scope.launch {
+                    html = withContext(Dispatchers.Default) {
+                        val tpl = ctx.assets.open("replay3d.html").bufferedReader().readText()
+                        ReplayHtml.build(s.df, "TRACE replay - " + LapMath.lapLabel(s.meta), ctl.b?.df?.takeIf { ReplayHtml.usable(it) }, tpl)
+                    }
+                    saveReplay.launch("trace_replay_${LapMath.safeName(s.meta.text("track"))}.html")
                 }
             }
             Card(a, stringResource(R.string.export_section), accent = a.cyn) {
@@ -192,6 +206,7 @@ private fun SetupTab(ctl: LapController, a: AP, scope: kotlinx.coroutines.Corout
             confirmButton = { if (extras.isNotEmpty() && dupMsg == null) TBtn(a, "Move", on = true) { scope.launch { dupMsg = withContext(Dispatchers.IO) { val (m, e) = LapClean.moveDuplicates(groups, ctl.lapsDir); "Moved $m file(s) to _duplicates" + (if (e > 0) " ($e could not be moved)" else "") } } } },
             dismissButton = { TBtn(a, if (dupMsg == null) "Cancel" else "Close") { dupGroups = null } })
     }
+    replayMsg?.let { ReportDialog(a, stringResource(R.string.replay3d_title), it) { replayMsg = null } }
     val mode = pick
     if (mode != null) LapPicker(a, ctl.rows, "Pick lap " + (if (mode == "X") "(overlay)" else mode), { r ->
         pick = null

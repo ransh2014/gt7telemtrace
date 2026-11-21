@@ -159,6 +159,27 @@ class LapController(val lapsDir: File) {
         }
     }
 
+    /** Share lap link. Only called after the confirmation dialog was answered Yes. Copies the link and reports in lbMsg. */
+    suspend fun shareLink(ctx: Context) {
+        val s = a ?: run { lbMsg = ctx.getString(R.string.share_needs_lap); return }
+        busy = true
+        val res = withContext(Dispatchers.IO) { ShareClient.shareLap(ctx, s.meta, s.df, confirmed = true) }
+        busy = false
+        lbMsg = if (!res.ok) ShareClient.reasonText(ctx, res.reason) else try {
+            (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                .setPrimaryClip(android.content.ClipData.newPlainText("TRACE lap link", res.link))
+            ctx.getString(R.string.share_copied, res.link)
+        } catch (e: Exception) { ctx.getString(R.string.share_link_is, res.link) }
+    }
+
+    suspend fun deleteShared(ctx: Context) {
+        val s = a ?: run { lbMsg = ctx.getString(R.string.share_needs_lap); return }
+        busy = true
+        val res = withContext(Dispatchers.IO) { ShareClient.deleteShared(ctx, s.meta) }
+        busy = false
+        lbMsg = if (res.ok) ctx.getString(R.string.share_deleted) else ShareClient.reasonText(ctx, res.reason)
+    }
+
     fun extrasFor(): List<Extra> = extras.map { Extra(it.first.label, it.first.df, Color(it.second)) }
 
     /** Lap notes live in the lap file itself ("notes"); written atomically. */

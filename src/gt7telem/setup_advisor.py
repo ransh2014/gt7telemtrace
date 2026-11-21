@@ -45,9 +45,14 @@ def _col(df, name, default=0.0):
 
 
 def _wheel_angle(df):
-    """Mean front road-wheel angle (rad) per row, or None if the lap has no such data."""
+    """Mean front road-wheel angle (rad) per row, or None if the lap has no such data. Saved laps carry the two
+    front wheels as wheel_steering_angle_l / _r; a frame may also carry them as one (left, right) column."""
     if "wheel_steering_angle" not in df.columns:
-        return None
+        if "wheel_steering_angle_l" not in df.columns or "wheel_steering_angle_r" not in df.columns:
+            return None
+        a = (pd.to_numeric(df["wheel_steering_angle_l"], errors="coerce").to_numpy(dtype=float)
+             + pd.to_numeric(df["wheel_steering_angle_r"], errors="coerce").to_numpy(dtype=float)) / 2.0
+        return None if np.isnan(a).mean() > 0.5 else np.nan_to_num(a)
     vals = []
     for v in df["wheel_steering_angle"]:
         try:

@@ -97,7 +97,7 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - Desktop notifications (with a sound where the system supports one) on a new personal best and when a race recording ends automatically. Switch them off with the **`NOTIFICATIONS`** checkbox in the Live Dashboard header
 - **Keep awake** — the **`KEEP AWAKE`** checkbox in the Live Dashboard header (on by default) stops Windows, macOS and Linux from idle-sleeping or hibernating the whole time the Dashboard is open, and lets the PC sleep again the moment you close it. Untick it to stay awake only while telemetry is flowing. The Android app does the same (it holds the phone awake while open), and both warn you with a red bar and a siren if the battery drops below 20% while a lap or race is recording on battery power
 - Dark / light theme toggle in the Launcher footer (applies the next time you open a tool)
-- Update check — the Launcher shows its version (e.g. `v1.5.3`) and, after one quiet background look at the latest GitHub release, either `current` (green) or `update available: vX` (blue, click to open the release page). Drafts and pre-releases are ignored and nothing is shown offline. Tick **`Ignore update checks`** on the Launcher (or untick **`CHECK FOR UPDATES`** in the Live Dashboard header — the same setting) to stop it (see [Privacy & analytics](#privacy--analytics))
+- Update check — the Launcher shows its version (e.g. `v1.6.0`) and, after one quiet background look at the latest GitHub release, either `current` (green) or `update available: vX` (blue, click to open the release page). Drafts and pre-releases are ignored and nothing is shown offline. Tick **`Ignore update checks`** on the Launcher (or untick **`CHECK FOR UPDATES`** in the Live Dashboard header — the same setting) to stop it (see [Privacy & analytics](#privacy--analytics))
 - **Ask TRACE (website chat)** — the [website](https://gt7trace.netlify.app) has an AI support chat for setup and how-to questions. It only sends something when you type a question, it never runs in the desktop app, and nothing is stored. Answers are AI-generated and can be wrong; open an issue if it can't help. Details on the [Privacy](https://gt7trace.netlify.app/privacy.html) page
 
 ### Coaching and analysis tools
@@ -105,7 +105,60 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 - **Setup advisor** — reads understeer, oversteer, wheelspin, front lock-ups and bottoming-out from one lap and suggests changes in GT7's own units; an A/B check compares laps before and after a change
 - **Race engineer** — pit window, undercut and overcut, a simulated finishing position and live "Pit next lap" / "Box this lap" calls. Estimates only: GT7 sends no tyre wear and no pit-lane flag
 - **3D lap replay**, **Driver DNA**, **practice planner**, **friends groups and weekly challenges** (pasteable codes, no server), **lap validation**, **dyno overlay**, and an OBS **stream overlay** at `/overlay` on the web UI
-- `gt7telem-tools` runs the same tools on saved lap files from a terminal: `coach`, `setup`, `ab`, `plan`, `validate`, `replay`, `dna`, `dyno-compare`, `challenge`
+- `gt7telem-tools` runs the same tools on saved lap files from a terminal: `coach`, `setup`, `ab`, `plan`, `validate`, `replay`, `dna`, `dyno-compare`, `challenge`, `motec`, `video`
+
+### Local AI wording (optional, off by default)
+
+Switch on **LOCAL AI WORDING** (Dashboard header, or Settings in the terminal edition) and a small language model on
+your own PC rewords the coach's tips after each lap in friendlier language. Nothing is sent anywhere. It is limited on
+purpose:
+
+- It only **rewords** the rule-based tips. The rules decide what to say; a check throws the AI's sentence away unless
+  every number, corner label (T4) and direction word (earlier / later / sooner) is unchanged, and then you simply get the
+  rules text. The log says "AI wording" only for tips that passed.
+- It never runs while you drive (the spoken cues stay rules-based and instant) and there is no chat or Q&A.
+- Turning it on shows a warning first (your PC's spec check, the one-time download size, the free disk space needed) and
+  downloads nothing until you say yes. "Remove AI model" in Settings deletes it again.
+
+| | CPU | RAM | Replies |
+|---|---|---|---|
+| Minimum | 4 cores, no GPU | 6 GB | several seconds |
+| Recommended | 4+ cores (any recent i5 / Ryzen 5) | 8 GB | 1-3 s, no GPU needed |
+| Best | 6+ cores, optional NVIDIA GPU with 2 GB+ VRAM | 16 GB | fastest |
+
+It needs about 1.5 GB of free disk space. Install the runtime with `pip install "gt7tracetelem[ai]"`; the downloadable
+Windows `TRACE.exe` fetches a pinned official `llama-server` build instead (the Microsoft Store build does not download
+or run extra programs, so it does not offer this). The model and runtime are checked against pinned SHA-256 sums.
+
+**Built with Llama.** The model is Llama 3.2 1B Instruct (Q4_K_M), used under the
+[Llama 3.2 Community License](https://www.llama.com/llama3_2/license/). Llama 3.2 is copyright (c) Meta Platforms, Inc.
+All rights reserved.
+
+### Export to MoTeC (.ld)
+**Export to MoTeC (.ld)** in Lap Analyst (also in the terminal edition and as `gt7telem-tools motec LAP.json OUT.ld`)
+writes the open lap as a MoTeC log file with speed, throttle, brake, steering, gear, rpm, tyre, suspension, g-force and
+position channels, plus the car, track and lap time in the header. It is desktop and terminal only, not on Android. The
+file layout was written from the public description of the format and is checked by byte-level tests (an optional extra
+test reads it back with the third-party `ldparser` package when that is installed); **it has not been opened in MoTeC i2
+itself**, so if i2 refuses a file, please open an issue.
+
+### Video sync (optional, needs ffmpeg)
+**Export video overlay** in Lap Analyst (also in the terminal edition and as `gt7telem-tools video LAP.json VIDEO OUT.mp4
+--sync S`) burns the lap's HUD (speed, gear, rpm, pedals, steering, lap timer, delta against Lap B if loaded, and a track
+map) into your own gameplay video. You pick the second of the video where the lap starts, fine-tune it by up to 5 s and
+check a preview frame first. The audio is copied untouched and the original video is never modified. It needs
+[ffmpeg](https://ffmpeg.org/download.html) on your PATH (or set `FFMPEG_PATH` in settings); without it the button is
+greyed out with an install hint and everything else works as before. Not on Android. It has not been run against many
+real recordings: keep the original video until you have checked the result.
+
+### Share lap link (optional, online)
+**Share lap link** in Lap Analyst (PC and Android) uploads one lap so anyone you send the link to can open a read-only
+page (`gt7trace.netlify.app/lap?id=...`) with its traces and track map. It always asks first ("This uploads this lap's
+telemetry so anyone with the link can view it. It is deleted after 90 days or when you delete it.") and sends nothing
+until you confirm. Links are unlisted, deleted after 90 days, and **Delete shared lap** removes one straight away from
+the device that shared it. It uses the same free anonymous account as the leaderboard and is limited to 20 shares a day.
+The upload is a compact trace of at most 3,000 points (time, position, speed, throttle, brake), not the whole lap file.
+The server side is `docs/supabase-shared-laps.sql`; see [Privacy & analytics](#privacy--analytics).
 
 ### Terminal edition
 - `gt7telem tui` (or `python -m gt7telem.tui`, or the **Terminal UI** link in the Launcher footer) runs TRACE inside a terminal on Windows, macOS and Linux (not Android). It is part of the normal install; Textual and textual-plotext come with it. With no display (for example over SSH) plain `gt7telem` opens it automatically
@@ -116,7 +169,9 @@ Also published on PyPI as [`gt7tracetelem`](https://pypi.org/project/gt7tracetel
 ### Android app (sideload)
 - A standalone phone version of all three tools — Live Dashboard, Lap Analyst and Race Analyst — with the same features, layout, colours and fonts, tweaked for a touch screen. The phone receives your PS5's telemetry itself over Wi-Fi, so no PC is needed
 - Everything the desktop apps do, with the same wording, layout and chart tabs (a test, `tests/test_android_parity.py`, fails the build if a desktop label differs from Android's), including `AUTO LAP`, the `WEB UI :8080` dashboard served from the phone, **Dyno & Tune**, **Export Chart HTML** and **Find Duplicate Laps**: live dashboard with strategy and the top-lap ghost gap, lap and race recording, all chart groups with chart-to-HTML export, replay with the saved track boundary, Lap and Race share cards (PNG), the Community Leaderboard (Top-10, ghost download, submit, consensus line), the Records table, spoken alerts (Android text-to-speech), notifications, the optional metrics endpoint, and **Backup All Laps** to a zip
-- Free and sideloaded: download `gt7telem-android.apk` from the [latest release](https://github.com/ransh2014/gt7telemtrace/releases/latest) (see [Install](#option-5--android-apk)). Not on the Play Store
+- The 1.2.0 analysis tools are on the phone too, with the desktop's wording: the driving coach (and its spoken cues), setup advisor, race engineer, Driver DNA, practice plan, lap validation, dyno comparison, 3D replay export, friends groups, the OBS overlay page at `/overlay` on the phone's web UI, and **Share lap link**. MoTeC export and video sync are desktop-only
+- **Two APKs.** **TRACE Lite** (`gt7telem-android.apk`) is the app that has always shipped. **TRACE AI** (`gt7telem-android-ai.apk`) is the same app plus the local AI wording: after a lap or session a small language model on the phone rewords the coach's tips. It is a separate app with the same signing key, bigger (it carries a 0.8 GB model, 64-bit phones only) and there is no switch inside Lite to turn it on. Same rules as on the PC: the rules decide what to say, a check discards any sentence whose numbers, corner labels or direction words changed, it never runs while you drive, and there is no chat. It shows a spec warning on first launch. Minimum: a mid-range phone from about 2022 (Snapdragon 7-series class) with 6 GB of RAM. Recommended: a Snapdragon 8-series class phone with 8 GB or more (replies in 1-3 s). Under 5 GB of RAM, use Lite
+- Free and sideloaded: download `gt7telem-android.apk` (or `gt7telem-android-ai.apk`) from the [latest release](https://github.com/ransh2014/gt7telemtrace/releases/latest) (see [Install](#option-5--android-apk)). Not on the Play Store
 
 ### Tooling
 - `gt7telem-add-car` / `gt7telem-add-track` — add a missing car/track ID to the local database from the terminal (also runnable as `python -m gt7telem.add_car` / `python -m gt7telem.add_track`). Additions are saved beside `settings.json` (`car_ids_local.csv` / `course_ids_local.csv`), so they survive upgrades
@@ -186,7 +241,7 @@ brew install --cask gt7telem
 Package-manager releases go through a review step, so a new version can take a little while to appear there. The binaries above are always the latest build.
 
 ### Option 5 — Android APK
-Download `gt7telem-android.apk` from the [latest release](https://github.com/ransh2014/gt7telemtrace/releases/latest) on your phone, open it and allow *Install unknown apps* for your browser or file manager when Android asks. It needs Android 8.0 or newer and the phone on the same Wi-Fi as your PS5 (enter the PS5's IP, or use **Auto-Detect**). Laps are saved in the app's own folder; use **Backup Laps** on the launcher to zip them out. Updating: install the newer APK over the old one — it keeps your laps and settings.
+Download `gt7telem-android.apk` from the [latest release](https://github.com/ransh2014/gt7telemtrace/releases/latest) on your phone, open it and allow *Install unknown apps* for your browser or file manager when Android asks. It needs Android 8.0 or newer and the phone on the same Wi-Fi as your PS5 (enter the PS5's IP, or use **Auto-Detect**). Laps are saved in the app's own folder; use **Backup Laps** on the launcher to zip them out. Updating: install the newer APK over the old one — it keeps your laps and settings. Want the local AI wording? Install `gt7telem-android-ai.apk` instead (a separate app called TRACE AI; check the phone spec in [Android app](#android-app-sideload) first). Lite and AI can be installed side by side.
 
 ---
 
@@ -228,7 +283,7 @@ TRACE talks directly to the console for all core telemetry — no server, no bro
 - Because TRACE always requests the extended packet, you get motion/sway/heave/surge and filtered-input data automatically — there's no separate "heartbeat type" setting to configure.
 - Settings (last-used IP, sample rate, known-good IPs, and the analytics, update-check, notification, voice-alert and top-lap-ghost switches) persist to a `settings.json`, so there's nothing to reconfigure between sessions. It lives in `~/.gt7telem/`, which survives `pip install --upgrade` and package-manager upgrades — except for a standalone .exe/binary unzipped into a folder you can write to, which keeps it next to the executable so it stays portable.
 
-The exceptions are the optional leaderboard and the Dashboard's top-lap ghost (the optional Prometheus metrics endpoint is separate again: it is a local server, not something TRACE sends anywhere): submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS, and so does the Dashboard's one-off top-lap fetch (see below). Nothing about your live session is ever sent unless you press "Submit to Leaderboard."
+The exceptions are the optional leaderboard and the Dashboard's top-lap ghost (the optional Prometheus metrics endpoint is separate again: it is a local server, not something TRACE sends anywhere): submitting, browsing the Top-10, downloading a ghost lap, or loading the consensus line talks to a Supabase backend over HTTPS, and so does the Dashboard's one-off top-lap fetch (see below). Two more things talk to the network, both only when you ask: **Share lap link** (below) and, if you turn on the optional local AI wording on a PC, the one-time download of the model and runtime from their official hosts. Nothing about your live session is ever sent unless you press "Submit to Leaderboard" or "Share lap link."
 
 ---
 
@@ -250,7 +305,11 @@ The optional **metrics export** (off by default) isn't data sent anywhere: it on
 
 Submitting a lap to the leaderboard is a separate, always-explicit opt-in (a button you press). A signed-in submission also carries your anonymous account ID (the database needs it to attach the lap to an account; it isn't shown publicly). The optional free account only ever stores a display name and that anonymous ID — no email, no password. If a submission is rejected because your login has expired, TRACE sends your stored refresh token to the same database to renew it and retries once — only during a submission you started, never in the background.
 
-Full disclosure of exactly what's sent for both: **[gt7trace.netlify.app/privacy.html](https://gt7trace.netlify.app/privacy.html)**
+**Share lap link** is a third explicit opt-in. It shows a confirmation first and uploads nothing until you say yes. It sends the car, track and lap time plus a compact trace of that one lap (at most 3,000 points of time, position, speed, throttle and brake) and your anonymous account ID, which is never shown on the page. The lap is deleted after 90 days or when you press **Delete shared lap**; the link is unlisted and the page is not indexed by search engines.
+
+The local AI wording (PC or TRACE AI on Android) never sends your laps anywhere: the model runs on your own device and answers over a loopback connection to `127.0.0.1`.
+
+Full disclosure of exactly what's sent for all of these: **[gt7trace.netlify.app/privacy.html](https://gt7trace.netlify.app/privacy.html)**
 
 ---
 
@@ -307,6 +366,8 @@ TRACE stands on the shoulders of people who did the hard, unglamorous work this 
 
 - **[Bornhall](https://github.com/Bornhall/gt7telemetry)** — reverse-engineered GT7's UDP telemetry protocol, including the Salsa20 decryption key and full packet byte structure. Every telemetry value TRACE reads comes from this work.
 - **[ddm999](https://github.com/ddm999/gt7info)** — maintains [gt7info](https://ddm999.github.io/gt7info/), the community car and track database that resolves every car/track ID to a real name shown anywhere in TRACE.
+- **[Meta](https://www.llama.com/llama3_2/license/)** — Llama 3.2 1B Instruct, the model behind the optional local AI wording (see [Local AI wording](#local-ai-wording-optional-off-by-default)). **Built with Llama.** Llama 3.2 is licensed under the Llama 3.2 Community License and is copyright (c) Meta Platforms, Inc. All rights reserved. The model is downloaded from its official host (PC) or bundled in the TRACE AI APK; it is not part of this repository's MIT licence.
+- **[llama.cpp](https://github.com/ggml-org/llama.cpp)** — the MIT-licensed `llama-server` that runs the model.
 - **[MacManley](https://github.com/MacManley/gt7-udp)** and **[Nenkai](https://github.com/Nenkai/PDTools)** — the community packet documentation `udp.py` cross-references for the per-version packet lengths (A/B/~/C) and the extended-field byte offsets.
 
 Full writeup and credits: **[gt7trace.netlify.app/about.html](https://gt7trace.netlify.app/about.html)**.

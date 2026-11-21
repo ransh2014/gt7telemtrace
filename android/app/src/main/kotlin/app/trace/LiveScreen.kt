@@ -129,6 +129,8 @@ fun LiveScreen(c: LiveController, onBack: () -> Unit) {
                 Check(stringResource(R.string.pref_top_lap_ghost), c.ghostEnabled) { c.onGhostToggle(it) }; Check(stringResource(R.string.pref_check_for_updates), c.updateOn) { c.onUpdate(it) }
                 Check(stringResource(R.string.pref_share_usage_data), c.analyticsOn) { c.onAnalytics(it) }; Check(stringResource(R.string.pref_debug_log), c.debugOn) { c.onDebug(it) }
             }
+            // not a switch on Android: the local AI wording is a separate app (TRACE AI), never a setting of this one
+            Text(stringResource(R.string.pref_local_ai) + "  (TRACE AI app)", color = D.dim, fontFamily = Mono, fontSize = 11.sp)
         }
 
         Row(Modifier.fillMaxWidth().background(D.pnl).padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {

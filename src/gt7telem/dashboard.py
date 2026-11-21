@@ -26,6 +26,8 @@ from . import (
     keepawake,
     lapclean,
     leaderboard,
+    llm,
+    llm_ui,
     metrics_server,
     notify,
     theme,
@@ -455,6 +457,14 @@ class App(tk.Tk):
                        command=self._on_auto_lap_toggle, bg=theme.BG2, fg=DIM,
                        selectcolor=theme.BG3, activebackground=theme.BG2,
                        font=(theme.MONO, 8)).pack(side="right", padx=(4, 4))
+
+        self.llm_var = tk.BooleanVar(value=bool(runtime_config.LLM_ENABLED))
+        tk.Checkbutton(hdr3, text=L.PREF_LOCAL_AI, variable=self.llm_var,
+                       command=self._on_llm_toggle, bg=theme.BG2, fg=DIM,
+                       selectcolor=theme.BG3, activebackground=theme.BG2,
+                       font=(theme.MONO, 8)).pack(side="right", padx=(4, 0))
+        tk.Button(hdr3, text=llm_ui.REMOVE_LABEL, command=self._on_remove_ai, bg=theme.BG3, fg=DIM, relief="flat",
+                  font=(theme.MONO, 7), padx=4, pady=0, cursor="hand2").pack(side="right", padx=(4, 4))
 
         self.keep_awake_var = tk.BooleanVar(value=bool(runtime_config.KEEP_AWAKE_ENABLED))
         tk.Checkbutton(hdr3, text=L.PREF_KEEP_AWAKE, variable=self.keep_awake_var,
@@ -1398,6 +1408,21 @@ class App(tk.Tk):
             self.log_msg("Auto lap on -- in time trial / practice, laps record by themselves from the next start/finish crossing")
         else:
             self.log_msg("Auto lap off")
+
+    def _on_llm_toggle(self):
+        """LOCAL AI WORDING: off by default. Turning it on shows the warning first; the model is only downloaded after a
+        yes there, and the box stays unticked until it is installed."""
+        if self.llm_var.get():
+            self.llm_var.set(False)
+            llm_ui.ask_enable(self, self.log_msg, lambda ok: self.llm_var.set(bool(ok)))
+        else:
+            runtime_config.LLM_ENABLED = False
+            runtime_config.save(LLM_ENABLED=False)
+            self.log_msg("Local AI wording off -- Rules mode")
+
+    def _on_remove_ai(self):
+        llm_ui.remove_model(self, self.log_msg)
+        self.llm_var.set(bool(runtime_config.LLM_ENABLED))
 
     def _on_keep_awake_toggle(self):
         runtime_config.KEEP_AWAKE_ENABLED = self.keep_awake_var.get()
@@ -2788,7 +2813,8 @@ class App(tk.Tk):
                 return
             tips = coach.analyse(lap_df, ref_df)
             self.log_msg(coach.describe(tips))
-            self._live_coach.set_tips(tips)    # spoken before those corners on the next lap
+            self._live_coach.set_tips(tips)    # spoken before those corners on the next lap (always rules-based)
+            llm.reword_async(tips, self.log_msg)   # local AI wording, if switched on: logged a moment later, never live
         except Exception:
             pass
 

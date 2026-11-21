@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gt7tracetelem"
-version = "1.5.3"
+version = "1.6.0"
 description = "TRACE - GT7 telemetry capture, live dashboard, and lap/race analysis toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -72,6 +72,8 @@ where = ["src"]
 gt7telem = ["*.csv", "py.typed", "fonts/*.ttf", "fonts/OFL.txt"]
 
 [project.optional-dependencies]
+# Local AI wording (off by default): lets TRACE run Llama 3.2 1B on this PC to reword the coach's tips. See llm.py.
+ai = ["llama-cpp-python>=0.3"]
 dev = [
     "pytest",
     "ruff",

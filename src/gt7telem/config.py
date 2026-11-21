@@ -21,7 +21,7 @@ __all__ = ["load", "save", "remember_good_ip", "PS_IP", "LAPS_FOLDER", "SAMPLE_R
            "SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID", "ONBOARDING_DONE",
            "METRICS_ENABLED", "METRICS_PORT", "METRICS_BIND_ALL",
            "WEBUI_ENABLED", "WEBUI_PORT", "WEBUI_BIND_ALL", "WEBUI_HZ",
-           "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "GHOST_ENABLED", "UPDATE_CHECK_ENABLED", "AUTO_LAP_ENABLED", "KEEP_AWAKE_ENABLED", "backup_laps",
+           "THEME", "NOTIFY_ENABLED", "VOICE_ENABLED", "GHOST_ENABLED", "UPDATE_CHECK_ENABLED", "AUTO_LAP_ENABLED", "KEEP_AWAKE_ENABLED", "LLM_ENABLED", "FFMPEG_PATH", "data_dir", "backup_laps",
            "ensure_ca_bundle", "explain_error", "MONO", "install_mac_buttons"]
 
 _SUPABASE_SECRET_KEYS = ("SUPABASE_ACCESS_TOKEN", "SUPABASE_REFRESH_TOKEN", "SUPABASE_USER_ID")
@@ -119,6 +119,11 @@ def _default_laps_dir() -> Path:
 
 
 _SETTINGS_FILE = _base_dir() / "settings.json"
+
+
+def data_dir() -> Path:
+    """The TRACE data folder: where settings.json lives (and where the optional AI model is kept)."""
+    return _SETTINGS_FILE.parent
 _KEY_FILE = _base_dir() / ".settings.key"
 
 
@@ -270,6 +275,13 @@ _DEFAULTS = {
     # it sleep again the moment you close it. Off = only stay awake while telemetry is flowing.
     # Switch: the KEEP AWAKE checkbox in the Dashboard header.
     "KEEP_AWAKE_ENABLED": True,
+    # Local AI wording: a small model on this PC rewords the coach's tips after a lap (never live, never chat). OFF
+    # by default; turning it on shows a warning first and only then downloads the model. See llm.py.
+    # Switch: the LOCAL AI WORDING checkbox in the Dashboard header / the terminal UI's Settings.
+    "LLM_ENABLED": False,
+    # Video sync (Lap Analyst "Export video overlay"): full path to ffmpeg (or the folder holding it) when it is not on PATH.
+    # Empty = look on PATH. ffmpeg is an optional, separate install; without it the tool just says so.
+    "FFMPEG_PATH": "",
 }
 
 def remember_good_ip(ip: str) -> list:
@@ -422,6 +434,8 @@ GHOST_ENABLED = _cfg["GHOST_ENABLED"]
 UPDATE_CHECK_ENABLED = _cfg["UPDATE_CHECK_ENABLED"]
 AUTO_LAP_ENABLED = _cfg["AUTO_LAP_ENABLED"]
 KEEP_AWAKE_ENABLED = _cfg["KEEP_AWAKE_ENABLED"]
+LLM_ENABLED = _cfg["LLM_ENABLED"]
+FFMPEG_PATH = _cfg["FFMPEG_PATH"]
 
 
 def backup_laps() -> "Path | None":

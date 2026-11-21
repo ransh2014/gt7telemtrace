@@ -77,3 +77,15 @@ def test_garbage_input():
     d = _lap()
     d.loc[10, "speed_kmh"] = np.nan
     assert "nan" in codes(validate.check(d))
+
+
+def test_off_track_reads_the_recorded_per_wheel_letters():
+    """surface_type is recorded as one letter per wheel (T tarmac, C kerb, D dirt, G grass, S sand, s snow)."""
+    d = _lap()
+    d["surface_type"] = "TTTT"
+    d.loc[:100, "surface_type"] = "TTGG"
+    assert "off_track" in codes(validate.check(d))
+    k = _lap()
+    k["surface_type"] = "TCTT"
+    k.loc[:200, "surface_type"] = "TTTG"      # kerbs and a single wheel on the grass are not a cut
+    assert "off_track" not in codes(validate.check(k))

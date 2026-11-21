@@ -60,6 +60,7 @@
     <string name="pref_check_for_updates" translatable="false">"CHECK FOR UPDATES"</string>
     <string name="pref_share_usage_data" translatable="false">"SHARE USAGE DATA"</string>
     <string name="pref_debug_log" translatable="false">"DEBUG LOG"</string>
+    <string name="pref_local_ai" translatable="false">"LOCAL AI WORDING"</string>
     <string name="speed_unit" translatable="false">"km/h"</string>
     <string name="suggest" translatable="false">"SUGGEST"</string>
     <string name="gear" translatable="false">"gear"</string>
@@ -119,6 +120,26 @@
     <string name="find_duplicate_laps" translatable="false">"🧹  Find Duplicate Laps"</string>
     <string name="leaderboard_section" translatable="false">"LEADERBOARD"</string>
     <string name="submit_to_leaderboard" translatable="false">"🏆  Submit to Leaderboard"</string>
+    <string name="share_lap_link" translatable="false">"🔗  Share lap link"</string>
+    <string name="share_title" translatable="false">"Share lap link"</string>
+    <string name="share_confirm" translatable="false">"This uploads this lap's telemetry so anyone with the link can view it. It is deleted after 90 days or when you delete it."</string>
+    <string name="share_delete" translatable="false">"Delete shared lap"</string>
+    <string name="share_copied" translatable="false">"Link copied to the clipboard: %1$s"</string>
+    <string name="share_link_is" translatable="false">"Your link (copy it from here if the clipboard is unavailable): %1$s"</string>
+    <string name="share_deleted" translatable="false">"Shared lap deleted."</string>
+    <string name="share_nothing_to_delete" translatable="false">"This lap has no shared link from this device."</string>
+    <string name="share_delete_confirm" translatable="false">"Delete the shared link for this lap? Anyone who has the link will no longer be able to open it."</string>
+    <string name="share_needs_lap" translatable="false">"Load Lap A first."</string>
+    <string name="share_incomplete" translatable="false">"This lap is incomplete -- it was stopped before the line, so it can't be shared."</string>
+    <string name="share_no_samples" translatable="false">"This lap has too few samples to share."</string>
+    <string name="share_bad_time" translatable="false">"This lap has no valid lap time to share."</string>
+    <string name="share_too_big" translatable="false">"This lap is too large to share."</string>
+    <string name="share_fail_unconfirmed" translatable="false">"Nothing was uploaded: the sharing prompt wasn't confirmed."</string>
+    <string name="share_fail_data" translatable="false">"This lap's data couldn't be prepared for sharing (is the file damaged?)."</string>
+    <string name="share_fail_network" translatable="false">"Couldn't reach the server. Check your connection and try again."</string>
+    <string name="share_fail_auth" translatable="false">"Your account on this device is no longer valid. Create a free account from Submit to Leaderboard, then share again."</string>
+    <string name="share_fail_limit" translatable="false">"You've reached today's limit of 20 shared laps. Try again tomorrow."</string>
+    <string name="share_fail_server" translatable="false">"The server rejected the lap -- this is a server-side issue, not your connection. Try again later."</string>
     <string name="load_community_line" translatable="false">"🌐  Load Community Line"</string>
     <string name="top10_placeholder" translatable="false">"load a lap to see the top 10"</string>
     <string name="sectors_lap_a" translatable="false">"SECTORS — LAP A"</string>
@@ -153,6 +174,27 @@
     <string name="read_lap_pct" translatable="false">"Lap %"</string>
     <string name="read_lap" translatable="false">"Lap"</string>
     <string name="read_race_pct" translatable="false">"Race %"</string>
+    <string name="analysis_tools" translatable="false">"ANALYSIS TOOLS"</string>
+    <string name="tool_coach_ab" translatable="false">"Coach (A vs B)"</string>
+    <string name="tool_setup_advisor" translatable="false">"Setup advisor"</string>
+    <string name="tool_driver_dna" translatable="false">"Driver DNA"</string>
+    <string name="tool_practice_plan_all" translatable="false">"Practice plan (all loaded laps)"</string>
+    <string name="tool_validate_lap" translatable="false">"Validate lap"</string>
+    <string name="tool_compare_dyno" translatable="false">"Compare dyno (A vs B)"</string>
+    <string name="tool_export_replay3d" translatable="false">"Export 3D replay (HTML)"</string>
+    <string name="race_tool_coach" translatable="false">"Coach (slowest vs best lap)"</string>
+    <string name="race_tool_plan" translatable="false">"Practice plan"</string>
+    <string name="race_tool_dna" translatable="false">"Driver DNA"</string>
+    <string name="race_tool_validate" translatable="false">"Validate laps"</string>
+    <string name="report_coach" translatable="false">"Coach"</string>
+    <string name="report_setup" translatable="false">"Setup advisor"</string>
+    <string name="report_dna" translatable="false">"Driver DNA"</string>
+    <string name="report_plan" translatable="false">"Practice plan"</string>
+    <string name="report_validate" translatable="false">"Lap validation"</string>
+    <string name="report_dyno" translatable="false">"Dyno comparison"</string>
+    <string name="report_race" translatable="false">"Race analysis"</string>
+    <string name="replay3d_title" translatable="false">"3D replay"</string>
+    <string name="replay3d_needs_lap" translatable="false">"Load Lap A first. It needs a lap with position data (not a leaderboard ghost)."</string>
     <string-array name="lap_chart_tabs" translatable="false">
         <item>"Inputs"</item>
         <item>"Engine"</item>

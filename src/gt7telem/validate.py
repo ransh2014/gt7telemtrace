@@ -20,7 +20,9 @@ MAX_LAT_G = 6.5
 MAX_SPEED_KMH = 650.0
 MIN_ROWS = 60
 LENGTH_TOL = 0.04            # distance within 4% of the reference lap, else a shortcut / wrong layout
-SURFACE_OFF = {2, 3, 4, 5}   # not asphalt; GT7 reports the surface under the car (best-effort, see below)
+SURFACE_OFF = {2, 3, 4, 5}   # legacy numeric surface codes that are not asphalt
+OFF_LETTERS = "DGSs"         # recorded surface_type is one letter per wheel (FL FR RL RR): T tarmac, C kerb, D dirt, G grass,
+OFF_WHEELS = 2               # S sand, s snow. A sample is off the tarmac when this many wheels are on dirt/grass/sand/snow
 
 
 @dataclass
@@ -28,6 +30,15 @@ class Issue:
     code: str
     level: str     # "suspect" | "invalid"
     text: str
+
+
+def _sample_off(v) -> bool:
+    """One surface_type sample: per-wheel letters ("TTGG"), or a legacy numeric code."""
+    s = str(v).strip()
+    try:
+        return float(s) in SURFACE_OFF
+    except ValueError:
+        return sum(ch in OFF_LETTERS for ch in s) >= OFF_WHEELS
 
 
 def check(df, ref_length_m: float | None = None, lap_time_s: float | None = None) -> dict:
@@ -82,8 +93,7 @@ def check(df, ref_length_m: float | None = None, lap_time_s: float | None = None
 
     # wall hits and cuts show up as sudden speed loss or a long off-asphalt stretch
     if "surface_type" in df.columns:
-        surf = pd.to_numeric(df["surface_type"], errors="coerce").fillna(0).to_numpy()
-        off_share = float(np.mean(np.isin(surf, list(SURFACE_OFF))))
+        off_share = float(np.mean([_sample_off(v) for v in df["surface_type"]]))
         if off_share > 0.05:
             issues.append(Issue("off_track", "suspect", f"{off_share * 100:.0f}% of the lap is off the tarmac."))
     if "ang_y" in df.columns:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import threading
 import time
 
-from .. import coach, engineer, ghost, leaderboard, trackdetect, voice
+from .. import coach, engineer, ghost, leaderboard, llm, trackdetect, voice
 from .. import udp as telem
 from . import recorder as rec
 
@@ -77,7 +77,8 @@ class LiveEngine:
             self.hooks.log(f"{corners.describe_time_loss(deltas, 3)}  (vs your reference lap)")
         self.tips = coach.analyse(lap_df, ref_df)
         self.hooks.log(coach.describe(self.tips))
-        self.live_coach.set_tips(self.tips)
+        self.live_coach.set_tips(self.tips)          # spoken cues stay rules-based and instant
+        llm.reword_async(self.tips, self.hooks.log)  # local AI wording, if switched on: logged a moment later
 
     def _learn_track(self, samples, incomplete, ui_track):
         if incomplete or not ui_track or not trackdetect.can_learn(ui_track, samples):

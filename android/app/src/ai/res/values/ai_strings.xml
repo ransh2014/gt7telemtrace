@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TRACE AI only: its name and the first-launch warning. TRACE Lite has none of this. The phone-spec wording lives in
+     telemetry/LlmGuard.kt (tested against the desktop's llm.py), the rest of the app's text comes from labels.py. -->
+<resources>
+    <string name="app_name" translatable="false">TRACE AI</string>
+    <string name="ai_warning_title" translatable="false">TRACE AI</string>
+    <string name="ai_warning_body" translatable="false">TRACE AI is TRACE plus a small language model that runs on this phone. After a lap or session it rewords the coach\'s tips in friendlier language. The rules still decide what to say: a check throws the AI\'s sentence away unless every number, corner (T4) and direction word is unchanged, and then you simply get the rules text. It never runs while telemetry is arriving, it needs about 1.6 GB of storage, and it can make the phone warm.</string>
+    <string name="ai_warning_recommended" translatable="false">Recommended phone</string>
+    <string name="ai_warning_continue" translatable="false">Continue</string>
+    <string name="ai_warning_continue_anyway" translatable="false">Continue anyway</string>
+</resources>

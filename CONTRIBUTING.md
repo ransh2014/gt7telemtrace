@@ -54,11 +54,18 @@ session or a previously recorded lap.
 - `src/gt7telem/labels.py` — every piece of UI wording the desktop and Android apps share (window titles, headers, buttons, preference names, card text). Change a label **here**, run `python tools/gen_android_strings.py` (writes `android/app/src/main/res/values/strings.xml`) and use `R.string.<name>` in the Kotlin screen; `tests/test_android_parity.py` fails CI until the two agree. `tools/gen_android_webui.py` likewise copies the desktop web-UI page into the Android assets.
 - `android/` — the standalone Android app (Kotlin + Jetpack Compose, built with
   Gradle: `gradlew assembleRelease`). Its packet decoding is checked against golden
-  packets made by `android/tools/make_fixtures*.py` from the Python code. `ruff`
-  skips this folder. It has its own `car_ids.csv` / `course_ids.csv` copies in
+  packets made by `android/tools/make_fixtures*.py` from the Python code (the 1.2.0
+  tools, the local-AI guard and the share-link payload are checked the same way against
+  `golden4.json.gz`: after changing `coach.py`, `setup_advisor.py`, `llm.py`, `sharelink.py`
+  and the like, run `python android/tools/make_fixtures4.py`; a test fails if it is stale).
+  The app has two product flavours: `lite` (TRACE Lite) and `ai` (TRACE AI, which bundles
+  the model; its assets come from `tools/fetch_ai_assets.py`). `ruff` skips this folder. It has its own `car_ids.csv` / `course_ids.csv` copies in
   `android/app/src/main/assets/`, so update those whenever the ones in `src/gt7telem/`
-  change. CI builds and signs the APK (`.github/workflows/build-android.yml`) on every
-  `v*` tag.
+  change. CI builds and signs both APKs (`.github/workflows/build-android.yml`) on every
+  `v*` tag. Nothing in this repository is compiled locally for Android.
+- `docs/supabase-shared-laps.sql` — the Supabase side of Share lap link. It is run by hand
+  in the SQL editor (nothing here applies it); keep it in step with `sharelink.py` and the
+  website's `lap.html`.
 - `tools/build_source_zip.py` — builds `gt7telem-source.zip`, the "Python
   Source" download. CI runs it on every version tag
   (`.github/workflows/build-source.yml`) and attaches the zip to the GitHub

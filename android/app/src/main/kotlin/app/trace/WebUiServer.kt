@@ -23,7 +23,7 @@ import kotlin.math.abs
  * 6-digit code, the QR link or a remembered device) -- except requests from the phone itself (127.0.0.1 / ::1).
  * Nothing leaves the local network. Needs only the INTERNET permission the app already declares.
  */
-class WebUiServer(private val page: () -> ByteArray, private val loginPage: () -> ByteArray, devicesFile: File) {
+class WebUiServer(private val page: () -> ByteArray, private val loginPage: () -> ByteArray, devicesFile: File, private val overlayPage: () -> ByteArray) {
     val auth = WebAuth(devicesFile)
     @Volatile private var remote = false
     @Volatile private var server: ServerSocket? = null
@@ -66,10 +66,10 @@ class WebUiServer(private val page: () -> ByteArray, private val loginPage: () -
     }
 
     private fun num(v: Any?, d: Double = 0.0): Double = ((v as? Number)?.toDouble() ?: d).let { if (it.isNaN() || it.isInfinite()) d else it }
-    private fun clean(v: String?) = (v ?: "").filter { !it.isISOControl() }.take(80)
+    private fun clean(v: String?, n: Int = 80) = (v ?: "").filter { !it.isISOControl() }.take(n)
 
     /** webui_server.update(): extras = connected, curMs, delta, vsTop, strategy, car, track. */
-    fun update(d: Map<String, Any?>, connected: Boolean, curMs: Int?, delta: Double?, vsTop: Double?, st: app.trace.telemetry.StintTracker.Snapshot?, car: String, track: String) {
+    fun update(d: Map<String, Any?>, connected: Boolean, curMs: Int?, delta: Double?, vsTop: Double?, st: app.trace.telemetry.StintTracker.Snapshot?, car: String, track: String, coach: String = "", radio: String = "") {
         if (server == null) return
         try {
             synchronized(lock) {
@@ -98,7 +98,7 @@ class WebUiServer(private val page: () -> ByteArray, private val loginPage: () -
                     }
                 }
                 prevSpd = spd to now; smoothLong = lg
-                json = frame(d, spd, lg, connected, curMs, delta, vsTop, st, car, track).toString()
+                json = frame(d, spd, lg, connected, curMs, delta, vsTop, st, car, track, coach, radio).toString()
                 frameAt = System.nanoTime(); seq++
             }
         } catch (_: Exception) {}
@@ -110,7 +110,7 @@ class WebUiServer(private val page: () -> ByteArray, private val loginPage: () -
         return Math.round(v * m) / m
     }
 
-    private fun frame(d: Map<String, Any?>, spd: Double, lg: Double, ok: Boolean, curMs: Int?, delta: Double?, vsTop: Double?, st: app.trace.telemetry.StintTracker.Snapshot?, car: String, track: String): JSONObject {
+    private fun frame(d: Map<String, Any?>, spd: Double, lg: Double, ok: Boolean, curMs: Int?, delta: Double?, vsTop: Double?, st: app.trace.telemetry.StintTracker.Snapshot?, car: String, track: String, coach: String, radio: String): JSONObject {
         val latG = (num(d["ang_y"]) * spd / 3.6 / 9.81).coerceIn(-4.0, 4.0)
         val sug = num(d["suggested_gear"]).toInt()
         fun arr(ks: List<String>, n: Int) = JSONArray().also { a -> ks.forEach { a.put(r(num(d[it]), n)) } }
@@ -134,6 +134,7 @@ class WebUiServer(private val page: () -> ByteArray, private val loginPage: () -
             .put("pos", r(num(d["track_position"]), 1)).put("x", r(num(d["world_x"]), 1)).put("z", r(num(d["world_z"]), 1)).put("hdg", r(num(d["heading"]), 3))
             .put("tcs", d["tcs_active"] as? Boolean ?: false).put("asm", d["asm_active"] as? Boolean ?: false).put("lim", d["rev_limit_alert"] as? Boolean ?: false)
             .put("loss_pkt", JSONObject.NULL).put("hist", hist)
+            .put("coach", clean(coach, 120)).put("radio", clean(radio, 120))
     }
 
     private fun trackMessage(): String {
@@ -232,6 +233,8 @@ class WebUiServer(private val page: () -> ByteArray, private val loginPage: () -
             // nothing -- not the feed, not even a 404 -- before the code
             if (!authed(c, h)) { loginResponse(out); return }
             if (path == "/session") { respond(out, 204, "No Content", ByteArray(0)); return }
+            // transparent OBS browser-source page; same login rules as the main page (everything below needs the code)
+            if (path == "/overlay") { respond(out, 200, "OK", overlayPage(), "text/html; charset=utf-8"); return }
             if (path == "/ws") {
                 // a web page on another site must not be able to read the feed
                 if (!sameOrigin(h)) { respond(out, 403, "Forbidden", "Forbidden\n".toByteArray()); return }

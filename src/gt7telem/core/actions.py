@@ -12,7 +12,7 @@ import json
 import os
 from pathlib import Path
 
-from .. import auth, dyno, lapclean, leaderboard
+from .. import auth, dyno, lapclean, leaderboard, sharelink
 from .. import config as runtime_config
 
 # ── notes ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -91,6 +91,40 @@ def export_csv(df, path):
     from .. import lap_charts
     lap_charts.export_csv(df, path)
     return Path(path)
+
+
+def export_motec(df, data, path):
+    """Write the lap as a MoTeC i2 .ld file; returns the motec.Report (what went in, what was skipped).
+    Raises ValueError for a lap that is too short to export."""
+    from .. import motec
+    return motec.write(path, df, data or {}, driver=str(runtime_config.PSN_NAME or ""))
+
+
+def video_ffmpeg():
+    """The ffmpeg program for the video overlay (FFMPEG_PATH setting, else PATH), or None: then the tool is greyed out
+    with videosync.INSTALL_HINT in both front ends."""
+    from .. import videosync
+    return videosync.configured_ffmpeg()
+
+
+def make_video_job(df, ref_df, video, out, sync_s, offset_s=0.0):
+    """An ExportJob for Lap A (and the reference lap, if any) on `video`. Call .run() from a worker thread; .cancel() stops it.
+    Raises ValueError (no ffmpeg, unreadable video or lap)."""
+    from .. import videosync
+    ff = video_ffmpeg()
+    if not ff:
+        raise ValueError(videosync.INSTALL_HINT)
+    track = videosync.LapTrack(df, ref_df)
+    return videosync.ExportJob(ff, video, out, track, videosync.probe(ff, video), sync_s, offset_s)
+
+
+def video_preview(df, ref_df, video, sync_s, offset_s=0.0):
+    """One frame at the sync point with the HUD drawn in (a Pillow image)."""
+    from .. import videosync
+    ff = video_ffmpeg()
+    if not ff:
+        raise ValueError(videosync.INSTALL_HINT)
+    return videosync.preview_image(ff, video, videosync.probe(ff, video), videosync.LapTrack(df, ref_df), sync_s, offset_s)
 
 
 def export_lap_card(data, df, path):
@@ -183,6 +217,59 @@ def submit_lap(data: dict, psn: str) -> tuple[bool, str]:
             setattr(runtime_config, k, "")
         runtime_config.save(SUPABASE_ACCESS_TOKEN="", SUPABASE_REFRESH_TOKEN="", SUPABASE_USER_ID="")
     return bool(ok), "" if ok else reason
+
+
+# ── lap-sharing link (sharelink.py) ──────────────────────────────────────────────────────────────────────────────
+def _share_store():
+    return sharelink.ShareStore(runtime_config.data_dir() / "shared_laps.json")
+
+
+def share_problem(data: dict) -> str | None:
+    return sharelink.sharing_problem(data or {})
+
+
+def shared_id(data: dict) -> str | None:
+    """The id of the link this device made for this lap, if any."""
+    return _share_store().get(sharelink.lap_key(data))
+
+
+def _with_session(call):
+    """Run call(access_token) -> ShareResult, refreshing an expired session once. Returns the ShareResult."""
+    if not runtime_config.SUPABASE_ACCESS_TOKEN:
+        return sharelink.ShareResult(False, "auth")
+    res = call(runtime_config.SUPABASE_ACCESS_TOKEN)
+    if not res.ok and res.reason == "auth":
+        session = auth.refresh_session(runtime_config.SUPABASE_REFRESH_TOKEN)
+        if session:
+            runtime_config.SUPABASE_ACCESS_TOKEN = session["access_token"]
+            runtime_config.SUPABASE_REFRESH_TOKEN = session["refresh_token"]
+            runtime_config.save(SUPABASE_ACCESS_TOKEN=session["access_token"], SUPABASE_REFRESH_TOKEN=session["refresh_token"])
+            res = call(session["access_token"])
+        elif auth.last_refresh_error != "invalid":
+            res = sharelink.ShareResult(False, "network")
+    return res
+
+
+def share_lap_link(data: dict, *, confirmed: bool, http=None):
+    """Upload Lap A for a share link. Nothing is sent unless confirmed is True (the caller shows sharelink.CONFIRM_TEXT first).
+    Returns a sharelink.ShareResult; on success the link is remembered on this device so it can be deleted later."""
+    if confirmed is not True:
+        return sharelink.ShareResult(False, "unconfirmed")
+    res = _with_session(lambda tok: sharelink.share(data, tok, confirmed=True, http=http))
+    if res.ok:
+        _share_store().put(sharelink.lap_key(data), res.id)
+    return res
+
+
+def delete_shared_lap(data: dict, *, http=None):
+    """Delete the link this device made for this lap. ok=True when it is gone. reason "data" means there was none."""
+    lap_id = shared_id(data)
+    if not lap_id:
+        return sharelink.ShareResult(False, "data")
+    res = _with_session(lambda tok: sharelink.delete(lap_id, tok, http=http))
+    if res.ok:
+        _share_store().drop(sharelink.lap_key(data))
+    return res
 
 
 SUBMIT_MESSAGES = {

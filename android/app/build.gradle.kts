@@ -9,8 +9,8 @@ android {
         applicationId = "app.trace.gt7"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1503
-        versionName = "1.5.3"
+        versionCode = 1600
+        versionName = "1.6.0"
     }
     val ks = System.getenv("TRACE_KEYSTORE")
     signingConfigs {
@@ -25,8 +25,7 @@ android {
         release {
             // R8: drops unused code (most of Compose/Material3/coroutines we never call) and shortens names;
             // the resource shrinker then drops resources nothing references. Rules: proguard-rules.pro.
-            // One universal APK stays the only download: the app has no native libraries, so there is
-            // nothing per-ABI to split.
+            // One universal APK per edition: Lite has no native libraries, and AI carries only arm64-v8a.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -39,6 +38,24 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+
+    // Two builds from one codebase. TRACE Lite is what shipped before (applicationId unchanged, "TRACE").
+    // TRACE AI adds the local AI wording: it installs next to Lite (applicationId ".ai"), is "TRACE AI", ships only
+    // arm64-v8a, and bundles the model (src/ai/assets) and a llama-server built for arm64 (src/ai/jniLibs). CI fills
+    // those two folders (tools/fetch_ai_assets.py and the llama.cpp step in .github/workflows/build-android.yml).
+    flavorDimensions += "edition"
+    productFlavors {
+        create("lite") { dimension = "edition" }
+        create("ai") {
+            dimension = "edition"
+            applicationIdSuffix = ".ai"
+            ndk { abiFilters += "arm64-v8a" }
+        }
+    }
+    // the model is a 0.8 GB file the server memory-maps after a straight copy: never compress it
+    androidResources { noCompress += "gguf" }
+    // libllama_server.so is an executable run from the app's native library folder, so it must be extracted there
+    packaging { jniLibs { useLegacyPackaging = true } }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
 }
 dependencies {

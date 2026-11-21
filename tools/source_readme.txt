@@ -121,6 +121,12 @@ gt7telem/         The TRACE package itself (same source that ships on
                     progress between sessions
   validate.py       Lap validation: teleports, shortcuts, impossible data, wall hits
   dyno_compare.py   Car-vs-car power overlay and final-drive advice
+  motec.py          MoTeC i2 export: a saved lap as a .ld data file
+  llm.py            Optional local AI wording: rewords the coach's tips, checked so no number or direction changes
+  llm_ui.py         The Tk warning and download dialogs for the local AI wording switch
+  videosync.py      Video sync: burns a lap's HUD into a gameplay video (needs ffmpeg, optional)
+  video_ui.py       The Tk dialog for the video overlay export
+  sharelink.py      Share lap link: the opt-in upload of one lap behind a link, and deleting it again
   groups.py         Friends groups, weekly challenges and sector boards, shared as
                     pasteable codes (no server)
   overlay_page.py   The transparent OBS overlay served at /overlay by the web UI

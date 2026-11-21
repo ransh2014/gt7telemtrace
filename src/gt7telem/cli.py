@@ -6,6 +6,9 @@
     gt7telem-tools plan LAPS_DIR                    practice plan from a session's laps
     gt7telem-tools validate LAP.json [--ref-length M]
     gt7telem-tools replay LAP.json OUT.html [--ghost REF.json] [--gif OUT.gif]
+    gt7telem-tools motec LAP.json [OUT.ld]          MoTeC i2 data file (default: next to the lap file)
+    gt7telem-tools video LAP.json VIDEO OUT.mp4 --sync S [--offset O] [--ref REF.json] [--preview PNG]
+                                                    gameplay video with the lap's HUD burned in (needs ffmpeg)
     gt7telem-tools dna LAP.json [--save] [--code] [--vs CODE]
     gt7telem-tools dyno-compare A.json B.json
     gt7telem-tools challenge new|add|show|export|import ...
@@ -104,6 +107,58 @@ def cmd_replay(a):
         print(f"Wrote {a.gif}" if replay3d.export_gif(a.gif, d["samples"]) else "GIF needs Pillow; skipped.")
 
 
+def cmd_motec(a):
+    import pandas as pd
+
+    from . import motec
+
+    d = _load(a.lap)
+    out = Path(a.out) if a.out else Path(a.lap).with_suffix(".ld")
+    try:
+        rep = motec.write(out, pd.DataFrame([s for s in d["samples"] if isinstance(s, dict)]), d)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+    print(f"Wrote {rep.path}  ({rep.text()})")
+    return 0
+
+
+def cmd_video(a):
+    import pandas as pd
+
+    from . import videosync
+
+    ff = videosync.find_ffmpeg(a.ffmpeg or "") if a.ffmpeg else videosync.configured_ffmpeg()
+    if not ff:
+        print(videosync.INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    def frame(path):
+        return pd.DataFrame([s for s in _load(path)["samples"] if isinstance(s, dict)])
+    track = videosync.LapTrack(frame(a.lap), frame(a.ref) if a.ref else None)
+    info = videosync.probe(ff, a.video)
+    if a.preview:
+        videosync.preview_image(ff, a.video, info, track, a.sync, a.offset).convert("RGB").save(a.preview)
+        print(f"Wrote {a.preview}")
+    if Path(a.out).resolve() == Path(a.video).resolve():
+        print("Error: the output must not be the input video", file=sys.stderr)
+        return 2
+    job = videosync.ExportJob(ff, a.video, a.out, track, info, a.sync, a.offset)
+    last = [-1]
+
+    def progress(f):
+        if int(f * 10) != last[0]:
+            last[0] = int(f * 10)
+            print(f"  {f * 100:.0f}%", flush=True)
+    try:
+        rep = job.run(progress)
+    except videosync.ExportError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+    print(f"Wrote {rep.path}  ({rep.frames} HUD frames, audio copied untouched)")
+    return 0
+
+
 def cmd_dna(a):
     from . import driver_dna as dna
 
@@ -197,6 +252,9 @@ def build_parser():
     add("plan", cmd_plan, ("folder", {}), ("-n", {"type": int, "default": 3}))
     add("validate", cmd_validate, ("lap", {}), ("--ref-length", {"type": float}))
     add("replay", cmd_replay, ("lap", {}), ("out", {}), ("--ghost", {}), ("--gif", {}))
+    add("motec", cmd_motec, ("lap", {}), ("out", {"nargs": "?"}))
+    add("video", cmd_video, ("lap", {}), ("video", {}), ("out", {}), ("--sync", {"type": float, "default": 0.0}),
+        ("--offset", {"type": float, "default": 0.0}), ("--ref", {}), ("--preview", {}), ("--ffmpeg", {}))
     add("dna", cmd_dna, ("lap", {}), ("--save", {"action": "store_true"}), ("--code", {"action": "store_true"}),
         ("--name", {"default": ""}), ("--vs", {}))
     add("dyno-compare", cmd_dyno_compare, ("a", {}), ("b", {}))

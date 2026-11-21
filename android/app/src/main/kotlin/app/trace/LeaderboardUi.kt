@@ -90,10 +90,43 @@ fun LeaderboardCard(ctl: LapController, a: AP, scope: CoroutineScope) {
             }
             TBtn(a, stringResource(R.string.load_community_line), Modifier.weight(1f), color = a.cyn) { scope.launch { ctl.loadConsensus() } }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TBtn(a, stringResource(R.string.share_lap_link), Modifier.weight(1f), color = a.grn) {
+                val err = ShareClient.problemText(ctx, s.meta, s.df)
+                if (err != null) ctl.lbMsg = err else dlg = "share_confirm"
+            }
+            TBtn(a, stringResource(R.string.share_delete), Modifier.weight(1f), color = a.acc) {
+                if (ShareClient.idFor(ctx, s.meta) == null) ctl.lbMsg = ctx.getString(R.string.share_nothing_to_delete) else dlg = "unshare_confirm"
+            }
+        }
         TBtn(a, "Refresh top 10", Modifier.fillMaxWidth()) { scope.launch { ctl.refreshTop10() } }
         ctl.lbMsg?.let { m -> Lbl(a, m, a.org, 11, modifier = Modifier.clickable { ctl.lbMsg = null }) }
     }
     when (dlg) {
+        // the confirmation always comes first: nothing is uploaded until Yes
+        "share_confirm" -> Dialog(onDismissRequest = { dlg = null }) {
+            Column(Modifier.fillMaxWidth().background(a.bg).border(1.dp, a.dim2).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Lbl(a, stringResource(R.string.share_title), a.yel, 13, true)
+                Lbl(a, stringResource(R.string.share_confirm), a.fg, 12)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TBtn(a, "Yes", Modifier.weight(1f), on = true) {
+                        if (Account.load(ctx).signedIn) { dlg = null; scope.launch { ctl.shareLink(ctx) } } else dlg = "share_account"
+                    }
+                    TBtn(a, "No", Modifier.weight(1f)) { dlg = null }
+                }
+            }
+        }
+        "share_account" -> CreateAccountDialog(a, psn, onDone = { n -> psn = n; dlg = null; scope.launch { ctl.shareLink(ctx) } }, onDismiss = { dlg = null })
+        "unshare_confirm" -> Dialog(onDismissRequest = { dlg = null }) {
+            Column(Modifier.fillMaxWidth().background(a.bg).border(1.dp, a.dim2).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Lbl(a, stringResource(R.string.share_delete), a.yel, 13, true)
+                Lbl(a, stringResource(R.string.share_delete_confirm), a.fg, 12)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TBtn(a, "Yes", Modifier.weight(1f), on = true) { dlg = null; scope.launch { ctl.deleteShared(ctx) } }
+                    TBtn(a, "No", Modifier.weight(1f)) { dlg = null }
+                }
+            }
+        }
         "account" -> CreateAccountDialog(a, psn, onDone = { n -> psn = n; dlg = "psn" }, onDismiss = { dlg = null })
         "psn" -> {
             val slot = ctl.a

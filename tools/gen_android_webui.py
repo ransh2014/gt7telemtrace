@@ -16,6 +16,8 @@ sys.path.insert(0, str(REPO / "src"))
 ASSETS = REPO / "android" / "app" / "src" / "main" / "assets"
 OUT = ASSETS / "webui.html"
 OUT_LOGIN = ASSETS / "webui_login.html"
+OUT_OVERLAY = ASSETS / "overlay.html"
+OUT_REPLAY = ASSETS / "replay3d.html"
 OUT_QR = REPO / "android" / "telemetry" / "src" / "test" / "resources" / "qr_golden.json"
 
 # what the Dashboard really encodes, plus edge sizes for each QR version boundary
@@ -37,6 +39,17 @@ def render_login() -> str:
     return LOGIN_PAGE
 
 
+def render_overlay() -> str:
+    from gt7telem.overlay_page import OVERLAY
+    return OVERLAY
+
+
+def render_replay() -> str:
+    """The 3D replay page template (replay3d._PAGE) the phone fills in for its HTML export."""
+    from gt7telem.replay3d import _PAGE
+    return _PAGE
+
+
 def render_qr_golden() -> str:
     from gt7telem import qr
     rows = []
@@ -48,6 +61,7 @@ def render_qr_golden() -> str:
 
 if __name__ == "__main__":
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    for path, text in ((OUT, render()), (OUT_LOGIN, render_login()), (OUT_QR, render_qr_golden())):
+    for path, text in ((OUT, render()), (OUT_LOGIN, render_login()), (OUT_OVERLAY, render_overlay()),
+                       (OUT_REPLAY, render_replay()), (OUT_QR, render_qr_golden())):
         path.write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {path} ({path.stat().st_size} bytes)")

@@ -9,3 +9,7 @@ src/gt7telem/settings.json
 src/gt7telem/.settings.key
 gpg-signing-key/*
 !gpg-signing-key/trace-public-key.asc
+
+# TRACE AI build inputs, filled by CI (tools/fetch_ai_assets.py and the llama.cpp step in build-android.yml)
+android/app/src/ai/assets/
+android/app/src/ai/jniLibs/

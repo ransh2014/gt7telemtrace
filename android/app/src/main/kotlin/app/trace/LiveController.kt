@@ -55,13 +55,19 @@ class LiveController(private val appCtx: Context) {
     private var webQrUrl = ""
     private val autoLap = AutoLap()
     private val webUi = WebUiServer({ appCtx.assets.open("webui.html").readBytes() }, { appCtx.assets.open("webui_login.html").readBytes() },
-        File(appCtx.filesDir, "devices.json"))
+        File(appCtx.filesDir, "devices.json"), { appCtx.assets.open("overlay.html").readBytes() })
     var battWarn by mutableStateOf<Int?>(null)       // charge % shown on the red low-battery bar; null = hidden
     val alerts = Alerts(appCtx)
     private val battery = BatteryGuard()
     private var battNext = 0.0
     private var wake: PowerManager.WakeLock? = null
     private val announcer = AlertAnnouncer()
+    // corner coach (spoken before each coached corner) and the race engineer's pit calls; both obey VOICE ALERTS
+    private val coachLock = Any()
+    private val liveCoach = LiveCoach()
+    private var radioText = ""
+    private var radioUntil = 0.0
+    private var radioLap: Int? = null
     private val metrics = MetricsServer()
     private var lastDebug = 0.0
     private fun say(m: String) { log.add("[${SimpleDateFormat("HH:mm:ss", Locale.ROOT).format(Date())}] $m") }
@@ -169,6 +175,19 @@ class LiveController(private val appCtx: Context) {
     private var running = false
 
     val client = TelemetryClient(ip) { p -> synchronized(lock) { events.check(p) } }
+    /** dashboard._coach_lap: after a timed lap, log the coach's tips against the reference and arm the cues for the next lap. Never throws. */
+    private fun coachLap(samples: List<Map<String, Any?>>, refSamples: List<Map<String, Any?>>) {
+        try {
+            val lapDf = Corners.frameFromSamples(samples) ?: return
+            val refDf = Corners.frameFromSamples(refSamples) ?: return
+            val deltas = Corners.matchCorners(lapDf, refDf).deltas
+            if (deltas.isNotEmpty()) post { say("${Corners.describeTimeLoss(deltas, 3)}  (vs your reference lap)") }
+            val tips = Coach.analyse(lapDf, refDf)
+            post { say(Coach.describe(tips)) }
+            synchronized(coachLock) { liveCoach.setTips(tips) }
+        } catch (_: Exception) {}
+    }
+
     val recorder = Recorder(lapsDir, { msg -> post { log.add("[${SimpleDateFormat("HH:mm:ss", Locale.ROOT).format(Date())}] $msg"); if (log.size > 500) log.removeAt(0) } },
         onLapSaved = { m ->
             post { history.add(0, m) }
@@ -176,7 +195,8 @@ class LiveController(private val appCtx: Context) {
                 val mm = (m.lapTimeS / 60).toInt(); val ss = m.lapTimeS - mm * 60
                 alerts.notify("New Personal Best", "${m.car} @ ${m.track}\n$mm:${"%06.3f".format(Locale.ROOT, ss)}")
             }
-        })
+        },
+        onLapComplete = { lap, ref -> coachLap(lap, ref) })
 
     private fun post(f: () -> Unit) = f()
     private fun read(n: String) = appCtx.assets.open(n).bufferedReader().readText()
@@ -221,6 +241,7 @@ class LiveController(private val appCtx: Context) {
         batteryStep(System.nanoTime() / 1e9)
         val p = client.latest; val ok = client.isConnected()
         online = ok
+        TelemetryGate.receiving = ok          // TRACE AI never works while telemetry is arriving
         if (!ok) {
             if (wasConnected) log.add("[${SimpleDateFormat("HH:mm:ss", Locale.ROOT).format(Date())}] Connection dropped: no packets received")
             wasConnected = false; return
@@ -280,6 +301,15 @@ class LiveController(private val appCtx: Context) {
             if (temps.any { it < 60 }) active.add("cold")
             for (line in announcer.update(active, now, fuelLaps)) alerts.speak(line)
         }
+        // coach cue before a coached corner, else the engineer's pit call; shown on the web UI, spoken only with VOICE ALERTS on
+        var radio: String? = null
+        if (!recorder.paused) {
+            radio = synchronized(coachLock) { liveCoach.update(trackPos, n("speed_kmh")) }
+            if (radio == null && totLap > 0 && curLap > 0) {
+                Engineer.pitCall(curLap, totLap, Engineer.snapOf(strat), lastCalled = radioLap)?.let { radio = it.first; radioLap = curLap }
+            }
+        }
+        radio?.let { radioText = it; radioUntil = now + 6.0; if (voiceOn) alerts.speak(it) }
         if (debugOn && now - lastDebug >= 2.0) {
             lastDebug = now
             say("[DEBUG] on_track=${p["car_on_track"]} paused=${recorder.paused} speed=${n("speed_kmh")} lap=$curLap/$totLap")
@@ -307,7 +337,8 @@ class LiveController(private val appCtx: Context) {
         ghostGap = if (gh != null && curElapsed > 0.5) gh.gap(trackPos, curElapsed) else null
 
         autoLapStep(p, now)
-        webUi.update(p, true, if (curElapsed > 0) (curElapsed * 1000).toInt() else null, delta, ghostGap, strat, car, track)
+        webUi.update(p, true, if (curElapsed > 0) (curElapsed * 1000).toInt() else null, delta, ghostGap, strat, car, track,
+            coach = if (now < radioUntil) radioText else "", radio = if (now < radioUntil) radioText else "")
     }
 
     /** dashboard._auto_lap_step: arm Record Lap by itself while driving in a session without race laps. */
