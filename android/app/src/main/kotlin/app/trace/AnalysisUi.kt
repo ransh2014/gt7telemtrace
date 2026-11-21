@@ -35,21 +35,21 @@ fun ReportDialog(a: AP, title: String, text: String, onClose: () -> Unit) {
 }
 
 /** One tool button: its label from strings.xml, the report title from strings.xml, the text from [AnalysisTools]. */
-private class Tool(val kind: String, val label: Int, val title: Int)
+private class AnalysisTool(val kind: String, val label: Int, val title: Int)
 
 private val LAP_TOOLS = listOf(
-    Tool("coach", R.string.tool_coach_ab, R.string.report_coach),
-    Tool("setup", R.string.tool_setup_advisor, R.string.report_setup),
-    Tool("dna", R.string.tool_driver_dna, R.string.report_dna),
-    Tool("plan", R.string.tool_practice_plan_all, R.string.report_plan),
-    Tool("validate", R.string.tool_validate_lap, R.string.report_validate),
-    Tool("dyno", R.string.tool_compare_dyno, R.string.report_dyno),
+    AnalysisTool("coach", R.string.tool_coach_ab, R.string.report_coach),
+    AnalysisTool("setup", R.string.tool_setup_advisor, R.string.report_setup),
+    AnalysisTool("dna", R.string.tool_driver_dna, R.string.report_dna),
+    AnalysisTool("plan", R.string.tool_practice_plan_all, R.string.report_plan),
+    AnalysisTool("validate", R.string.tool_validate_lap, R.string.report_validate),
+    AnalysisTool("dyno", R.string.tool_compare_dyno, R.string.report_dyno),
 )
 private val RACE_TOOLS = listOf(
-    Tool("coach", R.string.race_tool_coach, R.string.report_race),
-    Tool("plan", R.string.race_tool_plan, R.string.report_race),
-    Tool("dna", R.string.race_tool_dna, R.string.report_race),
-    Tool("validate", R.string.race_tool_validate, R.string.report_race),
+    AnalysisTool("coach", R.string.race_tool_coach, R.string.report_race),
+    AnalysisTool("plan", R.string.race_tool_plan, R.string.report_race),
+    AnalysisTool("dna", R.string.race_tool_dna, R.string.report_race),
+    AnalysisTool("validate", R.string.race_tool_validate, R.string.report_race),
 )
 
 /** Lap Analyst ANALYSIS TOOLS (registry.LAP_TOOLS + the 3D replay export), same labels and order as the desktop. */
