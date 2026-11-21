@@ -26,10 +26,25 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
+def load_llm():
+    """gt7telem.llm. On a CI runner with no numpy/pandas the package itself can't be imported, but llm.py needs none of
+    that (its package imports are all inside functions), so it is loaded straight from its file instead."""
+    try:
+        from gt7telem import llm
+        return llm
+    except ImportError:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("gt7telem_llm_standalone", REPO / "src" / "gt7telem" / "llm.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+
 def fetch(dest_dir, url: str | None = None, sha256: str | None = None, name: str | None = None, allow_local: bool = False,
           say=print) -> Path:
     """The verified model file in `dest_dir`. Raises llm.DownloadError when the download does not match its checksum."""
-    from gt7telem import llm
+    llm = load_llm()
     url, sha256, name = url or llm.MODEL_URL, sha256 or llm.MODEL_SHA256, name or llm.MODEL_FILE
     dest = Path(dest_dir) / name
     if dest.is_file() and sha256_of(dest) == sha256.lower():
@@ -50,8 +65,11 @@ def fetch(dest_dir, url: str | None = None, sha256: str | None = None, name: str
 
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    if argv == ["--server-tag"]:           # the pinned llama.cpp release the desktop downloads (llm.SERVER_TAG)
+        print(load_llm().SERVER_TAG)
+        return 0
     if len(argv) != 1:
-        print("usage: python tools/fetch_ai_assets.py <asset folder>", file=sys.stderr)
+        print("usage: python tools/fetch_ai_assets.py <asset folder> | --server-tag", file=sys.stderr)
         return 2
     try:
         fetch(argv[0])
