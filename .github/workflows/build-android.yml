@@ -9,6 +9,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Attach the built APKs to this existing release (for example v1.6.0). Leave empty for a test build that publishes nothing."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -56,9 +61,10 @@ jobs:
           path: android/app/build/outputs/mapping/liteRelease/mapping.txt
           retention-days: 90
       - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
           files: android/gt7telem-android.apk
 
   ai:
@@ -140,7 +146,8 @@ jobs:
           path: android/app/build/outputs/mapping/aiRelease/mapping.txt
           retention-days: 90
       - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
           files: android/gt7telem-android-ai.apk
