@@ -74,7 +74,7 @@ object AiWording {
             val cores = Runtime.getRuntime().availableProcessors()
             proc = ProcessBuilder(serverExe(ctx).absolutePath, "-m", model.absolutePath, "--host", "127.0.0.1", "--port", "$port",
                 "-c", "${LlmGuard.CONTEXT}", "-t", "${LlmGuard.nThreads(cores)}")
-                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(java.io.File(ctx.cacheDir, "llama-server.log"))).start()
             val deadline = System.nanoTime() + 90_000_000_000L
             var up = false
             while (!up && System.nanoTime() < deadline) {
